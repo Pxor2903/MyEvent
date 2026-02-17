@@ -1,0 +1,1087 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import type { Event, User, ChatMessage, SubEvent, Guest, Organizer, Permission, KeyMoment } from '@/core/types';
+import { dbService, supabase } from '@/api';
+import { generateSharePassword } from '@/utils/sharePassword';
+import { Input } from './Input';
+
+interface EventDetailProps {
+  event: Event;
+  user: User;
+  onBack: () => void;
+  onUpdate: (updated: Event | null) => void;
+}
+
+export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, onUpdate }) => {
+  const [activeTab, setActiveTab] = useState<'overview' | 'program' | 'chat' | 'settings'>('overview');
+  const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
+  const [subTab, setSubTab] = useState<'details' | 'moments' | 'guests'>('details');
+
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [typingNames, setTypingNames] = useState<string[]>([]);
+
+  const chatChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Modals
+  const [showMomentModal, setShowMomentModal] = useState(false);
+  const [momentForm, setMomentForm] = useState({ time: '', label: '' });
+  const [showSequenceModal, setShowSequenceModal] = useState(false);
+  const [seqForm, setSeqForm] = useState({ title: '', date: '', location: '' });
+  const [showGuestModal, setShowGuestModal] = useState(false);
+  const [guestForm, setGuestForm] = useState({ firstName: '', lastName: '', email: '' });
+  const [showEventSettingsModal, setShowEventSettingsModal] = useState(false);
+  const [eventSettingsTab, setEventSettingsTab] = useState<'general' | 'appearance'>('general');
+  const [imageUploading, setImageUploading] = useState(false);
+  const eventImageInputRef = useRef<HTMLInputElement>(null);
+  const [eventEditForm, setEventEditForm] = useState({
+    title: '',
+    isDateTBD: false,
+    startDate: '',
+    location: '',
+    budget: '',
+    image: ''
+  });
+  const [approveModalOrganizer, setApproveModalOrganizer] = useState<Organizer | null>(null);
+  const [approvePermissions, setApprovePermissions] = useState<Permission[]>(['access_organizer_chat']);
+  const [approveSubEventIds, setApproveSubEventIds] = useState<string[]>([]);
+  const [editRightsOrganizer, setEditRightsOrganizer] = useState<Organizer | null>(null);
+  const [editRightsPermissions, setEditRightsPermissions] = useState<Permission[]>([]);
+  const [editRightsSubEventIds, setEditRightsSubEventIds] = useState<string[]>([]);
+  const [copiedField, setCopiedField] = useState<'code' | 'password' | null>(null);
+  const [editingPassword, setEditingPassword] = useState(false);
+  const [newPasswordValue, setNewPasswordValue] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+  const chatScrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleCopy = useCallback((value: string, field: 'code' | 'password') => {
+    navigator.clipboard.writeText(String(value).trim()).then(() => {
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+    });
+  }, []);
+
+  const startEditPassword = () => {
+    setNewPasswordValue(generateSharePassword());
+    setEditingPassword(true);
+  };
+  const cancelEditPassword = () => {
+    setEditingPassword(false);
+    setNewPasswordValue('');
+  };
+  const saveNewPassword = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const trimmed = newPasswordValue.trim();
+    if (!trimmed) return;
+    if (savingPassword) return;
+    setSavingPassword(true);
+    try {
+      const updated = await dbService.updateEventAtomic(event.id, (evt) => ({ ...evt, sharePassword: trimmed }));
+      onUpdate(updated);
+    } catch (err) {
+      console.error(err);
+      alert('Impossible de modifier le mot de passe. Vérifie que la base contient la colonne share_password (migration).');
+    } finally {
+      setSavingPassword(false);
+      setEditingPassword(false);
+      setNewPasswordValue('');
+    }
+  };
+
+  const PERMISSION_LABELS: Record<Permission, string> = {
+    edit_details: 'Modifier le projet (nom, date, lieu, budget, photo)',
+    manage_subevents: 'Gérer le programme (séquences, jalons)',
+    manage_guests: 'Gérer les invités',
+    access_organizer_chat: 'Accès à la messagerie équipe',
+    view_budget: 'Voir le budget',
+    all: 'Tout autoriser'
+  };
+
+  const isOwner = event.creatorId === user.id;
+  const currentSub = event.subEvents.find(s => s.id === selectedSubId);
+  const pendingOrganizers = event.organizers?.filter(o => o.status === 'pending') || [];
+  const activeOrganizers = event.organizers?.filter(o => o.status === 'confirmed') || [];
+  const currentOrganizer = activeOrganizers.find(o => o.userId === user.id);
+  const permissions = currentOrganizer?.permissions || [];
+  const hasPermission = (perm: Permission) => isOwner || permissions.includes(perm) || permissions.includes('all');
+  const canManageProgram = hasPermission('manage_subevents');
+  const canManageGuests = hasPermission('manage_guests');
+  const canChat = hasPermission('access_organizer_chat');
+  const canEditEvent = hasPermission('edit_details');
+  const canViewBudget = hasPermission('view_budget');
+  const allowedSubIds = currentOrganizer?.allowedSubEventIds;
+  const canManageSubEvent = (subId: string) =>
+    !allowedSubIds?.length || allowedSubIds.includes(subId);
+  const canManageProgramHere = canManageProgram && (!selectedSubId || canManageSubEvent(selectedSubId));
+  const canManageGuestsHere = canManageGuests && (!selectedSubId || canManageSubEvent(selectedSubId));
+
+  // Chargement + abonnement Realtime pour la messagerie (mise à jour en direct sans recharger)
+  useEffect(() => {
+    let isMounted = true;
+    const channelId = selectedSubId || 'global';
+
+    const loadMessages = async () => {
+      const msgs = await dbService.getMessages(event.id, channelId);
+      if (isMounted) setMessages(msgs);
+    };
+
+    const mergeMessagesFromServer = async () => {
+      const msgs = await dbService.getMessages(event.id, channelId);
+      if (!isMounted) return;
+      setMessages((prev) => {
+        const byId = new Map(prev.map((m) => [m.id, m]));
+        msgs.forEach((m) => byId.set(m.id, m));
+        return Array.from(byId.values()).sort(
+          (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
+      });
+    };
+
+    const mapRealtimeMessage = (row: any): ChatMessage => ({
+      id: row.id,
+      eventId: row.event_id,
+      channelId: row.channel_id,
+      senderId: row.sender_id,
+      senderName: row.sender_name,
+      text: row.text,
+      timestamp: row.created_at,
+      role: row.role
+    });
+
+    loadMessages();
+
+    const channelName = `chat:${event.id}:${channelId}`;
+    const realtime = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `event_id=eq.${event.id}` },
+        (payload) => {
+          const row = payload.new as any;
+          if (!row || row.channel_id !== channelId) return;
+          const incoming = mapRealtimeMessage(row);
+          setMessages((prev) => (prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]));
+        }
+      )
+      .on('presence', { event: 'sync' }, () => {
+        if (!isMounted) return;
+        const state = realtime.presenceState();
+        const presences = (Object.values(state) as Array<Array<{ userId?: string; userName?: string; typing?: boolean }>>).flat();
+        const names = [...new Set(
+          presences
+            .filter((p) => p.typing === true && p.userId !== user.id && p.userName)
+            .map((p) => p.userName as string)
+        )];
+        setTypingNames(names);
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          mergeMessagesFromServer();
+        }
+        if (status === 'SUBSCRIBED') {
+          chatChannelRef.current = realtime;
+          realtime.track({ userId: user.id, userName: `${user.firstName} ${user.lastName}`, typing: false });
+        }
+      });
+
+    return () => {
+      isMounted = false;
+      chatChannelRef.current = null;
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      setTypingNames([]);
+      supabase.removeChannel(realtime);
+    };
+  }, [event.id, selectedSubId, user.id, user.firstName, user.lastName]);
+
+  // Polling de secours : quand l’onglet Chat est actif, rafraîchir les messages toutes les 3s
+  // pour que le destinataire voie les nouveaux messages même si Realtime ne se déclenche pas
+  useEffect(() => {
+    if (activeTab !== 'chat') return;
+    const channelId = selectedSubId || 'global';
+    const poll = async () => {
+      const msgs = await dbService.getMessages(event.id, channelId);
+      setMessages((prev) => {
+        const byId = new Map(prev.map((m) => [m.id, m]));
+        msgs.forEach((m) => byId.set(m.id, m));
+        return Array.from(byId.values()).sort(
+          (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
+      });
+    };
+    const interval = setInterval(poll, 3000);
+    return () => clearInterval(interval);
+  }, [activeTab, event.id, selectedSubId]);
+
+  useEffect(() => {
+    const el = chatScrollContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages]);
+
+  const handleShare = async () => {
+    const text = [
+      `Invitation co-organisateur – ${event.title}`,
+      '',
+      'Pour rejoindre ce projet sur EventMaster :',
+      '1. Ouvre l’app et clique sur « Rejoindre »',
+      "2. Saisis la clé et le mot de passe ci-dessous (ou « Coller l'invitation ») :",
+      '',
+      `Clé de partage : ${event.shareCode.trim()}`,
+      `Mot de passe : ${(event.sharePassword ?? '').trim()}`,
+      '',
+      '— EventMaster'
+    ].join('\n');
+    if (navigator.share) {
+      try { await navigator.share({ title: `Invitation – ${event.title}`, text }); } catch (e) {}
+    } else {
+      await navigator.clipboard.writeText(text);
+      alert('Invitation copiée dans le presse-papier.');
+    }
+  };
+
+  const handleAddSequence = async () => {
+    if (!canManageProgram) return;
+    if (!seqForm.title) return;
+    const newSeq: SubEvent = { 
+      id: crypto.randomUUID(), 
+      ...seqForm, 
+      estimatedGuests: 0, 
+      keyMoments: [] 
+    };
+    const updated = await dbService.updateEventAtomic(event.id, (evt) => ({
+      ...evt,
+      subEvents: [...evt.subEvents, newSeq]
+    }));
+    onUpdate(updated);
+    setShowSequenceModal(false);
+    setSeqForm({ title: '', date: '', location: '' });
+  };
+
+  const handleAddGuest = async () => {
+    if (!canManageGuestsHere || !selectedSubId) return;
+    if (!guestForm.firstName) return;
+    const newGuest: Guest = { 
+      id: crypto.randomUUID(), 
+      ...guestForm, 
+      status: 'confirmed', 
+      companions: [], 
+      linkedSubEventIds: [selectedSubId] 
+    };
+    const updated = await dbService.updateEventAtomic(event.id, (evt) => ({
+      ...evt,
+      guests: [...(evt.guests || []), newGuest]
+    }));
+    onUpdate(updated);
+    setShowGuestModal(false);
+    setGuestForm({ firstName: '', lastName: '', email: '' });
+  };
+
+  const handleApprove = async (userId: string, approve: boolean, permissions?: Permission[], allowedSubEventIds?: string[]) => {
+    const updated = await dbService.updateEventAtomic(event.id, (evt) => {
+      if (!approve) return { ...evt, organizers: evt.organizers.filter(o => o.userId !== userId) };
+      return {
+        ...evt,
+        organizers: evt.organizers.map(o =>
+          o.userId === userId
+            ? { ...o, status: 'confirmed' as const, permissions: permissions ?? o.permissions, allowedSubEventIds }
+            : o
+        )
+      };
+    });
+    onUpdate(updated);
+    setApproveModalOrganizer(null);
+  };
+
+  const openApproveModal = (organizer: Organizer) => {
+    setApproveModalOrganizer(organizer);
+    setApprovePermissions(['access_organizer_chat']);
+    setApproveSubEventIds([]);
+  };
+
+  const handleSaveEditRights = async () => {
+    if (!editRightsOrganizer) return;
+    const updated = await dbService.updateEventAtomic(event.id, (evt) => ({
+      ...evt,
+      organizers: evt.organizers.map(o =>
+        o.userId === editRightsOrganizer.userId
+          ? { ...o, permissions: editRightsPermissions, allowedSubEventIds: editRightsSubEventIds.length > 0 ? editRightsSubEventIds : undefined }
+          : o
+      )
+    }));
+    onUpdate(updated);
+    setEditRightsOrganizer(null);
+  };
+
+  const togglePermission = (p: Permission, current: Permission[], set: (arr: Permission[]) => void) => {
+    if (p === 'all') {
+      set(current.includes('all') ? [] : (['all'] as Permission[]));
+      return;
+    }
+    if (current.includes('all')) {
+      set(current.filter(x => x !== 'all'));
+      return;
+    }
+    if (current.includes(p)) set(current.filter(x => x !== p));
+    else set([...current, p]);
+  };
+
+  const toggleSubEvent = (subId: string, current: string[], set: (arr: string[]) => void) => {
+    if (current.includes(subId)) set(current.filter(id => id !== subId));
+    else set([...current, subId]);
+  };
+
+  const handleAddKeyMoment = async () => {
+    if (!canManageProgramHere || !selectedSubId) return;
+    if (!momentForm.label) return;
+    const newMoment: KeyMoment = { id: crypto.randomUUID(), ...momentForm };
+    const updated = await dbService.updateEventAtomic(event.id, (evt) => ({
+      ...evt,
+      subEvents: evt.subEvents.map(s => s.id === selectedSubId ? { ...s, keyMoments: [...s.keyMoments, newMoment] } : s)
+    }));
+    onUpdate(updated);
+    setShowMomentModal(false);
+    setMomentForm({ time: '', label: '' });
+  };
+
+  const reportTyping = useCallback(() => {
+    if (!canChat) return;
+    const ch = chatChannelRef.current;
+    if (!ch) return;
+    const payload = { userId: user.id, userName: `${user.firstName} ${user.lastName}`, typing: true };
+    ch.track(payload);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      typingTimeoutRef.current = null;
+      chatChannelRef.current?.track({ ...payload, typing: false });
+    }, 3000);
+  }, [canChat, user.id, user.firstName, user.lastName]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canChat) return;
+    const text = newMessage.trim();
+    if (!text) return;
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+    chatChannelRef.current?.track({ userId: user.id, userName: `${user.firstName} ${user.lastName}`, typing: false });
+    const channelId = selectedSubId || 'global';
+    const msg: ChatMessage = {
+      id: crypto.randomUUID(),
+      eventId: event.id,
+      channelId,
+      senderId: user.id,
+      senderName: `${user.firstName} ${user.lastName}`,
+      text,
+      timestamp: new Date().toISOString(),
+      role: isOwner ? 'owner' : 'organizer'
+    };
+    setNewMessage('');
+    setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+    try {
+      await dbService.saveMessage(msg);
+    } catch (err) {
+      console.error('Envoi message', err);
+      setMessages((prev) => prev.filter((m) => m.id !== msg.id));
+      setNewMessage(text);
+    }
+  };
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return "À confirmer";
+    return new Date(dateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const openEventSettings = () => {
+    setEventEditForm({
+      title: event.title,
+      isDateTBD: event.isDateTBD,
+      startDate: event.startDate ? event.startDate.slice(0, 16) : '',
+      location: event.location || '',
+      budget: String(event.budget || 0),
+      image: event.image || ''
+    });
+    setEventSettingsTab('general');
+    setShowEventSettingsModal(true);
+  };
+
+  const processEventImageFile = useCallback(async (file: File) => {
+    if (!file.type.startsWith('image/')) return;
+    setImageUploading(true);
+    try {
+      const { data, error } = await supabase.storage
+        .from('event-images')
+        .upload(`${event.id}/${Date.now()}_${file.name}`, file, { upsert: true });
+      if (!error && data?.path) {
+        const { data: urlData } = supabase.storage.from('event-images').getPublicUrl(data.path);
+        setEventEditForm(prev => ({ ...prev, image: urlData.publicUrl }));
+      } else {
+        const reader = new FileReader();
+        reader.onload = () => setEventEditForm(prev => ({ ...prev, image: String(reader.result) }));
+        reader.readAsDataURL(file);
+      }
+    } catch {
+      const reader = new FileReader();
+      reader.onload = () => setEventEditForm(prev => ({ ...prev, image: String(reader.result) }));
+      reader.readAsDataURL(file);
+    } finally {
+      setImageUploading(false);
+    }
+  }, [event.id]);
+
+  const handleEventImageDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) processEventImageFile(file);
+  }, [processEventImageFile]);
+
+  const handleEventImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processEventImageFile(file);
+    e.target.value = '';
+  }, [processEventImageFile]);
+
+  const handleSaveEventSettings = async () => {
+    if (!canEditEvent) return;
+    const startDate = eventEditForm.isDateTBD ? undefined : (eventEditForm.startDate || undefined);
+    const updated = await dbService.updateEventAtomic(event.id, (evt) => ({
+      ...evt,
+      title: eventEditForm.title.trim() || evt.title,
+      isDateTBD: eventEditForm.isDateTBD,
+      startDate: startDate ?? evt.startDate,
+      location: eventEditForm.location.trim() || evt.location,
+      budget: parseFloat(eventEditForm.budget) || 0,
+      image: eventEditForm.image.trim() || undefined,
+      date: startDate ?? evt.date
+    }));
+    onUpdate(updated);
+    setShowEventSettingsModal(false);
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-white rounded-[3rem] border border-gray-100 shadow-2xl overflow-hidden min-w-0">
+      {/* HEADER */}
+      <div className="relative h-56 flex-shrink-0">
+        <img src={event.image || `https://picsum.photos/seed/${event.id}/1200/400`} className="w-full h-full object-cover" alt="B"/>
+        <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/40 to-transparent"></div>
+        <button onClick={onBack} className="absolute top-6 left-6 p-4 bg-white/10 backdrop-blur-xl text-white rounded-2xl border border-white/20">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7"/></svg>
+        </button>
+        {canEditEvent && (
+          <button
+            onClick={openEventSettings}
+            className="absolute top-6 right-6 p-4 bg-white/10 backdrop-blur-xl text-white rounded-2xl border border-white/20 hover:bg-white/20 transition-colors"
+            title="Réglages du projet"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          </button>
+        )}
+        <div className="absolute bottom-6 left-8 right-8">
+          <h1 className="text-3xl font-black text-white truncate mb-1">{event.title}</h1>
+          <div className="flex items-center gap-3 text-white/60 text-[10px] font-black uppercase tracking-widest">
+            <span>📅 {event.isDateTBD ? "À confirmer" : formatDate(event.startDate)}</span>
+            <span>📍 {event.location || "Lieu à définir"}</span>
+          </div>
+        </div>
+      </div>
+
+      {!selectedSubId ? (
+        <>
+          <nav className="flex px-4 border-b border-gray-50 bg-gray-50/30 overflow-x-auto no-scrollbar">
+            {[
+              { id: 'overview', label: 'Dashboard' },
+              { id: 'program', label: 'Programme' },
+              { id: 'chat', label: 'Messagerie' },
+              { id: 'settings', label: 'Équipe' }
+            ].map(tab => (
+              (tab.id !== 'settings' || isOwner) && (
+                <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`py-5 px-6 text-[11px] font-black uppercase tracking-widest relative whitespace-nowrap ${activeTab === tab.id ? 'text-indigo-600' : 'text-gray-400'}`}>
+                  {tab.label}
+                  {tab.id === 'settings' && pendingOrganizers.length > 0 && <span className="absolute top-4 right-3 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>}
+                  {activeTab === tab.id && <div className="absolute bottom-0 left-4 right-4 h-1 bg-indigo-600 rounded-t-full"></div>}
+                </button>
+              )
+            ))}
+          </nav>
+
+          <div className="flex-1 p-8 overflow-y-auto min-w-0 space-y-8">
+            {activeTab === 'overview' && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="md:col-span-2 space-y-8">
+                  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                    <h3 className="text-xl font-black text-gray-900 mb-4">Brief du projet</h3>
+                    <p className="text-gray-500 text-sm leading-relaxed whitespace-pre-wrap">{event.description || "Aucun brief."}</p>
+                  </div>
+                  <div className="bg-indigo-50/50 p-6 rounded-[2.5rem] border border-indigo-100/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                     <div>
+                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Co-Organisation</p>
+                        <p className="text-sm font-bold text-indigo-900">Partagez l'accès pour recruter des admins.</p>
+                     </div>
+                     <button onClick={handleShare} className="bg-white text-indigo-600 px-6 py-3 rounded-2xl font-black text-[10px] uppercase shadow-sm active:scale-95 transition-all">Partager l’invitation</button>
+                  </div>
+                </div>
+                {canViewBudget && (
+                  <div className="space-y-4">
+                    <div className="bg-indigo-600 p-8 rounded-[2.5rem] text-white shadow-xl shadow-indigo-100">
+                      <p className="text-[10px] font-black uppercase opacity-60 mb-2">Budget Projet</p>
+                      <p className="text-3xl font-black">{event.budget.toLocaleString()}€</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'program' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between px-2">
+                  <h3 className="text-2xl font-black text-gray-900">Programme</h3>
+                  <button
+                    onClick={() => setShowSequenceModal(true)}
+                    disabled={!canManageProgram}
+                    className={`bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-100 active:scale-95 transition-all ${!canManageProgram ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  >
+                    + Séquence
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {event.subEvents.map(sub => (
+                    <button key={sub.id} onClick={() => { setSelectedSubId(sub.id); setSubTab('moments'); }} className="p-8 bg-white border border-gray-100 rounded-[2.5rem] hover:border-indigo-600 hover:shadow-xl transition-all text-left group">
+                       <span className="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase mb-4 inline-block">
+                         {sub.date ? new Date(sub.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'TBD'}
+                       </span>
+                       <h4 className="text-lg font-black text-gray-900 mb-2 truncate">{sub.title}</h4>
+                       <p className="text-gray-400 text-xs truncate flex items-center gap-2">
+                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+                         {sub.location || "Lieu global"}
+                       </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'settings' && isOwner && (
+              <div className="space-y-8">
+                 <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
+                    <h3 className="text-xl font-black">Accès & invitation</h3>
+                    <p className="text-sm text-gray-500">Partage ces informations pour qu’un co-organisateur envoie une demande depuis la page d’accueil (Rejoindre).</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                       <div className="p-4 bg-gray-50 rounded-2xl flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                             <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Clé de partage</p>
+                             <p className="font-black text-indigo-600 text-lg break-all">{event.shareCode}</p>
+                          </div>
+                          <button type="button" onClick={() => handleCopy(event.shareCode, 'code')} className="p-2 rounded-xl text-gray-400 hover:bg-gray-200 hover:text-indigo-600 flex-shrink-0" title="Copier">
+                            {copiedField === 'code' ? (
+                              <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+                            ) : (
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h2m8 0h2a2 2 0 012 2v2m0 8v2a2 2 0 01-2 2h-2m-8 0H6m8 0h8"/></svg>
+                            )}
+                          </button>
+                       </div>
+                       <div className="p-4 bg-gray-50 rounded-2xl flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                             <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Mot de passe</p>
+                             {editingPassword ? (
+                               <div className="space-y-2 mt-2" onClick={e => e.stopPropagation()}>
+                                 <div className="flex gap-2 items-end">
+                                   <div className="flex-1 min-w-0">
+                                     <Input label="" placeholder="Nouveau mot de passe" value={newPasswordValue} onChange={e => setNewPasswordValue(e.target.value)} type="text" autoComplete="off" />
+                                   </div>
+                                   <button type="button" onClick={() => setNewPasswordValue(generateSharePassword())} className="px-3 py-3 rounded-2xl border-2 border-gray-200 text-gray-600 text-xs font-black uppercase hover:border-indigo-300 hover:text-indigo-600 whitespace-nowrap">Générer</button>
+                                 </div>
+                                 <div className="flex gap-2">
+                                   <button type="button" onClick={cancelEditPassword} disabled={savingPassword} className="px-3 py-1.5 text-gray-500 text-xs font-bold uppercase disabled:opacity-50">Annuler</button>
+                                   <button type="button" onClick={saveNewPassword} disabled={savingPassword} className="px-4 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase disabled:opacity-50">
+                                     {savingPassword ? 'Enregistrement…' : 'Enregistrer'}
+                                   </button>
+                                 </div>
+                               </div>
+                             ) : (
+                               <>
+                                 <p className="font-black text-indigo-600 text-lg break-all">{event.sharePassword ?? ''}</p>
+                                 <button type="button" onClick={startEditPassword} className="mt-2 text-indigo-600 text-[10px] font-black uppercase hover:underline">Modifier le mot de passe</button>
+                               </>
+                             )}
+                          </div>
+                          {!editingPassword && (
+                            <button type="button" onClick={() => handleCopy(event.sharePassword ?? '', 'password')} className="p-2 rounded-xl text-gray-400 hover:bg-gray-200 hover:text-indigo-600 flex-shrink-0" title="Copier">
+                              {copiedField === 'password' ? (
+                                <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+                              ) : (
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h2m8 0h2a2 2 0 012 2v2m0 8v2a2 2 0 01-2 2h-2m-8 0H6m8 0h8"/></svg>
+                              )}
+                            </button>
+                          )}
+                       </div>
+                    </div>
+                    <button onClick={handleShare} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-indigo-100 active:scale-95">
+                      Partager l’invitation
+                    </button>
+                 </div>
+
+                 {pendingOrganizers.length > 0 && (
+                   <div className="space-y-4">
+                      <h4 className="text-[10px] font-black text-red-500 uppercase px-2">Demandes en attente ({pendingOrganizers.length})</h4>
+                      <div className="max-h-64 overflow-y-auto space-y-3 pr-1">
+                         {pendingOrganizers.map(o => (
+                           <div key={o.userId} className="bg-white p-5 rounded-3xl border-2 border-amber-100 flex items-center justify-between gap-4 flex-shrink-0">
+                              <div className="flex items-center gap-3 min-w-0">
+                                 <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700 font-black text-sm flex-shrink-0">
+                                   {o.firstName.charAt(0)}{o.lastName.charAt(0)}
+                                 </div>
+                                 <p className="font-bold text-gray-900 truncate">{o.firstName} {o.lastName}</p>
+                              </div>
+                              <div className="flex gap-2 flex-shrink-0">
+                                 <button onClick={() => handleApprove(o.userId, false)} className="px-4 py-2 text-gray-400 font-bold text-[10px] uppercase rounded-xl hover:bg-gray-100">Refuser</button>
+                                 <button onClick={() => openApproveModal(o)} className="px-5 py-2 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase">Approuver</button>
+                              </div>
+                           </div>
+                         ))}
+                      </div>
+                   </div>
+                 )}
+
+                 <div className="space-y-4">
+                    <h4 className="text-[10px] font-black text-gray-400 uppercase px-2">Équipe confirmée</h4>
+                    <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden">
+                       <table className="w-full text-left">
+                          <thead className="bg-gray-50 border-b border-gray-100">
+                             <tr>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase">Membre</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase">Rôle</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase text-right">Droits</th>
+                             </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                             <tr>
+                                <td className="px-6 py-4 font-black text-indigo-600">{user.firstName} (Vous)</td>
+                                <td className="px-6 py-4 text-[10px] font-black text-gray-300 uppercase">Propriétaire</td>
+                                <td className="px-6 py-4 text-[10px] text-gray-300">—</td>
+                             </tr>
+                             {activeOrganizers.map(o => (
+                               <tr key={o.userId}>
+                                  <td className="px-6 py-4 font-bold text-gray-800">{o.firstName} {o.lastName}</td>
+                                  <td className="px-6 py-4 text-[10px] font-black text-emerald-600 uppercase">Co-organisateur</td>
+                                  <td className="px-6 py-4 text-right">
+                                    <button
+                                      onClick={() => {
+                                        setEditRightsOrganizer(o);
+                                        setEditRightsPermissions(o.permissions || []);
+                                        setEditRightsSubEventIds(o.allowedSubEventIds || []);
+                                      }}
+                                      className="text-indigo-600 font-bold text-[10px] uppercase hover:underline"
+                                    >
+                                      Modifier
+                                    </button>
+                                  </td>
+                               </tr>
+                             ))}
+                          </tbody>
+                       </table>
+                    </div>
+                 </div>
+              </div>
+            )}
+
+            {activeTab === 'chat' && (
+              <div className="flex flex-col h-[500px] bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
+                 {typingNames.length > 0 && (
+                   <div className="flex items-center gap-2 px-4 py-2 bg-indigo-50/80 border-b border-indigo-100 text-sm text-indigo-700 shrink-0">
+                     <span className="inline-flex gap-1" aria-hidden>
+                       <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                       <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                       <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                     </span>
+                     <span className="font-medium">
+                       {typingNames.length === 1
+                         ? `${typingNames[0]} est en train d'écrire`
+                         : typingNames.length === 2
+                           ? `${typingNames[0]} et ${typingNames[1]} sont en train d'écrire`
+                           : `${typingNames[0]} et ${typingNames.length - 1} autre(s) sont en train d'écrire`}
+                     </span>
+                   </div>
+                 )}
+                 <div ref={chatScrollContainerRef} className="flex-1 overflow-y-auto p-6 space-y-6 min-h-0">
+                    {messages.map(m => (
+                      <div key={m.id} className={`flex flex-col ${m.senderId === user.id ? 'items-end' : 'items-start'}`}>
+                         <span className="text-[9px] font-black text-gray-300 mb-1 uppercase">{m.senderName}</span>
+                         <div className={`px-5 py-3 rounded-2xl max-w-[85%] text-sm shadow-sm ${m.senderId === user.id ? 'bg-indigo-600 text-white' : 'bg-gray-50 text-gray-700'}`}>
+                            {m.text}
+                         </div>
+                      </div>
+                    ))}
+                 </div>
+                 <form onSubmit={handleSendMessage} className="p-4 bg-gray-50/50 border-t border-gray-100 flex gap-3">
+                    <input
+                      className="flex-1 bg-white border-2 border-gray-100 rounded-2xl px-6 py-3 text-sm outline-none focus:border-indigo-500 transition-all disabled:opacity-60"
+                      placeholder={canChat ? "Message d'équipe..." : "Accès messagerie restreint"}
+                      value={newMessage}
+                      onChange={e => {
+                        setNewMessage(e.target.value);
+                        reportTyping();
+                      }}
+                      disabled={!canChat}
+                    />
+                    <button
+                      type="submit"
+                      disabled={!canChat}
+                      className="p-4 bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 19l9-2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                    </button>
+                 </form>
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        /* VUE SÉQUENCE */
+        <div className="flex-1 flex flex-col bg-white min-w-0 animate-in slide-in-from-right-8 duration-500">
+           <header className="px-8 py-6 bg-gray-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-6 min-w-0 flex-1">
+                 <button onClick={() => setSelectedSubId(null)} className="p-3 bg-white/10 rounded-2xl hover:bg-white/20 transition-all">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7"/></svg>
+                 </button>
+                 <div className="min-w-0">
+                    <h2 className="text-xl font-black truncate">{currentSub?.title}</h2>
+                    <p className="text-white/40 text-[9px] font-black uppercase tracking-widest">Séquence du programme</p>
+                 </div>
+              </div>
+           </header>
+
+           <nav className="flex px-4 border-b border-gray-100 bg-gray-50/30 overflow-x-auto no-scrollbar">
+              {['moments', 'details', 'guests'].map(t => (
+                <button key={t} onClick={() => setSubTab(t as any)} className={`py-5 px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap ${subTab === t ? 'text-indigo-600' : 'text-gray-400'}`}>
+                  {t === 'moments' ? 'Timeline' : t === 'details' ? 'Infos' : 'Participants'}
+                  {subTab === t && <div className="absolute bottom-0 left-4 right-4 h-1 bg-indigo-600 rounded-t-full"></div>}
+                </button>
+              ))}
+           </nav>
+
+           <div className="flex-1 p-8 overflow-y-auto min-w-0 space-y-8">
+              {subTab === 'moments' && (
+                <div className="space-y-8">
+                   <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-black">Déroulé précis</h3>
+                      <button
+                        onClick={() => setShowMomentModal(true)}
+                        disabled={!canManageProgramHere}
+                        className={`bg-indigo-50 text-indigo-600 px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest ${!canManageProgramHere ? 'opacity-40 cursor-not-allowed' : ''}`}
+                      >
+                        + Jalon
+                      </button>
+                   </div>
+                   <div className="relative space-y-6 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-gray-100">
+                      {currentSub?.keyMoments.map(m => (
+                        <div key={m.id} className="relative pl-10 flex items-center gap-6">
+                           <div className="absolute left-0 w-6 h-6 bg-white border-4 border-indigo-600 rounded-full"></div>
+                           <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl min-w-[60px] text-center">{m.time || '--:--'}</span>
+                           <p className="font-bold text-gray-800">{m.label}</p>
+                        </div>
+                      ))}
+                      {(!currentSub?.keyMoments || currentSub.keyMoments.length === 0) && <div className="pl-10 text-gray-300 italic py-10">Aucun moment clé.</div>}
+                   </div>
+                </div>
+              )}
+
+              {subTab === 'guests' && (
+                <div className="space-y-6">
+                   <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-black">Participants à cette séquence</h3>
+                      <button
+                        onClick={() => setShowGuestModal(true)}
+                        disabled={!canManageGuestsHere}
+                        className={`bg-indigo-600 text-white px-5 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-indigo-100 ${!canManageGuestsHere ? 'opacity-40 cursor-not-allowed' : ''}`}
+                      >
+                        + Invité
+                      </button>
+                   </div>
+                   <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
+                      <table className="w-full text-left">
+                         <thead className="bg-gray-50 border-b border-gray-100"><tr className="text-[10px] font-black text-gray-400 uppercase"><th className="px-6 py-4">Nom</th><th className="px-6 py-4">Contact</th></tr></thead>
+                         <tbody className="divide-y divide-gray-50">
+                            {event.guests?.filter(g => g.linkedSubEventIds.includes(selectedSubId!)).map(g => (
+                              <tr key={g.id}>
+                                <td className="px-6 py-4 font-bold text-gray-900">{g.firstName} {g.lastName}</td>
+                                <td className="px-6 py-4 text-xs text-gray-500">{g.email}</td>
+                              </tr>
+                            ))}
+                            {event.guests?.filter(g => g.linkedSubEventIds.includes(selectedSubId!)).length === 0 && <tr><td colSpan={2} className="px-6 py-12 text-center text-gray-300 italic">Personne pour le moment.</td></tr>}
+                         </tbody>
+                      </table>
+                   </div>
+                </div>
+              )}
+           </div>
+        </div>
+      )}
+
+      {/* MODALS */}
+      {showEventSettingsModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-6 bg-gray-900/80 backdrop-blur-xl">
+          <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <h3 className="text-2xl font-black text-gray-900 px-10 pt-10 pb-4">Réglages du projet</h3>
+            <nav className="flex px-6 border-b border-gray-100">
+              {(['general', 'appearance'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setEventSettingsTab(tab)}
+                  className={`py-4 px-6 text-[11px] font-black uppercase tracking-widest border-b-2 transition-colors ${
+                    eventSettingsTab === tab
+                      ? 'border-indigo-600 text-indigo-600'
+                      : 'border-transparent text-gray-400 hover:text-gray-600'
+                  }`}
+                >
+                  {tab === 'general' ? 'Général' : 'Apparence'}
+                </button>
+              ))}
+            </nav>
+            <div className="flex-1 overflow-y-auto p-10 space-y-6">
+              {eventSettingsTab === 'general' && (
+                <>
+                  <Input
+                    label="Nom du projet"
+                    placeholder="Ex: Mariage de Sarah & Marc"
+                    value={eventEditForm.title}
+                    onChange={e => setEventEditForm(prev => ({ ...prev, title: e.target.value }))}
+                  />
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        checked={eventEditForm.isDateTBD}
+                        onChange={e => setEventEditForm(prev => ({ ...prev, isDateTBD: e.target.checked }))}
+                      />
+                      <span className="text-sm font-bold text-gray-700">Date à confirmer</span>
+                    </label>
+                    {!eventEditForm.isDateTBD && (
+                      <Input
+                        label="Date et heure"
+                        type="datetime-local"
+                        value={eventEditForm.startDate}
+                        onChange={e => setEventEditForm(prev => ({ ...prev, startDate: e.target.value }))}
+                      />
+                    )}
+                  </div>
+                  <Input
+                    label="Lieu"
+                    placeholder="Adresse ou lieu à confirmer"
+                    value={eventEditForm.location}
+                    onChange={e => setEventEditForm(prev => ({ ...prev, location: e.target.value }))}
+                  />
+                  <Input
+                    label="Budget (€)"
+                    type="number"
+                    min="0"
+                    value={eventEditForm.budget}
+                    onChange={e => setEventEditForm(prev => ({ ...prev, budget: e.target.value }))}
+                  />
+                </>
+              )}
+              {eventSettingsTab === 'appearance' && (
+                <>
+                  <input
+                    ref={eventImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleEventImageSelect}
+                  />
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('ring-2', 'ring-indigo-500', 'bg-indigo-50/50'); }}
+                    onDragLeave={(e) => { e.currentTarget.classList.remove('ring-2', 'ring-indigo-500', 'bg-indigo-50/50'); }}
+                    onDrop={handleEventImageDrop}
+                    onClick={() => eventImageInputRef.current?.click()}
+                    className="border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center cursor-pointer hover:border-indigo-300 hover:bg-gray-50/50 transition-all min-h-[180px] flex flex-col items-center justify-center gap-3"
+                  >
+                    {imageUploading ? (
+                      <div className="w-10 h-10 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto" />
+                    ) : eventEditForm.image ? (
+                      <div className="w-full rounded-xl overflow-hidden border border-gray-100 h-32">
+                        <img src={eventEditForm.image} alt="Aperçu" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                      </div>
+                    ) : null}
+                    <span className="text-sm font-bold text-gray-500">
+                      {eventEditForm.image && !imageUploading ? 'Cliquer ou glisser une autre image' : 'Glisser une image ici ou cliquer pour parcourir'}
+                    </span>
+                    <span className="text-xs text-gray-400">Fichiers ou photos depuis l’appareil</span>
+                  </div>
+                  <Input
+                    label="Ou coller une URL d’image"
+                    placeholder="https://..."
+                    value={eventEditForm.image?.startsWith('http') ? eventEditForm.image : ''}
+                    onChange={e => setEventEditForm(prev => ({ ...prev, image: e.target.value }))}
+                  />
+                </>
+              )}
+            </div>
+            <div className="flex gap-4 p-10 pt-4 border-t border-gray-100">
+              <button type="button" onClick={() => setShowEventSettingsModal(false)} className="flex-1 py-4 font-bold text-gray-400 text-[10px] uppercase rounded-2xl border border-gray-200">
+                Annuler
+              </button>
+              <button type="button" onClick={handleSaveEventSettings} className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-indigo-100">
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {approveModalOrganizer && (
+        <div className="fixed inset-0 z-[260] flex items-center justify-center p-6 bg-gray-900/80 backdrop-blur-xl">
+          <div className="bg-white w-full max-w-md rounded-[3rem] p-10 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-black">Droits du co-organisateur</h3>
+            <p className="text-sm text-gray-500">Choisis les droits pour {approveModalOrganizer.firstName} {approveModalOrganizer.lastName}.</p>
+            <div className="space-y-3">
+              {(['edit_details', 'manage_subevents', 'manage_guests', 'access_organizer_chat', 'view_budget', 'all'] as Permission[]).map((p) => (
+                <label key={p} className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="mt-1 w-4 h-4 rounded border-gray-300 text-indigo-600"
+                    checked={approvePermissions.includes(p)}
+                    onChange={() => togglePermission(p, approvePermissions, setApprovePermissions)}
+                  />
+                  <span className="text-sm font-medium text-gray-700">{PERMISSION_LABELS[p]}</span>
+                </label>
+              ))}
+            </div>
+            {event.subEvents.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-black text-gray-500 uppercase">Limiter à certaines séquences (optionnel)</p>
+                <div className="max-h-32 overflow-y-auto space-y-2 pl-1">
+                  {event.subEvents.map((sub) => (
+                    <label key={sub.id} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded border-gray-300 text-indigo-600"
+                        checked={approveSubEventIds.includes(sub.id)}
+                        onChange={() => toggleSubEvent(sub.id, approveSubEventIds, setApproveSubEventIds)}
+                      />
+                      <span className="text-sm text-gray-700">{sub.title}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="flex gap-4 pt-2">
+              <button type="button" onClick={() => setApproveModalOrganizer(null)} className="flex-1 py-3 font-bold text-gray-400 text-[10px] uppercase rounded-2xl border border-gray-200">Annuler</button>
+              <button
+                type="button"
+                onClick={() => handleApprove(approveModalOrganizer.userId, true, approvePermissions.length ? approvePermissions : ['access_organizer_chat'], approveSubEventIds.length > 0 ? approveSubEventIds : undefined)}
+                className="flex-[2] py-3 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase"
+              >
+                Approuver
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editRightsOrganizer && (
+        <div className="fixed inset-0 z-[260] flex items-center justify-center p-6 bg-gray-900/80 backdrop-blur-xl">
+          <div className="bg-white w-full max-w-md rounded-[3rem] p-10 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-black">Modifier les droits</h3>
+            <p className="text-sm text-gray-500">{editRightsOrganizer.firstName} {editRightsOrganizer.lastName}</p>
+            <div className="space-y-3">
+              {(['edit_details', 'manage_subevents', 'manage_guests', 'access_organizer_chat', 'view_budget', 'all'] as Permission[]).map((p) => (
+                <label key={p} className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="mt-1 w-4 h-4 rounded border-gray-300 text-indigo-600"
+                    checked={editRightsPermissions.includes(p)}
+                    onChange={() => togglePermission(p, editRightsPermissions, setEditRightsPermissions)}
+                  />
+                  <span className="text-sm font-medium text-gray-700">{PERMISSION_LABELS[p]}</span>
+                </label>
+              ))}
+            </div>
+            {event.subEvents.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-black text-gray-500 uppercase">Limiter à certaines séquences (optionnel)</p>
+                <div className="max-h-32 overflow-y-auto space-y-2 pl-1">
+                  {event.subEvents.map((sub) => (
+                    <label key={sub.id} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded border-gray-300 text-indigo-600"
+                        checked={editRightsSubEventIds.includes(sub.id)}
+                        onChange={() => toggleSubEvent(sub.id, editRightsSubEventIds, setEditRightsSubEventIds)}
+                      />
+                      <span className="text-sm text-gray-700">{sub.title}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="flex gap-4 pt-2">
+              <button type="button" onClick={() => setEditRightsOrganizer(null)} className="flex-1 py-3 font-bold text-gray-400 text-[10px] uppercase rounded-2xl border border-gray-200">Annuler</button>
+              <button type="button" onClick={handleSaveEditRights} className="flex-[2] py-3 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase">Enregistrer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSequenceModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-gray-900/80 backdrop-blur-xl animate-in fade-in">
+           <div className="bg-white w-full max-w-sm rounded-[3rem] p-10 space-y-6 shadow-2xl animate-in zoom-in-95">
+              <h3 className="text-2xl font-black">Nouvelle Séquence</h3>
+              <div className="space-y-4">
+                 <Input label="Titre de la séquence" placeholder="Ex: Cocktail de bienvenue" value={seqForm.title} onChange={e => setSeqForm({...seqForm, title: e.target.value})} />
+                 <Input label="Date & Heure" type="datetime-local" value={seqForm.date} onChange={e => setSeqForm({...seqForm, date: e.target.value})} />
+                 <Input label="Lieu spécifique" placeholder="Ex: Salon panoramique" value={seqForm.location} onChange={e => setSeqForm({...seqForm, location: e.target.value})} />
+              </div>
+              <div className="flex gap-4">
+                 <button onClick={() => setShowSequenceModal(false)} className="flex-1 py-4 font-bold text-gray-400 text-[10px] uppercase">Annuler</button>
+                 <button onClick={handleAddSequence} className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-indigo-100">Ajouter</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {showGuestModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-gray-900/80 backdrop-blur-xl animate-in fade-in">
+           <div className="bg-white w-full max-w-sm rounded-[3rem] p-10 space-y-6 shadow-2xl">
+              <h3 className="text-2xl font-black">Ajouter un participant</h3>
+              <div className="space-y-4">
+                 <Input label="Prénom" value={guestForm.firstName} onChange={e => setGuestForm({...guestForm, firstName: e.target.value})} />
+                 <Input label="Nom" value={guestForm.lastName} onChange={e => setGuestForm({...guestForm, lastName: e.target.value})} />
+                 <Input label="Email" type="email" value={guestForm.email} onChange={e => setGuestForm({...guestForm, email: e.target.value})} />
+              </div>
+              <div className="flex gap-4">
+                 <button onClick={() => setShowGuestModal(false)} className="flex-1 py-4 font-bold text-gray-400 text-[10px] uppercase">Annuler</button>
+                 <button onClick={handleAddGuest} className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-indigo-100">Enregistrer</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {showMomentModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-gray-900/80 backdrop-blur-xl animate-in fade-in">
+           <div className="bg-white w-full max-w-sm rounded-[3rem] p-10 space-y-6 shadow-2xl animate-in zoom-in-95">
+              <h3 className="text-2xl font-black">Nouveau Jalon</h3>
+              <div className="space-y-4">
+                 <Input label="Heure précise" type="time" value={momentForm.time} onChange={e => setMomentForm({...momentForm, time: e.target.value})} />
+                 <Input label="Description" placeholder="Ex: Arrivée du photographe" value={momentForm.label} onChange={e => setMomentForm({...momentForm, label: e.target.value})} />
+              </div>
+              <div className="flex gap-4">
+                 <button onClick={() => setShowMomentModal(false)} className="flex-1 py-4 font-bold text-gray-400 text-[10px] uppercase">Annuler</button>
+                 <button onClick={handleAddKeyMoment} className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-indigo-100">Confirmer</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}} />
+    </div>
+  );
+};

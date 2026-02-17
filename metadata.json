@@ -1,0 +1,7 @@
+{
+  "name": "EventMaster Pro",
+  "description": "Système de gestion d'événements haute fidélité avec intégration native.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
