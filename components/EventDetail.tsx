@@ -41,6 +41,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
   const [subEventEditForm, setSubEventEditForm] = useState({ title: '', date: '', location: '' });
   const [showImportGuestsModal, setShowImportGuestsModal] = useState(false);
   const [importedContacts, setImportedContacts] = useState<ImportedContact[]>([]);
+  const [showExportHelp, setShowExportHelp] = useState(false);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const [showEventSettingsModal, setShowEventSettingsModal] = useState(false);
   const [eventSettingsTab, setEventSettingsTab] = useState<'general' | 'appearance'>('general');
@@ -1339,6 +1340,10 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl max-h-[90vh] overflow-hidden flex flex-col">
             <div className="p-6 border-b border-slate-200">
               <h3 className="text-lg font-semibold text-slate-900">Importer des contacts</h3>
+              <p className="text-sm text-slate-600 mt-1">
+                Quand le <strong>sélecteur de contacts</strong> est disponible (Android Chrome, ou iPhone avec l’option activée), tu peux ouvrir la liste, cocher les contacts puis valider. Sinon, importe un fichier .vcf ou .csv.
+              </p>
+              <p className="text-xs text-slate-500 mt-1">Seuls les contacts que tu sélectionnes sont ajoutés à la séquence (aucune synchro du carnet).</p>
               {importedContacts.length === 0 ? (
                 <div className="mt-4 space-y-3">
                   {isContactPickerAvailable() && (
@@ -1346,14 +1351,31 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                       <button type="button" onClick={handleImportFromDevice} className="w-full py-3 px-4 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 text-sm font-medium hover:bg-indigo-100">
                         Ouvrir les contacts de l'appareil
                       </button>
-                      <p className="text-xs text-slate-500">Ouvre la liste de tes contacts : coche ceux à importer, puis valide. (Android Chrome)</p>
+                      <p className="text-xs text-slate-500">Ouvre la liste native : coche les contacts à importer, puis valide.</p>
                     </>
+                  )}
+                  {!isContactPickerAvailable() && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3 text-xs text-slate-700">
+                      <p className="font-medium text-amber-800">Pas de bouton « Ouvrir les contacts » ?</p>
+                      <p className="mt-1"><strong>iPhone :</strong> Réglages → Safari → Avancé → Fonctions expérimentales → activer « Contact Picker API ». Recharge l’app puis le bouton apparaîtra.</p>
+                      <p className="mt-1"><strong>Mac / PC :</strong> les navigateurs n’ont pas encore cette option ; utilise l’import de fichier ci-dessous.</p>
+                    </div>
                   )}
                   <input ref={importFileInputRef} type="file" accept=".vcf,.csv,text/vcard,text/csv" className="hidden" onChange={handleImportFile} />
                   <button type="button" onClick={() => importFileInputRef.current?.click()} className="w-full py-3 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
                     Importer un fichier (.vcf ou .csv)
                   </button>
-                  <p className="text-xs text-slate-500">Exportez vos contacts en .vcf (iOS/Android) ou .csv (Outlook, etc.).</p>
+                  <button type="button" onClick={() => setShowExportHelp(v => !v)} className="text-xs text-indigo-600 font-medium">
+                    {showExportHelp ? 'Masquer' : 'Comment exporter mes contacts ?'}
+                  </button>
+                  {showExportHelp && (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 space-y-2">
+                      <p><strong>iPhone :</strong> App Contacts → sélectionner les contacts ou « Tous mes contacts » → Partager → Enregistrer dans Fichiers (fichier .vcf).</p>
+                      <p><strong>Android :</strong> App Contacts → Menu (⋮) → Exporter vers le stockage / Partager → .vcf.</p>
+                      <p><strong>Mac :</strong> App Contacts → Fichier → Exporter… → Archive vCard (.vcf).</p>
+                      <p><strong>PC (Outlook / Windows) :</strong> Exporter les contacts en .csv (Fichier → Exporter) puis importer le fichier ici.</p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <>
@@ -1380,14 +1402,14 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                   ))}
                 </div>
                 <div className="p-4 border-t border-slate-200 flex gap-3">
-                  <button type="button" onClick={() => { setImportedContacts([]); setShowImportGuestsModal(false); }} className="flex-1 py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Annuler</button>
+                  <button type="button" onClick={() => { setImportedContacts([]); setShowExportHelp(false); setShowImportGuestsModal(false); }} className="flex-1 py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Annuler</button>
                   <button type="button" onClick={handleAddAllImportedGuests} className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl">Ajouter tous à la séquence</button>
                 </div>
               </>
             )}
             {importedContacts.length === 0 && (
               <div className="p-4 border-t border-slate-200">
-                <button type="button" onClick={() => setShowImportGuestsModal(false)} className="w-full py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Fermer</button>
+                <button type="button" onClick={() => { setShowExportHelp(false); setShowImportGuestsModal(false); }} className="w-full py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Fermer</button>
               </div>
             )}
           </div>

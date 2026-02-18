@@ -1,5 +1,8 @@
 /**
- * Import contacts: parsing vCard (.vcf) et CSV, et Contact Picker API (Android).
+ * Import contacts: parsing vCard (.vcf) et CSV, et Contact Picker API (Android / iOS si activé).
+ * - Picker : l'utilisateur ouvre la liste native, coche les contacts voulus, valide → on ne reçoit que la sélection.
+ * - Fichier : l'utilisateur importe un .vcf/.csv exporté de son carnet → on parse et affiche pour édition avant ajout.
+ * Aucune synchro ni accès au carnet complet ; uniquement ce que l'utilisateur choisit d'importer.
  * Champs possibles: prénom, nom, email, téléphone, adresse.
  */
 
