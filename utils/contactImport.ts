@@ -100,22 +100,31 @@ export function parseContactFile(file: File): Promise<ImportedContact[]> {
   });
 }
 
-/** Contact Picker API (Android Chrome). Retourne des contacts si disponible. */
+/**
+ * Contact Picker API : ouvre la liste des contacts de l'appareil.
+ * L'utilisateur peut cocher plusieurs contacts à importer, puis valider.
+ * Supporté : Chrome Android (HTTPS, geste utilisateur requis).
+ */
 export async function pickContactsFromDevice(): Promise<ImportedContact[]> {
   const nav = navigator as any;
-  if (!nav.contacts || !nav.contacts.select) return [];
-  const props: ('name' | 'email' | 'tel')[] = ['name', 'email', 'tel'];
+  if (!nav.contacts || typeof nav.contacts.select !== 'function') return [];
+  const props = ['name', 'email', 'tel', 'address'] as const;
   const contacts = await nav.contacts.select(props, { multiple: true });
   return (contacts || []).map((c: any) => {
     const name = (c.name && c.name[0]) || '';
     const parts = name.split(/\s+/).filter(Boolean);
     const first = parts[0] || '';
     const last = parts.slice(1).join(' ') || '';
+    const addr = c.address && c.address[0];
+    const addressStr = addr && typeof addr === 'object'
+      ? [addr.addressLine, addr.city, addr.region, addr.postalCode, addr.country].filter(Boolean).join(', ')
+      : (typeof addr === 'string' ? addr : undefined);
     return {
       firstName: first,
       lastName: last,
       email: (c.email && c.email[0]) || '',
-      phone: (c.tel && c.tel[0]) || ''
+      phone: (c.tel && c.tel[0]) || '',
+      address: addressStr
     };
   });
 }

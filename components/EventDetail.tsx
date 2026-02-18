@@ -1342,9 +1342,12 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
               {importedContacts.length === 0 ? (
                 <div className="mt-4 space-y-3">
                   {isContactPickerAvailable() && (
-                    <button type="button" onClick={handleImportFromDevice} className="w-full py-3 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
-                      Choisir depuis les contacts (appareil)
-                    </button>
+                    <>
+                      <button type="button" onClick={handleImportFromDevice} className="w-full py-3 px-4 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 text-sm font-medium hover:bg-indigo-100">
+                        Ouvrir les contacts de l'appareil
+                      </button>
+                      <p className="text-xs text-slate-500">Ouvre la liste de tes contacts : coche ceux à importer, puis valide. (Android Chrome)</p>
+                    </>
                   )}
                   <input ref={importFileInputRef} type="file" accept=".vcf,.csv,text/vcard,text/csv" className="hidden" onChange={handleImportFile} />
                   <button type="button" onClick={() => importFileInputRef.current?.click()} className="w-full py-3 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
