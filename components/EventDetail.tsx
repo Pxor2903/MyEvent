@@ -505,9 +505,37 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
           <div className="flex-1 p-6 overflow-y-auto min-w-0 space-y-6">
             {activeTab === 'overview' && (
               <div className="space-y-6">
-                <div className="w-full p-5 rounded-xl border border-slate-200 bg-slate-50/30">
-                  <h3 className="text-base font-semibold text-slate-900 mb-2">Description du projet</h3>
-                  <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">{event.description || "Aucune description."}</p>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2 p-5 rounded-xl border border-slate-200 bg-slate-50/30">
+                    <h3 className="text-base font-semibold text-slate-900 mb-2">Description du projet</h3>
+                    <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">{event.description || "Aucune description."}</p>
+                  </div>
+                  <div className="p-5 rounded-xl border border-slate-200 bg-white">
+                    <h3 className="text-base font-semibold text-slate-900 mb-4">Invités</h3>
+                    {(() => {
+                      const guests = event.guests || [];
+                      const confirmed = guests.filter(g => g.status === 'confirmed').length;
+                      const declined = guests.filter(g => g.status === 'declined').length;
+                      const pending = guests.filter(g => g.status === 'pending').length;
+                      const responded = confirmed + declined;
+                      return (
+                        <div className="space-y-4">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="text-sm text-slate-500">Viennent</span>
+                            <span className="text-xl font-semibold text-emerald-600">{confirmed}</span>
+                          </div>
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="text-sm text-slate-500">Invitations répondues</span>
+                            <span className="text-lg font-semibold text-slate-900">{responded}</span>
+                          </div>
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="text-sm text-slate-500">Non répondu</span>
+                            <span className="text-lg font-semibold text-slate-400">{pending}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                   <div className="lg:col-span-3 rounded-xl border border-slate-200 bg-white overflow-hidden">
