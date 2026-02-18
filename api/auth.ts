@@ -62,11 +62,12 @@ export const authApi = {
     if (error) return { success: false, error: error.message };
     const userId = data.user?.id;
     if (!userId) return { success: false, error: 'Session invalide.' };
-    const profile = await profilesApi.getById(userId);
-    if (profile) return { success: true, user: profile };
-    const fallback = buildProfileFromAuthUser(data.user);
-    const created = await profilesApi.upsert(fallback);
-    return { success: true, user: created };
+    let profile = await profilesApi.getById(userId);
+    if (!profile) {
+      const fallback = buildProfileFromAuthUser(data.user);
+      profile = await profilesApi.upsert(fallback);
+    }
+    return { success: true, user: profile };
   },
 
   async loginWithProvider(provider: 'google' | 'apple'): Promise<AuthResponse> {

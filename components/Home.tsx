@@ -93,14 +93,13 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
   const renderDashboard = () => (
     <div className="space-y-12 animate-in fade-in duration-500">
       {tbdEvents.length > 0 && (
-        <section className="space-y-6">
-          <div className="flex items-center gap-3 px-2">
-            <h2 className="text-xl font-black text-gray-900 tracking-tight">Projets en cours</h2>
-            <span className="bg-amber-100 text-amber-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">{tbdEvents.length}</span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+            Projets en cours <span className="text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">{tbdEvents.length}</span>
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {tbdEvents.map(e => (
-              <button key={e.id} onClick={() => { setSelectedId(e.id); setView('event-detail'); }} className="text-left hover:scale-[1.02] transition-transform">
+              <button key={e.id} type="button" onClick={() => { setSelectedId(e.id); setView('event-detail'); }} className="text-left rounded-xl overflow-hidden hover:shadow-md transition-shadow">
                 <EventCard event={e} />
               </button>
             ))}
@@ -108,23 +107,22 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
         </section>
       )}
 
-      <section className="space-y-6">
-        <div className="flex items-center gap-3 px-2">
-          <h2 className="text-xl font-black text-gray-900 tracking-tight">À venir</h2>
-          <span className="bg-indigo-100 text-indigo-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">{upcomingEvents.length}</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+          À venir <span className="text-xs font-medium text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">{upcomingEvents.length}</span>
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {upcomingEvents.map(e => (
-            <button key={e.id} onClick={() => { setSelectedId(e.id); setView('event-detail'); }} className="text-left hover:scale-[1.02] transition-transform">
+            <button key={e.id} type="button" onClick={() => { setSelectedId(e.id); setView('event-detail'); }} className="text-left rounded-xl overflow-hidden hover:shadow-md transition-shadow">
               <EventCard event={e} />
             </button>
           ))}
           {upcomingEvents.length === 0 && tbdEvents.length === 0 && (
-            <div className="col-span-full py-20 bg-gray-50 border-2 border-dashed border-gray-100 rounded-[3rem] flex flex-col items-center justify-center text-gray-300">
-               <p className="font-bold italic mb-4 text-center px-6">Aucun événement à l'horizon.</p>
-               <div className="flex gap-4">
-                 <button onClick={() => setView('create-event')} className="text-indigo-600 font-black uppercase text-[10px] tracking-widest">+ Créer</button>
-                 <button onClick={() => setShowJoinModal(true)} className="text-indigo-400 font-black uppercase text-[10px] tracking-widest underline">Rejoindre</button>
+            <div className="py-12 sm:py-16 bg-gray-50/80 border border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center text-gray-500">
+               <p className="text-sm font-medium mb-4 text-center px-4">Aucun projet pour le moment.</p>
+               <div className="flex gap-3">
+                 <button type="button" onClick={() => setView('create-event')} className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">Créer un projet</button>
+                 <button type="button" onClick={() => setShowJoinModal(true)} className="px-4 py-2 border border-gray-300 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50">Rejoindre un projet</button>
                </div>
             </div>
           )}
@@ -132,11 +130,11 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
       </section>
 
       {pastEvents.length > 0 && (
-        <section className="space-y-6 opacity-60">
-          <h2 className="text-xl font-black text-gray-400 tracking-tight px-2">Historique</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <section className="space-y-4 pt-6 border-t border-gray-100">
+          <h2 className="text-lg font-semibold text-gray-500">Historique</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {pastEvents.map(e => (
-              <button key={e.id} onClick={() => { setSelectedId(e.id); setView('event-detail'); }} className="text-left grayscale">
+              <button key={e.id} type="button" onClick={() => { setSelectedId(e.id); setView('event-detail'); }} className="text-left rounded-xl overflow-hidden opacity-75 hover:opacity-90 hover:shadow-md transition-all">
                 <EventCard event={e} />
               </button>
             ))}
@@ -169,38 +167,35 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
 
   return (
     <div className="min-h-screen bg-[#FDFDFF] flex flex-col">
-      <nav className="bg-white/80 backdrop-blur-2xl border-b border-gray-100 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
-          <button onClick={() => setView('dashboard')}><Logo /></button>
-          <div className="flex items-center gap-4">
-             <div className="hidden sm:block text-right">
-                <p className="text-xs font-black text-gray-900">{user.firstName}</p>
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">ID: {user.id}</p>
-             </div>
-             <img src={`https://ui-avatars.com/api/?name=${user.firstName}+${user.lastName}&background=6366f1&color=fff&bold=true`} className="w-10 h-10 rounded-2xl border-2 border-white shadow-sm" alt="U"/>
-             <button onClick={onLogout} className="p-3 text-gray-300 hover:text-red-500 transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7"/></svg></button>
+      <nav className="bg-white border-b border-gray-100 sticky top-0 z-50" aria-label="Navigation principale">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex justify-between items-center">
+          <button type="button" onClick={() => setView('dashboard')} aria-label="Retour à l'accueil myEvent" className="focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-lg"><Logo /></button>
+          <div className="flex items-center gap-2 sm:gap-4">
+             <span className="hidden sm:inline text-sm font-medium text-gray-700">Bonjour, {user.firstName}</span>
+             <img src={`https://ui-avatars.com/api/?name=${user.firstName}+${user.lastName}&background=6366f1&color=fff&bold=true`} className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border-2 border-gray-100 shadow-sm" alt={`Avatar de ${user.firstName} ${user.lastName}`}/>
+             <button type="button" onClick={onLogout} className="p-2.5 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors" aria-label="Déconnexion"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7"/></svg></button>
           </div>
         </div>
       </nav>
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-10">
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-10">
         {view === 'dashboard' && (
-          <header className="flex flex-col sm:flex-row sm:items-center justify-between mb-12 gap-6">
-            <h1 className="text-4xl font-black text-gray-900 tracking-tighter">Votre Console</h1>
-            <div className="flex gap-3">
-              <button onClick={() => setShowJoinModal(true)} className="px-6 py-5 bg-white border-2 border-gray-100 text-gray-500 rounded-[2rem] font-black text-[11px] uppercase tracking-widest hover:bg-gray-50 transition-all">
-                Rejoindre
+          <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6 mb-8 sm:mb-10">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Mes projets</h1>
+            <div className="flex flex-wrap gap-2 sm:gap-3">
+              <button type="button" onClick={() => setShowJoinModal(true)} className="px-4 py-3 sm:px-5 sm:py-3.5 bg-white border border-gray-200 text-gray-600 rounded-xl font-semibold text-sm hover:bg-gray-50 transition-colors">
+                Rejoindre un projet
               </button>
-              <button onClick={() => setView('create-event')} className="px-10 py-5 bg-indigo-600 text-white rounded-[2rem] font-black text-[11px] uppercase tracking-widest shadow-2xl shadow-indigo-100 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-3">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-                Nouveau Projet
+              <button type="button" onClick={() => setView('create-event')} className="px-5 py-3 sm:px-6 sm:py-3.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm shadow-lg shadow-indigo-100 hover:bg-indigo-700 active:scale-[0.98] transition-all flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                Nouveau projet
               </button>
             </div>
           </header>
         )}
 
         {view === 'create-event' ? (
-          <div className="max-w-4xl mx-auto bg-white p-12 rounded-[4rem] border border-gray-100 shadow-2xl">
+          <div className="max-w-2xl mx-auto bg-white p-6 sm:p-8 md:p-10 rounded-2xl border border-gray-100 shadow-lg">
             <EventForm user={user} onCancel={() => setView('dashboard')} onSubmit={handleCreate} />
           </div>
         ) : view === 'event-detail' ? (

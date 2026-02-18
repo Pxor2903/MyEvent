@@ -18,7 +18,7 @@ export const AuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
-            <span className="text-2xl font-bold tracking-tight">EventMaster</span>
+            <span className="text-2xl font-bold tracking-tight">myEvent</span>
           </div>
         </div>
 
@@ -46,11 +46,11 @@ export const AuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }
       </div>
 
       {/* Right side: Form */}
-      <div className="flex-1 flex items-center justify-center p-6 md:p-12 overflow-y-auto bg-gray-50">
-        <div className="w-full max-w-lg bg-white rounded-3xl shadow-xl shadow-gray-200/50 p-8 md:p-10 border border-gray-100">
+      <main className="flex-1 flex items-center justify-center p-4 sm:p-6 md:p-12 overflow-y-auto bg-gray-100/80" id="main-content">
+        <div className="w-full max-w-md bg-white rounded-2xl sm:rounded-3xl shadow-lg shadow-gray-200/60 p-6 sm:p-8 md:p-10 border border-gray-100">
           {children}
         </div>
-      </div>
+      </main>
     </div>
   );
 };

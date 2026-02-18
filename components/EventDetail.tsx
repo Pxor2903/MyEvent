@@ -133,7 +133,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
         const byId = new Map(prev.map((m) => [m.id, m]));
         msgs.forEach((m) => byId.set(m.id, m));
         return Array.from(byId.values()).sort(
-          (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          (a: ChatMessage, b: ChatMessage) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
         );
       });
     };
@@ -208,7 +208,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
         const byId = new Map(prev.map((m) => [m.id, m]));
         msgs.forEach((m) => byId.set(m.id, m));
         return Array.from(byId.values()).sort(
-          (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          (a: ChatMessage, b: ChatMessage) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
         );
       });
     };
@@ -225,14 +225,14 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
     const text = [
       `Invitation co-organisateur – ${event.title}`,
       '',
-      'Pour rejoindre ce projet sur EventMaster :',
+      'Pour rejoindre ce projet sur myEvent :',
       '1. Ouvre l’app et clique sur « Rejoindre »',
       "2. Saisis la clé et le mot de passe ci-dessous (ou « Coller l'invitation ») :",
       '',
       `Clé de partage : ${event.shareCode.trim()}`,
       `Mot de passe : ${(event.sharePassword ?? '').trim()}`,
       '',
-      '— EventMaster'
+      '— myEvent'
     ].join('\n');
     if (navigator.share) {
       try { await navigator.share({ title: `Invitation – ${event.title}`, text }); } catch (e) {}
@@ -689,15 +689,15 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
             )}
 
             {activeTab === 'chat' && (
-              <div className="flex flex-col h-[500px] bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
+              <div className="flex flex-col bg-white rounded-2xl sm:rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm min-h-[280px] h-[min(500px,70dvh)] sm:h-[500px] max-h-[calc(100dvh-12rem)]">
                  {typingNames.length > 0 && (
-                   <div className="flex items-center gap-2 px-4 py-2 bg-indigo-50/80 border-b border-indigo-100 text-sm text-indigo-700 shrink-0">
+                   <div className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-indigo-50/80 border-b border-indigo-100 text-xs sm:text-sm text-indigo-700 shrink-0">
                      <span className="inline-flex gap-1" aria-hidden>
-                       <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                       <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                       <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                       <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                       <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                       <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '300ms' }} />
                      </span>
-                     <span className="font-medium">
+                     <span className="font-medium truncate">
                        {typingNames.length === 1
                          ? `${typingNames[0]} est en train d'écrire`
                          : typingNames.length === 2
@@ -706,19 +706,19 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                      </span>
                    </div>
                  )}
-                 <div ref={chatScrollContainerRef} className="flex-1 overflow-y-auto p-6 space-y-6 min-h-0">
+                 <div ref={chatScrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 space-y-4 sm:space-y-6 min-h-0 overscroll-behavior-contain">
                     {messages.map(m => (
                       <div key={m.id} className={`flex flex-col ${m.senderId === user.id ? 'items-end' : 'items-start'}`}>
                          <span className="text-[9px] font-black text-gray-300 mb-1 uppercase">{m.senderName}</span>
-                         <div className={`px-5 py-3 rounded-2xl max-w-[85%] text-sm shadow-sm ${m.senderId === user.id ? 'bg-indigo-600 text-white' : 'bg-gray-50 text-gray-700'}`}>
+                         <div className={`px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl max-w-[85%] text-sm shadow-sm break-words ${m.senderId === user.id ? 'bg-indigo-600 text-white' : 'bg-gray-50 text-gray-700'}`}>
                             {m.text}
                          </div>
                       </div>
                     ))}
                  </div>
-                 <form onSubmit={handleSendMessage} className="p-4 bg-gray-50/50 border-t border-gray-100 flex gap-3">
+                 <form onSubmit={handleSendMessage} className="p-3 sm:p-4 bg-gray-50/50 border-t border-gray-100 flex gap-2 sm:gap-3 shrink-0 pb-[env(safe-area-inset-bottom)] sm:pb-4">
                     <input
-                      className="flex-1 bg-white border-2 border-gray-100 rounded-2xl px-6 py-3 text-sm outline-none focus:border-indigo-500 transition-all disabled:opacity-60"
+                      className="flex-1 min-w-0 bg-white border-2 border-gray-100 rounded-xl sm:rounded-2xl px-4 py-3 sm:px-6 text-base sm:text-sm outline-none focus:border-indigo-500 transition-all disabled:opacity-60"
                       placeholder={canChat ? "Message d'équipe..." : "Accès messagerie restreint"}
                       value={newMessage}
                       onChange={e => {
@@ -726,11 +726,13 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                         reportTyping();
                       }}
                       disabled={!canChat}
+                      aria-label="Message"
                     />
                     <button
                       type="submit"
                       disabled={!canChat}
-                      className="p-4 bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="min-w-[44px] min-h-[44px] p-3 sm:p-4 bg-indigo-600 text-white rounded-xl sm:rounded-2xl shadow-lg shadow-indigo-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
+                      aria-label="Envoyer"
                     >
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 19l9-2-9-18-9 18 9-2zm0 0v-8"/></svg>
                     </button>

@@ -59,7 +59,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
         <div className="pt-8 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-xs text-gray-400 font-medium">
-            © {new Date().getFullYear()} EventMaster Pro. Tous droits réservés.
+            © {new Date().getFullYear()} myEvent. Tous droits réservés.
           </p>
           <div className="flex items-center gap-6">
             <span className="flex items-center gap-2 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">

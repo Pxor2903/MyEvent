@@ -31,10 +31,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSocialSubmit, 
   const isAnyLoading = isLoading || socialLoading !== null;
 
   return (
-    <div className="space-y-8">
-      <div className="space-y-3">
-        <h2 className="text-4xl font-black text-gray-900 tracking-tighter">Accès Dashboard</h2>
-        <p className="text-gray-400 font-medium">Content de vous revoir. Identifiez-vous pour continuer.</p>
+    <div className="space-y-6 sm:space-y-8">
+      <div className="space-y-2">
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Connexion</h2>
+        <p className="text-gray-500 text-sm sm:text-base">Identifiez-vous pour accéder à vos projets.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -52,7 +52,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSocialSubmit, 
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>}
         />
         <Input
-          label="Clé d'accès"
+          label="Mot de passe"
           type="password"
           placeholder="••••••••"
           value={password}
@@ -77,11 +77,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSocialSubmit, 
         <button
           type="submit"
           disabled={isAnyLoading}
-          className="w-full py-5 px-8 bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-widest text-[11px] rounded-2xl transition-all shadow-xl shadow-indigo-100 disabled:opacity-50 flex items-center justify-center gap-3"
+          className="w-full py-3.5 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl transition-colors shadow-lg shadow-indigo-100 disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {isLoading ? (
             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-          ) : 'Se connecter au système'}
+          ) : 'Se connecter'}
         </button>
       </form>
 

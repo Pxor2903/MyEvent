@@ -21,10 +21,16 @@ const App: React.FC = () => {
     let isMounted = true;
     authService.initSocialProviders();
 
+    const syncUserFromDb = async () => {
+      const user = await authService.getCurrentUser();
+      if (isMounted) setCurrentUser(user);
+      return user;
+    };
+
     const { data: authSubscription } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!isMounted) return;
       if (session?.user) {
-        setCurrentUser(authService.getProfileFromAuthUser(session.user));
+        syncUserFromDb();
       } else {
         setCurrentUser(null);
       }
@@ -44,7 +50,7 @@ const App: React.FC = () => {
             }
           }
           if (sessionUser && isMounted) {
-            setCurrentUser(authService.getProfileFromAuthUser(sessionUser));
+            await syncUserFromDb();
           }
           if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('auth_redirect_origin');
           window.history.replaceState({}, document.title, window.location.pathname);
@@ -54,8 +60,11 @@ const App: React.FC = () => {
 
         const { data: sessionData } = await supabase.auth.getSession();
         if (isMounted) {
-          const authUser = sessionData.session?.user || null;
-          setCurrentUser(authUser ? authService.getProfileFromAuthUser(authUser) : null);
+          if (sessionData.session?.user) {
+            await syncUserFromDb();
+          } else {
+            setCurrentUser(null);
+          }
           setIsInitializing(false);
         }
       } catch {
