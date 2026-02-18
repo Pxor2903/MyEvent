@@ -181,7 +181,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-10">
         {view === 'dashboard' && (
           <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6 mb-8 sm:mb-10">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Mes projets</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Vos Événements</h1>
             <div className="flex flex-wrap gap-2 sm:gap-3">
               <button type="button" onClick={() => setShowJoinModal(true)} className="px-4 py-3 sm:px-5 sm:py-3.5 bg-white border border-gray-200 text-gray-600 rounded-xl font-semibold text-sm hover:bg-gray-50 transition-colors">
                 Rejoindre un projet
