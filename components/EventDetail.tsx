@@ -9,6 +9,7 @@ import {
   isContactComplete,
   type ImportedContact
 } from '@/utils/contactImport';
+import { isNativeContactsAvailable, loadNativeContacts } from '@/utils/nativeContacts';
 import { Input } from './Input';
 
 interface EventDetailProps {
@@ -42,6 +43,11 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
   const [showImportGuestsModal, setShowImportGuestsModal] = useState(false);
   const [importedContacts, setImportedContacts] = useState<ImportedContact[]>([]);
   const [showExportHelp, setShowExportHelp] = useState(false);
+  const [nativeContactsAvailable, setNativeContactsAvailable] = useState<boolean | null>(null);
+  const [deviceContactList, setDeviceContactList] = useState<ImportedContact[] | null>(null);
+  const [deviceContactSelected, setDeviceContactSelected] = useState<Set<number>>(new Set());
+  const [deviceContactSearch, setDeviceContactSearch] = useState('');
+  const [loadingNativeContacts, setLoadingNativeContacts] = useState(false);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const [showEventSettingsModal, setShowEventSettingsModal] = useState(false);
   const [eventSettingsTab, setEventSettingsTab] = useState<'general' | 'appearance'>('general');
@@ -276,6 +282,22 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
   };
 
   const handleImportFromDevice = async () => {
+    const useNative = nativeContactsAvailable === true;
+    if (useNative) {
+      setLoadingNativeContacts(true);
+      try {
+        const list = await loadNativeContacts();
+        setDeviceContactList(list);
+        setDeviceContactSelected(new Set());
+        setDeviceContactSearch('');
+      } catch (e) {
+        console.error(e);
+        alert('Impossible d\'accéder aux contacts. Vérifie les autorisations.');
+      } finally {
+        setLoadingNativeContacts(false);
+      }
+      return;
+    }
     try {
       const contacts = await pickContactsFromDevice();
       if (contacts.length) setImportedContacts(contacts);
@@ -283,6 +305,31 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       console.error(e);
       alert('Impossible d\'accéder aux contacts.');
     }
+  };
+
+  useEffect(() => {
+    if (!showImportGuestsModal || nativeContactsAvailable !== null) return;
+    isNativeContactsAvailable().then(setNativeContactsAvailable);
+  }, [showImportGuestsModal, nativeContactsAvailable]);
+
+  const hasContactSource = isContactPickerAvailable() || nativeContactsAvailable === true;
+  const toggleDeviceContact = (index: number) => {
+    setDeviceContactSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
+  const confirmDeviceSelection = () => {
+    if (!deviceContactList) return;
+    const selected = Array.from(deviceContactSelected)
+      .map(i => deviceContactList[i])
+      .filter(Boolean);
+    setImportedContacts(selected);
+    setDeviceContactList(null);
+    setDeviceContactSelected(new Set());
+    setDeviceContactSearch('');
   };
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1338,55 +1385,111 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       {showImportGuestsModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-gray-900/80 backdrop-blur-xl">
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="p-6 border-b border-slate-200">
-              <h3 className="text-lg font-semibold text-slate-900">Importer des contacts</h3>
-              <p className="text-sm text-slate-600 mt-1">
-                Quand le <strong>sélecteur de contacts</strong> est disponible (Android Chrome, ou iPhone avec l’option activée), tu peux ouvrir la liste, cocher les contacts puis valider. Sinon, importe un fichier .vcf ou .csv.
-              </p>
-              <p className="text-xs text-slate-500 mt-1">Seuls les contacts que tu sélectionnes sont ajoutés à la séquence (aucune synchro du carnet).</p>
-              {importedContacts.length === 0 ? (
-                <div className="mt-4 space-y-3">
-                  {isContactPickerAvailable() && (
-                    <>
-                      <button type="button" onClick={handleImportFromDevice} className="w-full py-3 px-4 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 text-sm font-medium hover:bg-indigo-100">
-                        Ouvrir les contacts de l'appareil
+            {/* Étape : liste native avec cases à cocher */}
+            {deviceContactList !== null ? (
+              <>
+                <div className="p-4 border-b border-slate-200">
+                  <h3 className="text-lg font-semibold text-slate-900">Choisir des contacts</h3>
+                  <p className="text-xs text-slate-500 mt-1">Coche les invités à ajouter à la séquence, puis valide.</p>
+                  <input
+                    type="text"
+                    placeholder="Rechercher…"
+                    value={deviceContactSearch}
+                    onChange={e => setDeviceContactSearch(e.target.value)}
+                    className="mt-3 w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm"
+                  />
+                </div>
+                <div className="flex-1 overflow-y-auto p-2 min-h-0">
+                  {deviceContactList
+                    .map((c, idx) => ({ c, idx }))
+                    .filter(({ c }) => {
+                      const q = deviceContactSearch.trim().toLowerCase();
+                      if (!q) return true;
+                      const s = `${c.firstName} ${c.lastName} ${c.email} ${c.phone}`.toLowerCase();
+                      return s.includes(q);
+                    })
+                    .map(({ c, idx }) => {
+                      const selected = deviceContactSelected.has(idx);
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => toggleDeviceContact(idx)}
+                          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left border ${selected ? 'border-indigo-300 bg-indigo-50' : 'border-slate-100 hover:bg-slate-50'}`}
+                        >
+                          <span className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${selected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
+                            {selected && <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="font-medium text-slate-900 truncate">{c.firstName} {c.lastName}</p>
+                            <p className="text-xs text-slate-500 truncate">{c.email || c.phone || '—'}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                </div>
+                <div className="p-4 border-t border-slate-200 flex gap-3">
+                  <button type="button" onClick={() => { setDeviceContactList(null); setDeviceContactSelected(new Set()); setDeviceContactSearch(''); }} className="flex-1 py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Annuler</button>
+                  <button type="button" onClick={confirmDeviceSelection} disabled={deviceContactSelected.size === 0} className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed">
+                    Valider ({deviceContactSelected.size})
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="p-6 border-b border-slate-200">
+                  <h3 className="text-lg font-semibold text-slate-900">Ajouter des invités</h3>
+                  <p className="text-sm text-slate-600 mt-1">Choisis dans tes contacts ou ajoute à la main. Seuls les contacts que tu sélectionnes sont utilisés.</p>
+                  {importedContacts.length === 0 ? (
+                    <div className="mt-4 space-y-3">
+                      {hasContactSource && (
+                        <button
+                          type="button"
+                          disabled={loadingNativeContacts}
+                          onClick={handleImportFromDevice}
+                          className="w-full py-3 px-4 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 text-sm font-medium hover:bg-indigo-100 disabled:opacity-70"
+                        >
+                          {loadingNativeContacts ? 'Chargement des contacts…' : 'Choisir dans mes contacts'}
+                        </button>
+                      )}
+                      <button type="button" onClick={() => { setShowImportGuestsModal(false); setShowGuestModal(true); }} className="w-full py-3 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
+                        Ajouter un invité à la main
                       </button>
-                      <p className="text-xs text-slate-500">Ouvre la liste native : coche les contacts à importer, puis valide.</p>
+                      <button type="button" onClick={handleShare} className="w-full py-3 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
+                        Partager l’invitation (lien co-organisateur)
+                      </button>
+                      <details className="group">
+                        <summary className="text-xs text-indigo-600 font-medium cursor-pointer list-none">Import avancé (fichier .vcf ou .csv)</summary>
+                        <div className="mt-2 space-y-2">
+                          <input ref={importFileInputRef} type="file" accept=".vcf,.csv,text/vcard,text/csv" className="hidden" onChange={handleImportFile} />
+                          <button type="button" onClick={() => importFileInputRef.current?.click()} className="block w-full py-2 px-3 rounded-lg border border-slate-200 text-slate-600 text-xs hover:bg-slate-50">
+                            Choisir un fichier
+                          </button>
+                          <button type="button" onClick={() => setShowExportHelp(v => !v)} className="text-xs text-slate-500 underline">
+                            {showExportHelp ? 'Masquer l’aide' : 'Comment exporter mes contacts ?'}
+                          </button>
+                          {showExportHelp && (
+                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600 space-y-1">
+                              <p><strong>iPhone / Android :</strong> App Contacts → Partager / Exporter → .vcf</p>
+                              <p><strong>Mac / PC :</strong> Contacts ou Outlook → Exporter en .vcf ou .csv</p>
+                            </div>
+                          )}
+                        </div>
+                      </details>
+                      {!hasContactSource && nativeContactsAvailable === false && (
+                        <p className="text-xs text-slate-500">Sur ce navigateur, utilise « Ajouter à la main » ou l’import fichier. Sur l’app mobile (iOS/Android), le bouton « Choisir dans mes contacts » apparaît.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm text-slate-600 mt-1">{importedContacts.length} contact(s) sélectionné(s).</p>
+                      {importedContacts.some(c => !isContactComplete(c)) && (
+                        <p className="text-xs text-amber-600 mt-1">Complète les champs manquants (nom, prénom, et au moins email ou tél) pour les contacts ci-dessous.</p>
+                      )}
                     </>
                   )}
-                  {!isContactPickerAvailable() && (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3 text-xs text-slate-700">
-                      <p className="font-medium text-amber-800">Pas de bouton « Ouvrir les contacts » ?</p>
-                      <p className="mt-1"><strong>iPhone :</strong> Réglages → Safari → Avancé → Fonctions expérimentales → activer « Contact Picker API ». Recharge l’app puis le bouton apparaîtra.</p>
-                      <p className="mt-1"><strong>Mac / PC :</strong> les navigateurs n’ont pas encore cette option ; utilise l’import de fichier ci-dessous.</p>
-                    </div>
-                  )}
-                  <input ref={importFileInputRef} type="file" accept=".vcf,.csv,text/vcard,text/csv" className="hidden" onChange={handleImportFile} />
-                  <button type="button" onClick={() => importFileInputRef.current?.click()} className="w-full py-3 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
-                    Importer un fichier (.vcf ou .csv)
-                  </button>
-                  <button type="button" onClick={() => setShowExportHelp(v => !v)} className="text-xs text-indigo-600 font-medium">
-                    {showExportHelp ? 'Masquer' : 'Comment exporter mes contacts ?'}
-                  </button>
-                  {showExportHelp && (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 space-y-2">
-                      <p><strong>iPhone :</strong> App Contacts → sélectionner les contacts ou « Tous mes contacts » → Partager → Enregistrer dans Fichiers (fichier .vcf).</p>
-                      <p><strong>Android :</strong> App Contacts → Menu (⋮) → Exporter vers le stockage / Partager → .vcf.</p>
-                      <p><strong>Mac :</strong> App Contacts → Fichier → Exporter… → Archive vCard (.vcf).</p>
-                      <p><strong>PC (Outlook / Windows) :</strong> Exporter les contacts en .csv (Fichier → Exporter) puis importer le fichier ici.</p>
-                    </div>
-                  )}
                 </div>
-              ) : (
-                <>
-                  <p className="text-sm text-slate-600 mt-1">{importedContacts.length} contact(s) importé(s).</p>
-                  {importedContacts.some(c => !isContactComplete(c)) && (
-                    <p className="text-xs text-amber-600 mt-1">Complétez les champs manquants (nom, prénom, et au moins email ou tél) pour les contacts ci-dessous.</p>
-                  )}
-                </>
-              )}
-            </div>
-            {importedContacts.length > 0 && (
+                {importedContacts.length > 0 && (
               <>
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
                   {importedContacts.map((c, i) => (
@@ -1402,15 +1505,17 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                   ))}
                 </div>
                 <div className="p-4 border-t border-slate-200 flex gap-3">
-                  <button type="button" onClick={() => { setImportedContacts([]); setShowExportHelp(false); setShowImportGuestsModal(false); }} className="flex-1 py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Annuler</button>
+                  <button type="button" onClick={() => { setImportedContacts([]); setShowExportHelp(false); setDeviceContactList(null); setShowImportGuestsModal(false); }} className="flex-1 py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Annuler</button>
                   <button type="button" onClick={handleAddAllImportedGuests} className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl">Ajouter tous à la séquence</button>
                 </div>
               </>
             )}
             {importedContacts.length === 0 && (
               <div className="p-4 border-t border-slate-200">
-                <button type="button" onClick={() => { setShowExportHelp(false); setShowImportGuestsModal(false); }} className="w-full py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Fermer</button>
+                <button type="button" onClick={() => { setShowExportHelp(false); setDeviceContactList(null); setShowImportGuestsModal(false); }} className="w-full py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Fermer</button>
               </div>
+            )}
+              </>
             )}
           </div>
         </div>
