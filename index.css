@@ -1,0 +1,27 @@
+/* myEvent — base styles */
+body {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  background-color: #fafafa;
+  -webkit-tap-highlight-color: transparent;
+}
+
+* {
+  scroll-behavior: smooth;
+}
+
+input:focus, button:focus {
+  outline: none;
+}
+input:focus-visible, button:focus-visible {
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4);
+}
+
+/* Toast */
+.toast-enter { transform: translateY(100%); opacity: 0; }
+.toast-enter-active { transform: translateY(0); opacity: 1; transition: all 0.25s ease; }
+
+/* Hide scrollbar for tab bar when needed */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

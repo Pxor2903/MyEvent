@@ -463,58 +463,51 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
   };
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-[3rem] border border-gray-100 shadow-2xl overflow-hidden min-w-0">
+    <div className="flex flex-col h-full bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-w-0">
       {/* HEADER */}
-      <div className="relative h-56 flex-shrink-0">
-        <img src={event.image || `https://picsum.photos/seed/${event.id}/1200/400`} className="w-full h-full object-cover" alt="B"/>
-        <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/40 to-transparent"></div>
-        <button onClick={onBack} className="absolute top-6 left-6 p-4 bg-white/10 backdrop-blur-xl text-white rounded-2xl border border-white/20">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7"/></svg>
+      <div className="relative h-48 flex-shrink-0">
+        <img src={event.image || `https://picsum.photos/seed/${event.id}/1200/400`} className="w-full h-full object-cover" alt="" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent" />
+        <button type="button" onClick={onBack} className="absolute top-4 left-4 p-2.5 bg-white/90 text-slate-800 rounded-xl hover:bg-white" aria-label="Retour">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"/></svg>
         </button>
         {canEditEvent && (
-          <button
-            onClick={openEventSettings}
-            className="absolute top-6 right-6 p-4 bg-white/10 backdrop-blur-xl text-white rounded-2xl border border-white/20 hover:bg-white/20 transition-colors"
-            title="Réglages du projet"
-          >
+          <button type="button" onClick={openEventSettings} className="absolute top-4 right-4 p-2.5 bg-white/90 text-slate-800 rounded-xl hover:bg-white" title="Réglages">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
           </button>
         )}
-        <div className="absolute bottom-6 left-8 right-8">
-          <h1 className="text-3xl font-black text-white truncate mb-1">{event.title}</h1>
-          <div className="flex items-center gap-3 text-white/60 text-[10px] font-black uppercase tracking-widest">
-            <span>📅 {event.isDateTBD ? "À confirmer" : formatDate(event.startDate)}</span>
-            <span>📍 {event.location || "Lieu à définir"}</span>
-          </div>
+        <div className="absolute bottom-4 left-4 right-4">
+          <h1 className="text-2xl font-semibold text-white truncate">{event.title}</h1>
+          <p className="text-white/80 text-sm mt-0.5">{event.isDateTBD ? "À confirmer" : formatDate(event.startDate)} · {event.location || "Lieu à définir"}</p>
         </div>
       </div>
 
       {!selectedSubId ? (
         <>
-          <nav className="flex px-4 border-b border-gray-50 bg-gray-50/30 overflow-x-auto no-scrollbar">
+          <nav className="flex gap-1 px-4 pt-2 border-b border-slate-200 overflow-x-auto no-scrollbar" aria-label="Onglets">
             {[
-              { id: 'overview', label: 'Dashboard' },
+              { id: 'overview', label: "Vue d'ensemble" },
               { id: 'program', label: 'Programme' },
-              { id: 'chat', label: 'Messagerie' },
+              { id: 'chat', label: 'Chat' },
               { id: 'settings', label: 'Équipe' }
             ].map(tab => (
               (tab.id !== 'settings' || isOwner) && (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`py-5 px-6 text-[11px] font-black uppercase tracking-widest relative whitespace-nowrap ${activeTab === tab.id ? 'text-indigo-600' : 'text-gray-400'}`}>
+                <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id as any)} className={`py-3 px-4 text-sm font-medium rounded-t-lg whitespace-nowrap relative ${activeTab === tab.id ? 'text-indigo-600 bg-slate-50' : 'text-slate-500 hover:text-slate-700'}`}>
                   {tab.label}
-                  {tab.id === 'settings' && pendingOrganizers.length > 0 && <span className="absolute top-4 right-3 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>}
-                  {activeTab === tab.id && <div className="absolute bottom-0 left-4 right-4 h-1 bg-indigo-600 rounded-t-full"></div>}
+                  {tab.id === 'settings' && pendingOrganizers.length > 0 && <span className="absolute top-2 right-1 w-2 h-2 bg-red-500 rounded-full" />}
+                  {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-t" />}
                 </button>
               )
             ))}
           </nav>
 
-          <div className="flex-1 p-8 overflow-y-auto min-w-0 space-y-8">
+          <div className="flex-1 p-6 overflow-y-auto min-w-0 space-y-6">
             {activeTab === 'overview' && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="md:col-span-2 space-y-8">
                   <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-                    <h3 className="text-xl font-black text-gray-900 mb-4">Brief du projet</h3>
-                    <p className="text-gray-500 text-sm leading-relaxed whitespace-pre-wrap">{event.description || "Aucun brief."}</p>
+                    <h3 className="text-xl font-black text-gray-900 mb-4">Description</h3>
+                    <p className="text-gray-500 text-sm leading-relaxed whitespace-pre-wrap">{event.description || "Aucune description."}</p>
                   </div>
                   <div className="bg-indigo-50/50 p-6 rounded-[2.5rem] border border-indigo-100/50 flex flex-col sm:flex-row items-center justify-between gap-4">
                      <div>
@@ -527,7 +520,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 {canViewBudget && (
                   <div className="space-y-4">
                     <div className="bg-indigo-600 p-8 rounded-[2.5rem] text-white shadow-xl shadow-indigo-100">
-                      <p className="text-[10px] font-black uppercase opacity-60 mb-2">Budget Projet</p>
+                      <p className="text-[10px] font-black uppercase opacity-60 mb-2">Budget</p>
                       <p className="text-3xl font-black">{event.budget.toLocaleString()}€</p>
                     </div>
                   </div>
@@ -536,28 +529,17 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
             )}
 
             {activeTab === 'program' && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between px-2">
-                  <h3 className="text-2xl font-black text-gray-900">Programme</h3>
-                  <button
-                    onClick={() => setShowSequenceModal(true)}
-                    disabled={!canManageProgram}
-                    className={`bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-100 active:scale-95 transition-all ${!canManageProgram ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  >
-                    + Séquence
-                  </button>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-slate-900">Programme</h3>
+                  <button type="button" onClick={() => setShowSequenceModal(true)} disabled={!canManageProgram} className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">+ Séquence</button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {event.subEvents.map(sub => (
-                    <button key={sub.id} onClick={() => { setSelectedSubId(sub.id); setSubTab('moments'); }} className="p-8 bg-white border border-gray-100 rounded-[2.5rem] hover:border-indigo-600 hover:shadow-xl transition-all text-left group">
-                       <span className="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase mb-4 inline-block">
-                         {sub.date ? new Date(sub.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'TBD'}
-                       </span>
-                       <h4 className="text-lg font-black text-gray-900 mb-2 truncate">{sub.title}</h4>
-                       <p className="text-gray-400 text-xs truncate flex items-center gap-2">
-                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-                         {sub.location || "Lieu global"}
-                       </p>
+                    <button key={sub.id} type="button" onClick={() => { setSelectedSubId(sub.id); setSubTab('moments'); }} className="p-4 rounded-xl border border-slate-200 bg-white hover:border-indigo-300 hover:shadow-md text-left transition-all">
+                      <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md">{sub.date ? new Date(sub.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBD'}</span>
+                      <h4 className="text-base font-semibold text-slate-900 mt-2 truncate">{sub.title}</h4>
+                      <p className="text-slate-500 text-xs mt-1 truncate flex items-center gap-1"><svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>{sub.location || "Lieu global"}</p>
                     </button>
                   ))}
                 </div>
