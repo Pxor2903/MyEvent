@@ -12,7 +12,7 @@ interface EventDetailProps {
 }
 
 export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, onUpdate }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'program' | 'chat' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'program' | 'chat' | 'settings' | 'budget'>('overview');
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
   const [subTab, setSubTab] = useState<'details' | 'moments' | 'guests'>('details');
 
@@ -489,7 +489,8 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
               { id: 'overview', label: "Vue d'ensemble" },
               { id: 'program', label: 'Programme' },
               { id: 'chat', label: 'Chat' },
-              { id: 'settings', label: 'Équipe' }
+              { id: 'settings', label: 'Équipe' },
+              ...(canViewBudget ? [{ id: 'budget', label: 'Budget' }] : [])
             ].map(tab => (
               (tab.id !== 'settings' || isOwner) && (
                 <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id as any)} className={`py-3 px-4 text-sm font-medium rounded-t-lg whitespace-nowrap relative ${activeTab === tab.id ? 'text-indigo-600 bg-slate-50' : 'text-slate-500 hover:text-slate-700'}`}>
@@ -503,28 +504,89 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
 
           <div className="flex-1 p-6 overflow-y-auto min-w-0 space-y-6">
             {activeTab === 'overview' && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="md:col-span-2 space-y-8">
-                  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-                    <h3 className="text-xl font-black text-gray-900 mb-4">Description</h3>
-                    <p className="text-gray-500 text-sm leading-relaxed whitespace-pre-wrap">{event.description || "Aucune description."}</p>
-                  </div>
-                  <div className="bg-indigo-50/50 p-6 rounded-[2.5rem] border border-indigo-100/50 flex flex-col sm:flex-row items-center justify-between gap-4">
-                     <div>
-                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Co-Organisation</p>
-                        <p className="text-sm font-bold text-indigo-900">Partagez l'accès pour recruter des admins.</p>
-                     </div>
-                     <button onClick={handleShare} className="bg-white text-indigo-600 px-6 py-3 rounded-2xl font-black text-[10px] uppercase shadow-sm active:scale-95 transition-all">Partager l’invitation</button>
-                  </div>
+              <div className="space-y-6">
+                <div className="w-full p-5 rounded-xl border border-slate-200 bg-slate-50/30">
+                  <h3 className="text-base font-semibold text-slate-900 mb-2">Description du projet</h3>
+                  <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">{event.description || "Aucune description."}</p>
                 </div>
-                {canViewBudget && (
-                  <div className="space-y-4">
-                    <div className="bg-indigo-600 p-8 rounded-[2.5rem] text-white shadow-xl shadow-indigo-100">
-                      <p className="text-[10px] font-black uppercase opacity-60 mb-2">Budget</p>
-                      <p className="text-3xl font-black">{event.budget.toLocaleString()}€</p>
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                  <div className="lg:col-span-3 rounded-xl border border-slate-200 bg-white overflow-hidden">
+                    <button type="button" onClick={() => { setActiveTab('program'); setSelectedSubId(null); }} className="w-full text-left px-4 py-3 border-b border-slate-100 flex items-center justify-between group hover:bg-slate-50">
+                      <h3 className="text-sm font-semibold text-slate-900">Programme</h3>
+                      <span className="text-xs text-slate-500 group-hover:text-indigo-600">Voir tout →</span>
+                    </button>
+                    <div className="p-2 max-h-[320px] overflow-y-auto">
+                      {(() => {
+                        const sorted = [...event.subEvents].sort((a, b) => ((a.date ? new Date(a.date).getTime() : 0) - (b.date ? new Date(b.date).getTime() : 0)));
+                        if (sorted.length === 0) return <p className="p-4 text-slate-400 text-sm">Aucun créneau au programme.</p>;
+                        return (
+                          <ul className="relative space-y-0 pl-1">
+                            <div className="absolute left-5 top-3 bottom-3 w-px bg-slate-200" aria-hidden />
+                            {sorted.map((sub) => (
+                              <li key={sub.id}>
+                                <button type="button" onClick={() => { setSelectedSubId(sub.id); setActiveTab('program'); setSubTab('moments'); }} className="w-full text-left flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors relative">
+                                  <span className="flex flex-col items-center shrink-0 w-12 pt-0.5 relative z-10">
+                                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{sub.date ? new Date(sub.date).toLocaleDateString('fr-FR', { weekday: 'short' }) : '—'}</span>
+                                    <span className="text-lg font-bold text-slate-800 leading-tight">{sub.date ? new Date(sub.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : 'TBD'}</span>
+                                  </span>
+                                  <div className="min-w-0 flex-1 border-l border-slate-200 pl-3">
+                                    <p className="font-medium text-slate-900 truncate">{sub.title || 'Sans titre'}</p>
+                                    <p className="text-xs text-slate-500 truncate mt-0.5">{sub.date && new Date(sub.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}{sub.location && ` · ${sub.location}`}</p>
+                                  </div>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        );
+                      })()}
                     </div>
                   </div>
-                )}
+                  {canViewBudget && (
+                    <div className="lg:col-span-2">
+                      <button type="button" onClick={() => setActiveTab('budget')} className="w-full h-full min-h-[240px] rounded-xl border border-slate-200 bg-white p-4 flex flex-col items-center justify-center gap-3 hover:border-indigo-200 hover:shadow-md transition-all">
+                        <h3 className="text-sm font-semibold text-slate-900 w-full">Budget</h3>
+                        {event.budget > 0 ? (
+                          <>
+                            <div
+                              className="w-32 h-32 rounded-full flex-shrink-0 border-4 border-white shadow-md"
+                              style={{ background: `conic-gradient(#6366f1 0deg 360deg)` }}
+                              aria-hidden
+                            />
+                            <p className="text-xl font-semibold text-slate-900">{event.budget.toLocaleString('fr-FR')} €</p>
+                            <p className="text-xs text-slate-500">Cliquer pour le détail</p>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-32 h-32 rounded-full bg-slate-100 flex items-center justify-center" aria-hidden><span className="text-3xl text-slate-300">€</span></div>
+                            <p className="text-sm text-slate-500">Aucun budget renseigné</p>
+                            <p className="text-xs text-slate-400">Cliquer pour gérer</p>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="p-5 rounded-xl border border-indigo-100 bg-indigo-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-indigo-900">Inviter des co-organisateurs</p>
+                    <p className="text-xs text-indigo-600 mt-0.5">Partagez l'accès pour travailler à plusieurs.</p>
+                  </div>
+                  <button type="button" onClick={handleShare} className="px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 shrink-0">Partager l'invitation</button>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'budget' && canViewBudget && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-slate-900">Budget du projet</h2>
+                  <button type="button" onClick={() => setActiveTab('overview')} className="text-sm text-indigo-600 font-medium hover:underline">← Vue d'ensemble</button>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-6">
+                  <p className="text-sm text-slate-500 mb-2">Budget total</p>
+                  <p className="text-3xl font-semibold text-slate-900">{event.budget.toLocaleString('fr-FR')} €</p>
+                  <p className="mt-4 text-xs text-slate-400">La répartition des dépenses par poste sera disponible dans une prochaine version.</p>
+                </div>
               </div>
             )}
 

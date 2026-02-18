@@ -1,8 +1,11 @@
 /* myEvent — base styles */
 body {
   font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-  background-color: #fafafa;
+  background-color: #f8fafc;
   -webkit-tap-highlight-color: transparent;
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 * {
