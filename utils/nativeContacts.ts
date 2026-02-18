@@ -1,11 +1,13 @@
 /**
- * Contacts natifs (Capacitor) : iOS / Android.
- * Utilisé quand l'app tourne dans le shell natif (cap run ios / cap run android).
- * Demande la permission au moment du clic, charge la liste, l'UI affiche recherche + cases à cocher → sélection uniquement.
+ * Option A — Import direct via permissions (iOS CNContactStore / Android ContactsContract).
+ * Flux : clic → demande autorisation Contacts → affiche liste avec recherche → coche → importe.
+ * Utilisé uniquement en app native (Capacitor iOS/Android).
  */
 
 import { Capacitor } from '@capacitor/core';
 import type { ImportedContact } from './contactImport';
+
+export const isNativePlatform = (): boolean => Capacitor.isNativePlatform();
 
 let Contacts: typeof import('@capacitor-community/contacts').Contacts | null = null;
 
@@ -20,22 +22,33 @@ async function getContactsPlugin() {
   }
 }
 
-/** True si on tourne en natif (iOS/Android) et que le plugin contacts est disponible. */
+/** True si on est en natif et que le plugin contacts est chargé (pour message UI). */
 export async function isNativeContactsAvailable(): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) return false;
   const C = await getContactsPlugin();
   return !!C;
 }
 
-/** Charge la liste des contacts (après permission). À utiliser uniquement en natif. Retourne [] si refus ou erreur. */
-export async function loadNativeContacts(): Promise<ImportedContact[]> {
-  if (!Capacitor.isNativePlatform()) return [];
+export type LoadNativeContactsResult = {
+  contacts: ImportedContact[];
+  permissionDenied: boolean;
+};
+
+/**
+ * Option A : demande la permission Contacts, puis charge la liste.
+ * À appeler au clic (geste utilisateur). En cas de refus, permissionDenied = true.
+ */
+export async function loadNativeContacts(): Promise<LoadNativeContactsResult> {
+  const empty = { contacts: [] as ImportedContact[], permissionDenied: false };
+  if (!Capacitor.isNativePlatform()) return empty;
   const C = await getContactsPlugin();
-  if (!C) return [];
+  if (!C) return empty;
   try {
     const status = await C.requestPermissions();
     const allowed = status.contacts === 'granted' || status.contacts === 'limited';
-    if (!allowed) return [];
+    if (!allowed) {
+      return { contacts: [], permissionDenied: true };
+    }
     const { contacts } = await C.getContacts({
       projection: {
         name: true,
@@ -49,7 +62,7 @@ export async function loadNativeContacts(): Promise<ImportedContact[]> {
         image: false
       }
     });
-    return (contacts || []).map((c: any) => {
+    const list = (contacts || []).map((c: any) => {
       const name = c.name || {};
       const given = (name.given || '').trim();
       const family = (name.family || '').trim();
@@ -71,8 +84,9 @@ export async function loadNativeContacts(): Promise<ImportedContact[]> {
         address
       } as ImportedContact;
     });
+    return { contacts: list, permissionDenied: false };
   } catch (e) {
     console.error('loadNativeContacts', e);
-    return [];
+    return empty;
   }
 }

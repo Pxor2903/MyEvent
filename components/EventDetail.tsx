@@ -9,7 +9,7 @@ import {
   isContactComplete,
   type ImportedContact
 } from '@/utils/contactImport';
-import { isNativeContactsAvailable, loadNativeContacts } from '@/utils/nativeContacts';
+import { isNativePlatform, loadNativeContacts } from '@/utils/nativeContacts';
 import { Input } from './Input';
 
 interface EventDetailProps {
@@ -43,7 +43,6 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
   const [showImportGuestsModal, setShowImportGuestsModal] = useState(false);
   const [importedContacts, setImportedContacts] = useState<ImportedContact[]>([]);
   const [showExportHelp, setShowExportHelp] = useState(false);
-  const [nativeContactsAvailable, setNativeContactsAvailable] = useState<boolean | null>(null);
   const [deviceContactList, setDeviceContactList] = useState<ImportedContact[] | null>(null);
   const [deviceContactSelected, setDeviceContactSelected] = useState<Set<number>>(new Set());
   const [deviceContactSearch, setDeviceContactSearch] = useState('');
@@ -281,18 +280,22 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
     setSeqForm({ title: '', date: '', location: '' });
   };
 
+  /** Option A : clic → permission Contacts → liste avec recherche → coche → import. */
   const handleImportFromDevice = async () => {
-    const useNative = nativeContactsAvailable === true;
-    if (useNative) {
+    if (isNativePlatform()) {
       setLoadingNativeContacts(true);
       try {
-        const list = await loadNativeContacts();
-        setDeviceContactList(list);
+        const result = await loadNativeContacts();
+        if (result.permissionDenied) {
+          alert('Accès aux contacts refusé. Tu peux l’autoriser dans Réglages du téléphone, ou ajouter des invités à la main.');
+          return;
+        }
+        setDeviceContactList(result.contacts);
         setDeviceContactSelected(new Set());
         setDeviceContactSearch('');
       } catch (e) {
         console.error(e);
-        alert('Impossible d\'accéder aux contacts. Vérifie les autorisations.');
+        alert('Impossible d’accéder aux contacts. Vérifie les autorisations.');
       } finally {
         setLoadingNativeContacts(false);
       }
@@ -303,16 +306,11 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       if (contacts.length) setImportedContacts(contacts);
     } catch (e) {
       console.error(e);
-      alert('Impossible d\'accéder aux contacts.');
+      alert('Impossible d’accéder aux contacts.');
     }
   };
 
-  useEffect(() => {
-    if (!showImportGuestsModal || nativeContactsAvailable !== null) return;
-    isNativeContactsAvailable().then(setNativeContactsAvailable);
-  }, [showImportGuestsModal, nativeContactsAvailable]);
-
-  const hasContactSource = isContactPickerAvailable() || nativeContactsAvailable === true;
+  const hasContactSource = isContactPickerAvailable() || isNativePlatform();
   const toggleDeviceContact = (index: number) => {
     setDeviceContactSelected(prev => {
       const next = new Set(prev);
@@ -1476,7 +1474,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                           )}
                         </div>
                       </details>
-                      {!hasContactSource && nativeContactsAvailable === false && (
+                      {!hasContactSource && (
                         <p className="text-xs text-slate-500">Sur ce navigateur, utilise « Ajouter à la main » ou l’import fichier. Sur l’app mobile (iOS/Android), le bouton « Choisir dans mes contacts » apparaît.</p>
                       )}
                     </div>
