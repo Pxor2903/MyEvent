@@ -14,7 +14,7 @@ interface EventDetailProps {
 export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, onUpdate }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'program' | 'chat' | 'settings' | 'budget'>('overview');
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
-  const [subTab, setSubTab] = useState<'details' | 'moments' | 'guests'>('details');
+  const [subTab, setSubTab] = useState<'details' | 'moments' | 'guests' | 'chat'>('moments');
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -115,6 +115,8 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
     !allowedSubIds?.length || allowedSubIds.includes(subId);
   const canManageProgramHere = canManageProgram && (!selectedSubId || canManageSubEvent(selectedSubId));
   const canManageGuestsHere = canManageGuests && (!selectedSubId || canManageSubEvent(selectedSubId));
+  const canChatForCurrentSubEvent = !!selectedSubId && (isOwner || (canChat && canManageSubEvent(selectedSubId)));
+  const canSendChat = selectedSubId ? canChatForCurrentSubEvent : canChat;
 
   // Chargement + abonnement Realtime pour la messagerie (mise à jour en direct sans recharger)
   useEffect(() => {
@@ -359,9 +361,25 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
     }, 3000);
   }, [canChat, user.id, user.firstName, user.lastName]);
 
+  const handleDeleteSubEvent = async () => {
+    if (!canManageProgramHere || !selectedSubId) return;
+    if (!confirm('Supprimer cette séquence ? Les jalons et participants liés ne seront plus associés à une séquence.')) return;
+    try {
+      const updated = await dbService.updateEventAtomic(event.id, (evt) => ({
+        ...evt,
+        subEvents: evt.subEvents.filter((s) => s.id !== selectedSubId)
+      }));
+      onUpdate(updated);
+      setSelectedSubId(null);
+    } catch (err) {
+      console.error(err);
+      alert('Impossible de supprimer la séquence.');
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canChat) return;
+    if (!canSendChat) return;
     const text = newMessage.trim();
     if (!text) return;
     if (typingTimeoutRef.current) {
@@ -791,18 +809,18 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                  <form onSubmit={handleSendMessage} className="p-3 sm:p-4 bg-gray-50/50 border-t border-gray-100 flex gap-2 sm:gap-3 shrink-0 pb-[env(safe-area-inset-bottom)] sm:pb-4">
                     <input
                       className="flex-1 min-w-0 bg-white border-2 border-gray-100 rounded-xl sm:rounded-2xl px-4 py-3 sm:px-6 text-base sm:text-sm outline-none focus:border-indigo-500 transition-all disabled:opacity-60"
-                      placeholder={canChat ? "Message d'équipe..." : "Accès messagerie restreint"}
+                      placeholder={canSendChat ? "Message d'équipe..." : "Accès messagerie restreint"}
                       value={newMessage}
                       onChange={e => {
                         setNewMessage(e.target.value);
                         reportTyping();
                       }}
-                      disabled={!canChat}
+                      disabled={!canSendChat}
                       aria-label="Message"
                     />
                     <button
                       type="submit"
-                      disabled={!canChat}
+                      disabled={!canSendChat}
                       className="min-w-[44px] min-h-[44px] p-3 sm:p-4 bg-indigo-600 text-white rounded-xl sm:rounded-2xl shadow-lg shadow-indigo-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
                       aria-label="Envoyer"
                     >
@@ -816,9 +834,9 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       ) : (
         /* VUE SÉQUENCE */
         <div className="flex-1 flex flex-col bg-white min-w-0 animate-in slide-in-from-right-8 duration-500">
-           <header className="px-8 py-6 bg-gray-900 text-white flex items-center justify-between">
+           <header className="px-8 py-6 bg-gray-900 text-white flex items-center justify-between gap-4">
               <div className="flex items-center gap-6 min-w-0 flex-1">
-                 <button onClick={() => setSelectedSubId(null)} className="p-3 bg-white/10 rounded-2xl hover:bg-white/20 transition-all">
+                 <button type="button" onClick={() => setSelectedSubId(null)} className="p-3 bg-white/10 rounded-2xl hover:bg-white/20 transition-all" aria-label="Retour au programme">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7"/></svg>
                  </button>
                  <div className="min-w-0">
@@ -826,12 +844,17 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     <p className="text-white/40 text-[9px] font-black uppercase tracking-widest">Séquence du programme</p>
                  </div>
               </div>
+              {canManageProgramHere && (
+                <button type="button" onClick={handleDeleteSubEvent} className="p-3 rounded-2xl bg-red-500/20 text-red-200 hover:bg-red-500/30 transition-colors shrink-0" title="Supprimer cette séquence">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              )}
            </header>
 
            <nav className="flex px-4 border-b border-gray-100 bg-gray-50/30 overflow-x-auto no-scrollbar">
-              {['moments', 'details', 'guests'].map(t => (
-                <button key={t} onClick={() => setSubTab(t as any)} className={`py-5 px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap ${subTab === t ? 'text-indigo-600' : 'text-gray-400'}`}>
-                  {t === 'moments' ? 'Timeline' : t === 'details' ? 'Infos' : 'Participants'}
+              {(['moments', 'details', 'guests'] as const).concat(canChatForCurrentSubEvent ? (['chat'] as const) : []).map(t => (
+                <button key={t} type="button" onClick={() => setSubTab(t)} className={`py-5 px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap ${subTab === t ? 'text-indigo-600' : 'text-gray-400'}`}>
+                  {t === 'moments' ? 'Timeline' : t === 'details' ? 'Infos' : t === 'guests' ? 'Participants' : 'Chat'}
                   {subTab === t && <div className="absolute bottom-0 left-4 right-4 h-1 bg-indigo-600 rounded-t-full"></div>}
                 </button>
               ))}
@@ -889,6 +912,43 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                          </tbody>
                       </table>
                    </div>
+                </div>
+              )}
+
+              {subTab === 'chat' && canChatForCurrentSubEvent && (
+                <div className="flex flex-col bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm min-h-[280px] h-[min(400px,60dvh)]">
+                  <p className="px-4 py-2 text-xs text-slate-500 border-b border-slate-100">Chat réservé aux admins de cette séquence.</p>
+                  {typingNames.length > 0 && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50/80 border-b border-indigo-100 text-xs text-indigo-700 shrink-0">
+                      <span className="inline-flex gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </span>
+                      <span className="font-medium truncate">{typingNames.length === 1 ? `${typingNames[0]} écrit...` : `${typingNames[0]} et ${typingNames.length - 1} autre(s) écrivent...`}</span>
+                    </div>
+                  )}
+                  <div ref={chatScrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-4 min-h-0">
+                    {messages.map(m => (
+                      <div key={m.id} className={`flex flex-col ${m.senderId === user.id ? 'items-end' : 'items-start'}`}>
+                        <span className="text-[9px] font-medium text-slate-400 mb-1">{m.senderName}</span>
+                        <div className={`px-4 py-2.5 rounded-xl max-w-[85%] text-sm break-words ${m.senderId === user.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-800'}`}>{m.text}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <form onSubmit={handleSendMessage} className="p-3 bg-slate-50 border-t border-slate-200 flex gap-2 shrink-0">
+                    <input
+                      className="flex-1 min-w-0 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500 disabled:opacity-60"
+                      placeholder="Message..."
+                      value={newMessage}
+                      onChange={e => { setNewMessage(e.target.value); reportTyping(); }}
+                      disabled={!canSendChat}
+                      aria-label="Message"
+                    />
+                    <button type="submit" disabled={!canSendChat} className="min-w-[44px] min-h-[44px] p-3 bg-indigo-600 text-white rounded-xl disabled:opacity-40 flex items-center justify-center" aria-label="Envoyer">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9-2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                    </button>
+                  </form>
                 </div>
               )}
            </div>
