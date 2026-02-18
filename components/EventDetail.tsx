@@ -2,6 +2,13 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Event, User, ChatMessage, SubEvent, Guest, Organizer, Permission, KeyMoment } from '@/core/types';
 import { dbService, supabase } from '@/api';
 import { generateSharePassword } from '@/utils/sharePassword';
+import {
+  parseContactFile,
+  pickContactsFromDevice,
+  isContactPickerAvailable,
+  isContactComplete,
+  type ImportedContact
+} from '@/utils/contactImport';
 import { Input } from './Input';
 
 interface EventDetailProps {
@@ -14,7 +21,7 @@ interface EventDetailProps {
 export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, onUpdate }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'program' | 'chat' | 'settings' | 'budget'>('overview');
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
-  const [subTab, setSubTab] = useState<'details' | 'moments' | 'guests' | 'chat'>('moments');
+  const [subTab, setSubTab] = useState<'sequence' | 'chat'>('sequence');
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -29,7 +36,12 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
   const [showSequenceModal, setShowSequenceModal] = useState(false);
   const [seqForm, setSeqForm] = useState({ title: '', date: '', location: '' });
   const [showGuestModal, setShowGuestModal] = useState(false);
-  const [guestForm, setGuestForm] = useState({ firstName: '', lastName: '', email: '' });
+  const [guestForm, setGuestForm] = useState({ firstName: '', lastName: '', email: '', phone: '' });
+  const [showSubEventSettingsModal, setShowSubEventSettingsModal] = useState(false);
+  const [subEventEditForm, setSubEventEditForm] = useState({ title: '', date: '', location: '' });
+  const [showImportGuestsModal, setShowImportGuestsModal] = useState(false);
+  const [importedContacts, setImportedContacts] = useState<ImportedContact[]>([]);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
   const [showEventSettingsModal, setShowEventSettingsModal] = useState(false);
   const [eventSettingsTab, setEventSettingsTab] = useState<'general' | 'appearance'>('general');
   const [imageUploading, setImageUploading] = useState(false);
@@ -262,15 +274,72 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
     setSeqForm({ title: '', date: '', location: '' });
   };
 
+  const handleImportFromDevice = async () => {
+    try {
+      const contacts = await pickContactsFromDevice();
+      if (contacts.length) setImportedContacts(contacts);
+    } catch (e) {
+      console.error(e);
+      alert('Impossible d\'accéder aux contacts.');
+    }
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const contacts = await parseContactFile(file);
+      if (contacts.length) setImportedContacts(contacts);
+      else alert('Aucun contact trouvé dans le fichier.');
+    } catch (err) {
+      console.error(err);
+      alert('Fichier invalide ou impossible à lire.');
+    }
+  };
+
+  const updateImportedContact = (index: number, field: keyof ImportedContact, value: string) => {
+    setImportedContacts(prev => prev.map((c, i) => i === index ? { ...c, [field]: value } : c));
+  };
+
+  const handleAddAllImportedGuests = async () => {
+    if (!canManageGuestsHere || !selectedSubId) return;
+    const toAdd = importedContacts.map(c => ({
+      id: crypto.randomUUID(),
+      firstName: (c.firstName || '').trim() || 'Prénom',
+      lastName: (c.lastName || '').trim() || 'Nom',
+      email: (c.email || '').trim(),
+      phone: (c.phone || '').trim() || undefined,
+      status: 'pending' as const,
+      companions: [],
+      linkedSubEventIds: [selectedSubId]
+    })) as Guest[];
+    try {
+      const updated = await dbService.updateEventAtomic(event.id, (evt) => ({
+        ...evt,
+        guests: [...(evt.guests || []), ...toAdd]
+      }));
+      onUpdate(updated);
+      setImportedContacts([]);
+      setShowImportGuestsModal(false);
+    } catch (err) {
+      console.error(err);
+      alert('Impossible d\'ajouter les invités.');
+    }
+  };
+
   const handleAddGuest = async () => {
     if (!canManageGuestsHere || !selectedSubId) return;
-    if (!guestForm.firstName) return;
-    const newGuest: Guest = { 
-      id: crypto.randomUUID(), 
-      ...guestForm, 
-      status: 'confirmed', 
-      companions: [], 
-      linkedSubEventIds: [selectedSubId] 
+    if (!guestForm.firstName.trim()) return;
+    const newGuest: Guest = {
+      id: crypto.randomUUID(),
+      firstName: guestForm.firstName.trim(),
+      lastName: (guestForm.lastName || '').trim(),
+      email: (guestForm.email || '').trim(),
+      phone: guestForm.phone?.trim() || undefined,
+      status: 'confirmed',
+      companions: [],
+      linkedSubEventIds: [selectedSubId]
     };
     const updated = await dbService.updateEventAtomic(event.id, (evt) => ({
       ...evt,
@@ -278,7 +347,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
     }));
     onUpdate(updated);
     setShowGuestModal(false);
-    setGuestForm({ firstName: '', lastName: '', email: '' });
+    setGuestForm({ firstName: '', lastName: '', email: '', phone: '' });
   };
 
   const handleApprove = async (userId: string, approve: boolean, permissions?: Permission[], allowedSubEventIds?: string[]) => {
@@ -361,9 +430,43 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
     }, 3000);
   }, [canChat, user.id, user.firstName, user.lastName]);
 
+  const openSubEventSettings = () => {
+    if (!currentSub) return;
+    setSubEventEditForm({
+      title: currentSub.title ?? '',
+      date: currentSub.date ? currentSub.date.slice(0, 16) : '',
+      location: currentSub.location ?? ''
+    });
+    setShowSubEventSettingsModal(true);
+  };
+
+  const handleSaveSubEventSettings = async () => {
+    if (!selectedSubId) return;
+    try {
+      const updated = await dbService.updateEventAtomic(event.id, (evt) => ({
+        ...evt,
+        subEvents: evt.subEvents.map((s) =>
+          s.id === selectedSubId
+            ? {
+                ...s,
+                title: subEventEditForm.title.trim() || s.title,
+                date: subEventEditForm.date || undefined,
+                location: subEventEditForm.location.trim() || undefined
+              }
+            : s
+        )
+      }));
+      onUpdate(updated);
+      setShowSubEventSettingsModal(false);
+    } catch (err) {
+      console.error(err);
+      alert('Impossible d\'enregistrer.');
+    }
+  };
+
   const handleDeleteSubEvent = async () => {
     if (!canManageProgramHere || !selectedSubId) return;
-    if (!confirm('Supprimer cette séquence ? Les jalons et participants liés ne seront plus associés à une séquence.')) return;
+    if (!confirm('Supprimer cette séquence ? Les jalons et participants liés ne seront plus associés à cette séquence.')) return;
     try {
       const updated = await dbService.updateEventAtomic(event.id, (evt) => ({
         ...evt,
@@ -371,6 +474,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       }));
       onUpdate(updated);
       setSelectedSubId(null);
+      setShowSubEventSettingsModal(false);
     } catch (err) {
       console.error(err);
       alert('Impossible de supprimer la séquence.');
@@ -570,7 +674,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                             <div className="absolute left-5 top-3 bottom-3 w-px bg-slate-200" aria-hidden />
                             {sorted.map((sub) => (
                               <li key={sub.id}>
-                                <button type="button" onClick={() => { setSelectedSubId(sub.id); setActiveTab('program'); setSubTab('moments'); }} className="w-full text-left flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors relative">
+                                <button type="button" onClick={() => { setSelectedSubId(sub.id); setActiveTab('program'); setSubTab('sequence'); }} className="w-full text-left flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors relative">
                                   <span className="flex flex-col items-center shrink-0 w-12 pt-0.5 relative z-10">
                                     <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{sub.date ? new Date(sub.date).toLocaleDateString('fr-FR', { weekday: 'short' }) : '—'}</span>
                                     <span className="text-lg font-bold text-slate-800 leading-tight">{sub.date ? new Date(sub.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : 'TBD'}</span>
@@ -644,7 +748,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {event.subEvents.map(sub => (
-                    <button key={sub.id} type="button" onClick={() => { setSelectedSubId(sub.id); setSubTab('moments'); }} className="p-4 rounded-xl border border-slate-200 bg-white hover:border-indigo-300 hover:shadow-md text-left transition-all">
+                    <button key={sub.id} type="button" onClick={() => { setSelectedSubId(sub.id); setSubTab('sequence'); }} className="p-4 rounded-xl border border-slate-200 bg-white hover:border-indigo-300 hover:shadow-md text-left transition-all">
                       <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md">{sub.date ? new Date(sub.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBD'}</span>
                       <h4 className="text-base font-semibold text-slate-900 mt-2 truncate">{sub.title}</h4>
                       <p className="text-slate-500 text-xs mt-1 truncate flex items-center gap-1"><svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>{sub.location || "Lieu global"}</p>
@@ -845,74 +949,85 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                  </div>
               </div>
               {canManageProgramHere && (
-                <button type="button" onClick={handleDeleteSubEvent} className="p-3 rounded-2xl bg-red-500/20 text-red-200 hover:bg-red-500/30 transition-colors shrink-0" title="Supprimer cette séquence">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                <button type="button" onClick={openSubEventSettings} className="p-3 rounded-2xl bg-white/10 text-white hover:bg-white/20 transition-colors shrink-0" title="Réglages de la séquence">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 </button>
               )}
            </header>
 
            <nav className="flex px-4 border-b border-gray-100 bg-gray-50/30 overflow-x-auto no-scrollbar">
-              {(['moments', 'details', 'guests'] as const).concat(canChatForCurrentSubEvent ? (['chat'] as const) : []).map(t => (
-                <button key={t} type="button" onClick={() => setSubTab(t)} className={`py-5 px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap ${subTab === t ? 'text-indigo-600' : 'text-gray-400'}`}>
-                  {t === 'moments' ? 'Timeline' : t === 'details' ? 'Infos' : t === 'guests' ? 'Participants' : 'Chat'}
-                  {subTab === t && <div className="absolute bottom-0 left-4 right-4 h-1 bg-indigo-600 rounded-t-full"></div>}
+              <button key="sequence" type="button" onClick={() => setSubTab('sequence')} className={`py-5 px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap ${subTab === 'sequence' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                Séquence
+                {subTab === 'sequence' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-indigo-600 rounded-t-full" />}
+              </button>
+              {canChatForCurrentSubEvent && (
+                <button key="chat" type="button" onClick={() => setSubTab('chat')} className={`py-5 px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap ${subTab === 'chat' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                  Chat
+                  {subTab === 'chat' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-indigo-600 rounded-t-full" />}
                 </button>
-              ))}
+              )}
            </nav>
 
-           <div className="flex-1 p-8 overflow-y-auto min-w-0 space-y-8">
-              {subTab === 'moments' && (
-                <div className="space-y-8">
-                   <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-black">Déroulé précis</h3>
-                      <button
-                        onClick={() => setShowMomentModal(true)}
-                        disabled={!canManageProgramHere}
-                        className={`bg-indigo-50 text-indigo-600 px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest ${!canManageProgramHere ? 'opacity-40 cursor-not-allowed' : ''}`}
-                      >
+           <div className="flex-1 p-8 overflow-y-auto min-w-0 space-y-10">
+              {subTab === 'sequence' && (
+                <>
+                  {/* Infos */}
+                  <section className="space-y-3">
+                    <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Infos</h3>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                      <p className="font-semibold text-slate-900">{currentSub?.title || 'Sans titre'}</p>
+                      <p className="text-sm text-slate-600 mt-1">{currentSub?.date ? new Date(currentSub.date).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }) : 'Date à définir'}</p>
+                      <p className="text-sm text-slate-600">{currentSub?.location || 'Lieu à définir'}</p>
+                    </div>
+                  </section>
+
+                  {/* Timeline */}
+                  <section className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Déroulé précis</h3>
+                      <button type="button" onClick={() => setShowMomentModal(true)} disabled={!canManageProgramHere} className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-40">
                         + Jalon
                       </button>
-                   </div>
-                   <div className="relative space-y-6 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-gray-100">
+                    </div>
+                    <div className="relative space-y-4 pl-1">
+                      <div className="absolute left-2 top-2 bottom-2 w-px bg-slate-200" aria-hidden />
                       {currentSub?.keyMoments.map(m => (
-                        <div key={m.id} className="relative pl-10 flex items-center gap-6">
-                           <div className="absolute left-0 w-6 h-6 bg-white border-4 border-indigo-600 rounded-full"></div>
-                           <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl min-w-[60px] text-center">{m.time || '--:--'}</span>
-                           <p className="font-bold text-gray-800">{m.label}</p>
+                        <div key={m.id} className="relative pl-8 flex items-center gap-4">
+                          <span className="absolute left-0 w-4 h-4 bg-indigo-600 rounded-full border-2 border-white shadow" />
+                          <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md min-w-[4rem] text-center">{m.time || '--:--'}</span>
+                          <p className="font-medium text-slate-800">{m.label}</p>
                         </div>
                       ))}
-                      {(!currentSub?.keyMoments || currentSub.keyMoments.length === 0) && <div className="pl-10 text-gray-300 italic py-10">Aucun moment clé.</div>}
-                   </div>
-                </div>
-              )}
+                      {(!currentSub?.keyMoments || currentSub.keyMoments.length === 0) && <div className="pl-8 text-slate-400 text-sm italic py-6">Aucun moment clé.</div>}
+                    </div>
+                  </section>
 
-              {subTab === 'guests' && (
-                <div className="space-y-6">
-                   <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-black">Participants à cette séquence</h3>
-                      <button
-                        onClick={() => setShowGuestModal(true)}
-                        disabled={!canManageGuestsHere}
-                        className={`bg-indigo-600 text-white px-5 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-indigo-100 ${!canManageGuestsHere ? 'opacity-40 cursor-not-allowed' : ''}`}
-                      >
-                        + Invité
-                      </button>
-                   </div>
-                   <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
-                      <table className="w-full text-left">
-                         <thead className="bg-gray-50 border-b border-gray-100"><tr className="text-[10px] font-black text-gray-400 uppercase"><th className="px-6 py-4">Nom</th><th className="px-6 py-4">Contact</th></tr></thead>
-                         <tbody className="divide-y divide-gray-50">
-                            {event.guests?.filter(g => g.linkedSubEventIds.includes(selectedSubId!)).map(g => (
-                              <tr key={g.id}>
-                                <td className="px-6 py-4 font-bold text-gray-900">{g.firstName} {g.lastName}</td>
-                                <td className="px-6 py-4 text-xs text-gray-500">{g.email}</td>
-                              </tr>
-                            ))}
-                            {event.guests?.filter(g => g.linkedSubEventIds.includes(selectedSubId!)).length === 0 && <tr><td colSpan={2} className="px-6 py-12 text-center text-gray-300 italic">Personne pour le moment.</td></tr>}
-                         </tbody>
+                  {/* Participants */}
+                  <section className="space-y-4">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Participants</h3>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => setShowImportGuestsModal(true)} disabled={!canManageGuestsHere} className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-50 disabled:opacity-40">
+                          Importer contacts
+                        </button>
+                        <button type="button" onClick={() => setShowGuestModal(true)} disabled={!canManageGuestsHere} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold disabled:opacity-40">
+                          + Invité
+                        </button>
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 overflow-hidden">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-slate-50 border-b border-slate-200"><tr><th className="px-4 py-3 font-semibold text-slate-600">Nom</th><th className="px-4 py-3 font-semibold text-slate-600">Contact</th></tr></thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {event.guests?.filter(g => g.linkedSubEventIds.includes(selectedSubId!)).map(g => (
+                            <tr key={g.id}><td className="px-4 py-3 font-medium text-slate-900">{g.firstName} {g.lastName}</td><td className="px-4 py-3 text-slate-500">{g.email || g.phone || '—'}</td></tr>
+                          ))}
+                          {event.guests?.filter(g => g.linkedSubEventIds.includes(selectedSubId!)).length === 0 && <tr><td colSpan={2} className="px-4 py-12 text-center text-slate-400">Aucun participant.</td></tr>}
+                        </tbody>
                       </table>
-                   </div>
-                </div>
+                    </div>
+                  </section>
+                </>
               )}
 
               {subTab === 'chat' && canChatForCurrentSubEvent && (
@@ -1162,6 +1277,28 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
         </div>
       )}
 
+      {showSubEventSettingsModal && currentSub && (
+        <div className="fixed inset-0 z-[240] flex items-center justify-center p-6 bg-gray-900/80 backdrop-blur-xl">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6 space-y-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-slate-900">Réglages de la séquence</h3>
+            <div className="space-y-4">
+              <Input label="Titre" value={subEventEditForm.title} onChange={e => setSubEventEditForm(f => ({ ...f, title: e.target.value }))} placeholder="Ex: Cocktail" />
+              <Input label="Date & heure" type="datetime-local" value={subEventEditForm.date} onChange={e => setSubEventEditForm(f => ({ ...f, date: e.target.value }))} />
+              <Input label="Lieu" value={subEventEditForm.location} onChange={e => setSubEventEditForm(f => ({ ...f, location: e.target.value }))} placeholder="Lieu ou à définir" />
+            </div>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setShowSubEventSettingsModal(false)} className="flex-1 py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Annuler</button>
+              <button type="button" onClick={handleSaveSubEventSettings} className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl">Enregistrer</button>
+            </div>
+            {canManageProgramHere && (
+              <button type="button" onClick={handleDeleteSubEvent} className="w-full py-2.5 text-red-600 text-sm font-medium rounded-xl border border-red-200 hover:bg-red-50">
+                Supprimer la séquence
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {showSequenceModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-gray-900/80 backdrop-blur-xl animate-in fade-in">
            <div className="bg-white w-full max-w-sm rounded-[3rem] p-10 space-y-6 shadow-2xl animate-in zoom-in-95">
@@ -1181,18 +1318,76 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
 
       {showGuestModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-gray-900/80 backdrop-blur-xl animate-in fade-in">
-           <div className="bg-white w-full max-w-sm rounded-[3rem] p-10 space-y-6 shadow-2xl">
-              <h3 className="text-2xl font-black">Ajouter un participant</h3>
+           <div className="bg-white w-full max-w-sm rounded-2xl p-6 space-y-6 shadow-xl">
+              <h3 className="text-lg font-semibold text-slate-900">Ajouter un participant</h3>
               <div className="space-y-4">
                  <Input label="Prénom" value={guestForm.firstName} onChange={e => setGuestForm({...guestForm, firstName: e.target.value})} />
                  <Input label="Nom" value={guestForm.lastName} onChange={e => setGuestForm({...guestForm, lastName: e.target.value})} />
                  <Input label="Email" type="email" value={guestForm.email} onChange={e => setGuestForm({...guestForm, email: e.target.value})} />
+                 <Input label="Téléphone" type="tel" value={guestForm.phone} onChange={e => setGuestForm({...guestForm, phone: e.target.value})} />
               </div>
-              <div className="flex gap-4">
-                 <button onClick={() => setShowGuestModal(false)} className="flex-1 py-4 font-bold text-gray-400 text-[10px] uppercase">Annuler</button>
-                 <button onClick={handleAddGuest} className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-indigo-100">Enregistrer</button>
+              <div className="flex gap-3">
+                 <button type="button" onClick={() => setShowGuestModal(false)} className="flex-1 py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Annuler</button>
+                 <button type="button" onClick={handleAddGuest} className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl">Enregistrer</button>
               </div>
            </div>
+        </div>
+      )}
+
+      {showImportGuestsModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-gray-900/80 backdrop-blur-xl">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-slate-200">
+              <h3 className="text-lg font-semibold text-slate-900">Importer des contacts</h3>
+              {importedContacts.length === 0 ? (
+                <div className="mt-4 space-y-3">
+                  {isContactPickerAvailable() && (
+                    <button type="button" onClick={handleImportFromDevice} className="w-full py-3 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
+                      Choisir depuis les contacts (appareil)
+                    </button>
+                  )}
+                  <input ref={importFileInputRef} type="file" accept=".vcf,.csv,text/vcard,text/csv" className="hidden" onChange={handleImportFile} />
+                  <button type="button" onClick={() => importFileInputRef.current?.click()} className="w-full py-3 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
+                    Importer un fichier (.vcf ou .csv)
+                  </button>
+                  <p className="text-xs text-slate-500">Exportez vos contacts en .vcf (iOS/Android) ou .csv (Outlook, etc.).</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-600 mt-1">{importedContacts.length} contact(s) importé(s).</p>
+                  {importedContacts.some(c => !isContactComplete(c)) && (
+                    <p className="text-xs text-amber-600 mt-1">Complétez les champs manquants (nom, prénom, et au moins email ou tél) pour les contacts ci-dessous.</p>
+                  )}
+                </>
+              )}
+            </div>
+            {importedContacts.length > 0 && (
+              <>
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {importedContacts.map((c, i) => (
+                    <div key={i} className={`rounded-xl border p-4 space-y-2 ${isContactComplete(c) ? 'border-slate-200 bg-slate-50/50' : 'border-amber-200 bg-amber-50/50'}`}>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input label="Prénom" value={c.firstName} onChange={e => updateImportedContact(i, 'firstName', e.target.value)} />
+                        <Input label="Nom" value={c.lastName} onChange={e => updateImportedContact(i, 'lastName', e.target.value)} />
+                        <Input label="Email" type="email" value={c.email} onChange={e => updateImportedContact(i, 'email', e.target.value)} />
+                        <Input label="Téléphone" value={c.phone} onChange={e => updateImportedContact(i, 'phone', e.target.value)} />
+                      </div>
+                      {!isContactComplete(c) && <span className="text-xs text-amber-600">À compléter</span>}
+                    </div>
+                  ))}
+                </div>
+                <div className="p-4 border-t border-slate-200 flex gap-3">
+                  <button type="button" onClick={() => { setImportedContacts([]); setShowImportGuestsModal(false); }} className="flex-1 py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Annuler</button>
+                  <button type="button" onClick={handleAddAllImportedGuests} className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl">Ajouter tous à la séquence</button>
+                </div>
+              </>
+            )}
+            {importedContacts.length === 0 && (
+              <div className="p-4 border-t border-slate-200">
+                <button type="button" onClick={() => setShowImportGuestsModal(false)} className="w-full py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Fermer</button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
