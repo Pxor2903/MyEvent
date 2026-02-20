@@ -91,13 +91,13 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
   const pastEvents = events.filter(e => !e.isDateTBD && new Date(e.startDate!) < now);
 
   const renderDashboard = () => (
-    <div className="space-y-8">
+    <div className="space-y-10">
       {tbdEvents.length > 0 && (
         <section>
-          <h2 className="text-sm font-medium text-slate-500 mb-3">En cours</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">En cours</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {tbdEvents.map(e => (
-              <button key={e.id} type="button" onClick={() => { setSelectedId(e.id); setView('event-detail'); }} className="text-left">
+              <button key={e.id} type="button" onClick={() => { setSelectedId(e.id); setView('event-detail'); }} className="text-left rounded-2xl overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">
                 <EventCard event={e} />
               </button>
             ))}
@@ -106,19 +106,24 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
       )}
 
       <section>
-        <h2 className="text-sm font-medium text-slate-500 mb-3">À venir</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">À venir</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {upcomingEvents.map(e => (
-            <button key={e.id} type="button" onClick={() => { setSelectedId(e.id); setView('event-detail'); }} className="text-left">
+            <button key={e.id} type="button" onClick={() => { setSelectedId(e.id); setView('event-detail'); }} className="text-left rounded-2xl overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">
               <EventCard event={e} />
             </button>
           ))}
           {upcomingEvents.length === 0 && tbdEvents.length === 0 && (
-            <div className="py-16 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 flex flex-col items-center justify-center text-slate-500">
-              <p className="text-sm mb-4">Aucun événement pour le moment.</p>
-              <div className="flex gap-3">
-                <button type="button" onClick={() => setView('create-event')} className="px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700">Créer un événement</button>
-                <button type="button" onClick={() => setShowJoinModal(true)} className="px-4 py-2.5 border border-slate-300 text-slate-600 text-sm font-medium rounded-xl hover:bg-slate-100">Rejoindre</button>
+            <div className="col-span-full py-16 rounded-2xl border-2 border-dashed border-slate-200 bg-white flex flex-col items-center justify-center text-slate-500 px-4">
+              <p className="text-sm font-medium text-slate-600 mb-1">Aucun événement</p>
+              <p className="text-sm mb-6">Créez-en un ou rejoignez-en un avec une invitation.</p>
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <button type="button" onClick={() => setView('create-event')} className="min-h-[48px] px-5 py-3 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 active:bg-indigo-800">
+                  Créer un événement
+                </button>
+                <button type="button" onClick={() => setShowJoinModal(true)} className="min-h-[48px] px-5 py-3 border-2 border-slate-200 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50">
+                  Rejoindre avec une clé
+                </button>
               </div>
             </div>
           )}
@@ -126,11 +131,11 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
       </section>
 
       {pastEvents.length > 0 && (
-        <section className="pt-6 border-t border-slate-100">
-          <h2 className="text-sm font-medium text-slate-400 mb-3">Passés</h2>
+        <section className="pt-8 border-t border-slate-200">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Passés</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {pastEvents.map(e => (
-              <button key={e.id} type="button" onClick={() => { setSelectedId(e.id); setView('event-detail'); }} className="text-left opacity-80 hover:opacity-100 transition-opacity">
+              <button key={e.id} type="button" onClick={() => { setSelectedId(e.id); setView('event-detail'); }} className="text-left rounded-2xl overflow-hidden opacity-90 hover:opacity-100 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">
                 <EventCard event={e} />
               </button>
             ))}

@@ -161,7 +161,9 @@ export async function pickContactsFromDevice(): Promise<ImportedContact[]> {
   }
 }
 
+/** Contact Picker API : supporté uniquement sur Chrome Android (HTTPS + geste utilisateur). Pas sur Safari iOS ni desktop. */
 export function isContactPickerAvailable(): boolean {
-  const nav = navigator as any;
-  return !!(nav.contacts && typeof nav.contacts.select === 'function');
+  if (typeof navigator === 'undefined') return false;
+  const nav = navigator as Navigator & { contacts?: { select: (props: string[], opts?: { multiple?: boolean }) => Promise<unknown[]> } };
+  return 'contacts' in navigator && typeof nav.contacts?.select === 'function';
 }

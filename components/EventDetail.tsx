@@ -304,9 +304,10 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
     try {
       const contacts = await pickContactsFromDevice();
       if (contacts.length) setImportedContacts(contacts);
+      else alert('Aucun contact sélectionné ou accès non disponible. Utilisez l’import de fichier ou l’ajout à la main.');
     } catch (e) {
       console.error(e);
-      alert('Impossible d’accéder aux contacts.');
+      alert('Impossible d’accéder aux contacts. Utilisez l’import de fichier ou l’ajout à la main.');
     }
   };
 
@@ -1435,57 +1436,55 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
               </>
             ) : (
               <>
-                <div className="p-4 sm:p-6 border-b border-slate-200 shrink-0">
-                  <h3 className="text-lg font-semibold text-slate-900">Ajouter des invités</h3>
-                  <p className="text-sm text-slate-600 mt-1">Import fichier (CSV/tableur), contacts de l’appareil ou ajout à la main.</p>
+                <div className="p-5 sm:p-6 border-b border-slate-200 shrink-0">
+                  <h2 className="text-xl font-bold text-slate-900">Ajouter des invités</h2>
+                  <p className="text-sm text-slate-500 mt-1">Importez depuis un fichier, depuis les contacts de l’appareil (si disponible) ou ajoutez à la main.</p>
                   {importedContacts.length === 0 ? (
-                    <div className="mt-4 space-y-3">
+                    <div className="mt-5 space-y-4">
                       <input ref={importFileInputRef} type="file" accept=".vcf,.csv,.txt,text/vcard,text/csv,text/plain" className="hidden" onChange={handleImportFile} />
                       <button
                         type="button"
                         onClick={() => importFileInputRef.current?.click()}
-                        className="w-full min-h-[48px] py-3 px-4 rounded-xl border-2 border-indigo-200 bg-indigo-50 text-indigo-700 text-sm font-medium hover:bg-indigo-100 flex items-center justify-center gap-2"
+                        className="w-full min-h-[48px] py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold flex items-center justify-center gap-2 shadow-sm"
                       >
-                        Importer un fichier CSV ou vCard
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                        Importer depuis un fichier (CSV ou vCard)
                       </button>
-                      <p className="text-xs text-slate-500">Colonnes : Prénom, Nom, Email, Téléphone, Adresse. Optionnel : Accompagnants (nombre ou noms). Export Excel en CSV possible.</p>
-                      {hasContactSource && (
+                      <p className="text-xs text-slate-500">Colonnes reconnues : Prénom, Nom, Email, Téléphone, Adresse. Optionnel : Accompagnants. Export Excel/Sheets en CSV possible.</p>
+
+                      {hasContactSource ? (
                         <button
                           type="button"
                           disabled={loadingNativeContacts}
                           onClick={handleImportFromDevice}
-                          className="w-full min-h-[48px] py-3 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-70"
+                          className="w-full min-h-[48px] py-3 px-4 rounded-xl border-2 border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 hover:border-slate-300 disabled:opacity-70 flex items-center justify-center gap-2"
                         >
-                          {loadingNativeContacts ? 'Chargement des contacts…' : 'Choisir dans mes contacts'}
+                          {loadingNativeContacts ? 'Chargement…' : 'Choisir dans les contacts de l’appareil'}
                         </button>
+                      ) : (
+                        <div className="rounded-xl bg-slate-100 border border-slate-200 p-3 text-xs text-slate-600">
+                          <p className="font-medium text-slate-700">Sur cet appareil</p>
+                          <p className="mt-1">L’accès direct au carnet d’adresses n’est pas disponible (Safari, ordinateur…). Utilisez l’import de fichier ci-dessus ou l’ajout à la main.</p>
+                        </div>
                       )}
-                      <button type="button" onClick={() => { setShowImportGuestsModal(false); setShowGuestModal(true); }} className="w-full min-h-[48px] py-3 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
-                        Ajouter un invité à la main
-                      </button>
-                      <button type="button" onClick={handleShare} className="w-full min-h-[48px] py-3 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
-                        Partager l’invitation (lien co-organisateur)
-                      </button>
+
+                      <div className="flex flex-col gap-2 pt-1">
+                        <button type="button" onClick={() => { setShowImportGuestsModal(false); setShowGuestModal(true); }} className="w-full min-h-[44px] py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
+                          Ajouter un invité à la main
+                        </button>
+                        <button type="button" onClick={handleShare} className="w-full min-h-[44px] py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
+                          Partager l’invitation (co-organisateur)
+                        </button>
+                      </div>
+
                       <details className="group">
-                        <summary className="text-xs text-indigo-600 font-medium cursor-pointer list-none">Comment exporter en CSV ?</summary>
-                        <div className="mt-2 space-y-2">
-                          <input ref={importFileInputRef} type="file" accept=".vcf,.csv,.txt,text/vcard,text/csv,text/plain" className="hidden" onChange={handleImportFile} />
-                          <button type="button" onClick={() => importFileInputRef.current?.click()} className="block w-full py-2 px-3 rounded-lg border border-slate-200 text-slate-600 text-xs hover:bg-slate-50">
-                            Choisir un fichier
-                          </button>
-                          <button type="button" onClick={() => setShowExportHelp(v => !v)} className="text-xs text-slate-500 underline">
-                            {showExportHelp ? 'Masquer l’aide' : 'Comment exporter mes contacts ?'}
-                          </button>
-                          {showExportHelp && (
-                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600 space-y-1">
-                              <p><strong>iPhone / Android :</strong> App Contacts → Partager / Exporter → .vcf</p>
-                              <p><strong>Mac / PC :</strong> Contacts ou Outlook → Exporter en .vcf ou .csv</p>
-                            </div>
-                          )}
+                        <summary className="text-xs font-medium text-indigo-600 cursor-pointer list-none py-1">Comment exporter mes contacts ?</summary>
+                        <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 space-y-2">
+                          <p><strong>Excel / Google Sheets :</strong> Fichier → Télécharger → CSV.</p>
+                          <p><strong>iPhone / Android :</strong> App Contacts → Partager / Exporter → fichier .vcf.</p>
+                          <p><strong>Mac / PC :</strong> Contacts ou Outlook → Exporter en .vcf ou .csv.</p>
                         </div>
                       </details>
-                      {false && (
-                        <p className="text-xs text-slate-500">Sur ce navigateur, utilise « Ajouter à la main » ou l’import fichier. Sur l’app mobile (iOS/Android), le bouton « Choisir dans mes contacts » apparaît.</p>
-                      )}
                     </div>
                   ) : (
                     <>
