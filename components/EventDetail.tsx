@@ -636,11 +636,11 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       <div className="relative h-48 flex-shrink-0">
         <img src={event.image || `https://picsum.photos/seed/${event.id}/1200/400`} className="w-full h-full object-cover" alt="" />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent" />
-        <button type="button" onClick={onBack} className="absolute top-4 left-4 p-2.5 bg-white/90 text-slate-800 rounded-xl hover:bg-white" aria-label="Retour">
+        <button type="button" onClick={onBack} className="absolute top-3 left-3 sm:top-4 sm:left-4 p-3 sm:p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center bg-white/90 text-slate-800 rounded-xl hover:bg-white" aria-label="Retour">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"/></svg>
         </button>
         {canEditEvent && (
-          <button type="button" onClick={openEventSettings} className="absolute top-4 right-4 p-2.5 bg-white/90 text-slate-800 rounded-xl hover:bg-white" title="Réglages">
+          <button type="button" onClick={openEventSettings} className="absolute top-3 right-3 sm:top-4 sm:right-4 p-3 sm:p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center bg-white/90 text-slate-800 rounded-xl hover:bg-white" title="Réglages">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
           </button>
         )}
@@ -652,7 +652,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
 
       {!selectedSubId ? (
         <>
-          <nav className="flex gap-1 px-4 pt-2 border-b border-slate-200 overflow-x-auto no-scrollbar" aria-label="Onglets">
+          <nav className="flex gap-1 px-3 sm:px-4 pt-2 pb-1 border-b border-slate-200 overflow-x-auto no-scrollbar -webkit-overflow-scrolling-touch" aria-label="Onglets">
             {[
               { id: 'overview', label: "Vue d'ensemble" },
               { id: 'program', label: 'Programme' },
@@ -670,7 +670,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
             ))}
           </nav>
 
-          <div className="flex-1 p-6 overflow-y-auto min-w-0 space-y-6">
+          <div className="flex-1 p-4 sm:p-6 overflow-y-auto min-w-0 space-y-4 sm:space-y-6">
             {activeTab === 'overview' && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1381,23 +1381,23 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       )}
 
       {showImportGuestsModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-gray-900/80 backdrop-blur-xl">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 bg-gray-900/80 backdrop-blur-xl">
+          <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-xl h-[90vh] sm:h-auto sm:max-h-[90vh] overflow-hidden flex flex-col pb-[env(safe-area-inset-bottom)]">
             {/* Étape : liste native avec cases à cocher */}
             {deviceContactList !== null ? (
               <>
-                <div className="p-4 border-b border-slate-200">
+                <div className="p-4 sm:p-5 border-b border-slate-200 shrink-0">
                   <h3 className="text-lg font-semibold text-slate-900">Choisir des contacts</h3>
-                  <p className="text-xs text-slate-500 mt-1">Coche les invités à ajouter à la séquence, puis valide.</p>
+                  <p className="text-xs sm:text-sm text-slate-500 mt-1">Coche les invités à ajouter, puis valide.</p>
                   <input
                     type="text"
                     placeholder="Rechercher…"
                     value={deviceContactSearch}
                     onChange={e => setDeviceContactSearch(e.target.value)}
-                    className="mt-3 w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm"
+                    className="mt-3 w-full px-4 py-3 sm:py-2.5 rounded-xl border border-slate-200 text-sm"
                   />
                 </div>
-                <div className="flex-1 overflow-y-auto p-2 min-h-0">
+                <div className="flex-1 overflow-y-auto p-2 sm:p-3 min-h-0">
                   {deviceContactList
                     .map((c, idx) => ({ c, idx }))
                     .filter(({ c }) => {
@@ -1413,12 +1413,12 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                           key={idx}
                           type="button"
                           onClick={() => toggleDeviceContact(idx)}
-                          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left border ${selected ? 'border-indigo-300 bg-indigo-50' : 'border-slate-100 hover:bg-slate-50'}`}
+                          className={`w-full flex items-center gap-3 px-4 py-3.5 sm:py-3 rounded-xl text-left border min-h-[52px] sm:min-h-0 ${selected ? 'border-indigo-300 bg-indigo-50' : 'border-slate-100 hover:bg-slate-50'}`}
                         >
-                          <span className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${selected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
-                            {selected && <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
+                          <span className={`w-6 h-6 sm:w-5 sm:h-5 rounded border-2 flex items-center justify-center shrink-0 ${selected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
+                            {selected && <svg className="w-3.5 h-3.5 sm:w-3 sm:h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
                           </span>
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <p className="font-medium text-slate-900 truncate">{c.firstName} {c.lastName}</p>
                             <p className="text-xs text-slate-500 truncate">{c.email || c.phone || '—'}</p>
                           </div>
@@ -1426,40 +1426,49 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                       );
                     })}
                 </div>
-                <div className="p-4 border-t border-slate-200 flex gap-3">
-                  <button type="button" onClick={() => { setDeviceContactList(null); setDeviceContactSelected(new Set()); setDeviceContactSearch(''); }} className="flex-1 py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Annuler</button>
-                  <button type="button" onClick={confirmDeviceSelection} disabled={deviceContactSelected.size === 0} className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed">
+                <div className="p-4 border-t border-slate-200 flex gap-3 shrink-0">
+                  <button type="button" onClick={() => { setDeviceContactList(null); setDeviceContactSelected(new Set()); setDeviceContactSearch(''); }} className="flex-1 min-h-[48px] py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Annuler</button>
+                  <button type="button" onClick={confirmDeviceSelection} disabled={deviceContactSelected.size === 0} className="flex-1 min-h-[48px] py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed">
                     Valider ({deviceContactSelected.size})
                   </button>
                 </div>
               </>
             ) : (
               <>
-                <div className="p-6 border-b border-slate-200">
+                <div className="p-4 sm:p-6 border-b border-slate-200 shrink-0">
                   <h3 className="text-lg font-semibold text-slate-900">Ajouter des invités</h3>
-                  <p className="text-sm text-slate-600 mt-1">Choisis dans tes contacts ou ajoute à la main. Seuls les contacts que tu sélectionnes sont utilisés.</p>
+                  <p className="text-sm text-slate-600 mt-1">Import fichier (CSV/tableur), contacts de l’appareil ou ajout à la main.</p>
                   {importedContacts.length === 0 ? (
                     <div className="mt-4 space-y-3">
+                      <input ref={importFileInputRef} type="file" accept=".vcf,.csv,.txt,text/vcard,text/csv,text/plain" className="hidden" onChange={handleImportFile} />
+                      <button
+                        type="button"
+                        onClick={() => importFileInputRef.current?.click()}
+                        className="w-full min-h-[48px] py-3 px-4 rounded-xl border-2 border-indigo-200 bg-indigo-50 text-indigo-700 text-sm font-medium hover:bg-indigo-100 flex items-center justify-center gap-2"
+                      >
+                        Importer un fichier CSV ou vCard
+                      </button>
+                      <p className="text-xs text-slate-500">Colonnes : Prénom, Nom, Email, Téléphone, Adresse. Optionnel : Accompagnants (nombre ou noms). Export Excel en CSV possible.</p>
                       {hasContactSource && (
                         <button
                           type="button"
                           disabled={loadingNativeContacts}
                           onClick={handleImportFromDevice}
-                          className="w-full py-3 px-4 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 text-sm font-medium hover:bg-indigo-100 disabled:opacity-70"
+                          className="w-full min-h-[48px] py-3 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-70"
                         >
                           {loadingNativeContacts ? 'Chargement des contacts…' : 'Choisir dans mes contacts'}
                         </button>
                       )}
-                      <button type="button" onClick={() => { setShowImportGuestsModal(false); setShowGuestModal(true); }} className="w-full py-3 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
+                      <button type="button" onClick={() => { setShowImportGuestsModal(false); setShowGuestModal(true); }} className="w-full min-h-[48px] py-3 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
                         Ajouter un invité à la main
                       </button>
-                      <button type="button" onClick={handleShare} className="w-full py-3 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
+                      <button type="button" onClick={handleShare} className="w-full min-h-[48px] py-3 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
                         Partager l’invitation (lien co-organisateur)
                       </button>
                       <details className="group">
-                        <summary className="text-xs text-indigo-600 font-medium cursor-pointer list-none">Import avancé (fichier .vcf ou .csv)</summary>
+                        <summary className="text-xs text-indigo-600 font-medium cursor-pointer list-none">Comment exporter en CSV ?</summary>
                         <div className="mt-2 space-y-2">
-                          <input ref={importFileInputRef} type="file" accept=".vcf,.csv,text/vcard,text/csv" className="hidden" onChange={handleImportFile} />
+                          <input ref={importFileInputRef} type="file" accept=".vcf,.csv,.txt,text/vcard,text/csv,text/plain" className="hidden" onChange={handleImportFile} />
                           <button type="button" onClick={() => importFileInputRef.current?.click()} className="block w-full py-2 px-3 rounded-lg border border-slate-200 text-slate-600 text-xs hover:bg-slate-50">
                             Choisir un fichier
                           </button>
@@ -1474,13 +1483,13 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                           )}
                         </div>
                       </details>
-                      {!hasContactSource && (
+                      {false && (
                         <p className="text-xs text-slate-500">Sur ce navigateur, utilise « Ajouter à la main » ou l’import fichier. Sur l’app mobile (iOS/Android), le bouton « Choisir dans mes contacts » apparaît.</p>
                       )}
                     </div>
                   ) : (
                     <>
-                      <p className="text-sm text-slate-600 mt-1">{importedContacts.length} contact(s) sélectionné(s).</p>
+                      <p className="text-sm text-slate-600 mt-1">{importedContacts.length} contact(s) importé(s).</p>
                       {importedContacts.some(c => !isContactComplete(c)) && (
                         <p className="text-xs text-amber-600 mt-1">Complète les champs manquants (nom, prénom, et au moins email ou tél) pour les contacts ci-dessous.</p>
                       )}
@@ -1488,31 +1497,31 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                   )}
                 </div>
                 {importedContacts.length > 0 && (
-              <>
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {importedContacts.map((c, i) => (
-                    <div key={i} className={`rounded-xl border p-4 space-y-2 ${isContactComplete(c) ? 'border-slate-200 bg-slate-50/50' : 'border-amber-200 bg-amber-50/50'}`}>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input label="Prénom" value={c.firstName} onChange={e => updateImportedContact(i, 'firstName', e.target.value)} />
-                        <Input label="Nom" value={c.lastName} onChange={e => updateImportedContact(i, 'lastName', e.target.value)} />
-                        <Input label="Email" type="email" value={c.email} onChange={e => updateImportedContact(i, 'email', e.target.value)} />
-                        <Input label="Téléphone" value={c.phone} onChange={e => updateImportedContact(i, 'phone', e.target.value)} />
-                      </div>
-                      {!isContactComplete(c) && <span className="text-xs text-amber-600">À compléter</span>}
+                  <>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+                      {importedContacts.map((c, i) => (
+                        <div key={i} className={`rounded-xl border p-4 space-y-2 ${isContactComplete(c) ? 'border-slate-200 bg-slate-50/50' : 'border-amber-200 bg-amber-50/50'}`}>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                            <Input label="Prénom" value={c.firstName} onChange={e => updateImportedContact(i, 'firstName', e.target.value)} />
+                            <Input label="Nom" value={c.lastName} onChange={e => updateImportedContact(i, 'lastName', e.target.value)} />
+                            <Input label="Email" type="email" value={c.email} onChange={e => updateImportedContact(i, 'email', e.target.value)} className="sm:col-span-2" />
+                            <Input label="Téléphone" type="tel" value={c.phone} onChange={e => updateImportedContact(i, 'phone', e.target.value)} className="sm:col-span-2" />
+                          </div>
+                          {!isContactComplete(c) && <span className="text-xs text-amber-600">À compléter</span>}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-                <div className="p-4 border-t border-slate-200 flex gap-3">
-                  <button type="button" onClick={() => { setImportedContacts([]); setShowExportHelp(false); setDeviceContactList(null); setShowImportGuestsModal(false); }} className="flex-1 py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Annuler</button>
-                  <button type="button" onClick={handleAddAllImportedGuests} className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl">Ajouter tous à la séquence</button>
-                </div>
-              </>
-            )}
-            {importedContacts.length === 0 && (
-              <div className="p-4 border-t border-slate-200">
-                <button type="button" onClick={() => { setShowExportHelp(false); setDeviceContactList(null); setShowImportGuestsModal(false); }} className="w-full py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Fermer</button>
-              </div>
-            )}
+                    <div className="p-4 border-t border-slate-200 flex gap-3 shrink-0">
+                      <button type="button" onClick={() => { setImportedContacts([]); setShowExportHelp(false); setDeviceContactList(null); setShowImportGuestsModal(false); }} className="flex-1 min-h-[48px] py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Annuler</button>
+                      <button type="button" onClick={handleAddAllImportedGuests} className="flex-1 min-h-[48px] py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl">Ajouter tous à la séquence</button>
+                    </div>
+                  </>
+                )}
+                {importedContacts.length === 0 && (
+                  <div className="p-4 border-t border-slate-200 shrink-0">
+                    <button type="button" onClick={() => { setShowExportHelp(false); setDeviceContactList(null); setShowImportGuestsModal(false); }} className="w-full min-h-[48px] py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Fermer</button>
+                  </div>
+                )}
               </>
             )}
           </div>

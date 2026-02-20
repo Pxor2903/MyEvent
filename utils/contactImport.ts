@@ -47,12 +47,16 @@ export function parseVcf(text: string): ImportedContact[] {
   return out.filter(c => trim(c.firstName) || trim(c.lastName) || trim(c.email) || trim(c.phone));
 }
 
-/** Parse un CSV avec colonnes possibles: prénom, nom, email, téléphone, adresse (ou firstname, lastname, etc.). */
+/**
+ * Parse un CSV avec colonnes: prénom, nom, email, téléphone, adresse.
+ * Colonne optionnelle "accompagnants" / "companions" / "nombre": nombre (ex: 2) ou noms (ex: "M. Dupont, Mme Dupont")
+ * → génère un contact principal + un contact par accompagnant (même email/tél si non précisé).
+ */
 export function parseCsv(text: string): ImportedContact[] {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   if (lines.length < 2) return [];
-  const header = lines[0].toLowerCase().replace(/\s/g, '');
-  const cols = lines[0].split(/[,;\t]/).map(c => c.trim().toLowerCase().replace(/\s/g, ''));
+  const rawHeader = lines[0];
+  const cols = rawHeader.split(/[,;\t]/).map(c => c.trim().toLowerCase().replace(/\s/g, ''));
   const idx = (names: string[]) => {
     for (const n of names) {
       const i = cols.findIndex(c => c.includes(n) || n.includes(c));
@@ -60,30 +64,51 @@ export function parseCsv(text: string): ImportedContact[] {
     }
     return -1;
   };
-  const iFirst = idx(['prenom', 'prénom', 'firstname', 'first']);
-  const iLast = idx(['nom', 'lastname', 'last', 'name']);
-  const iEmail = idx(['email', 'mail', 'courriel']);
-  const iPhone = idx(['phone', 'tel', 'telephone', 'mobile']);
+  const iFirst = idx(['prenom', 'prénom', 'firstname', 'first', 'prenoms']);
+  const iLast = idx(['nom', 'lastname', 'last', 'name', 'noms', 'famille']);
+  const iEmail = idx(['email', 'mail', 'courriel', 'e-mail']);
+  const iPhone = idx(['phone', 'tel', 'telephone', 'mobile', 'portable', 'numero', 'numéro']);
   const iAddr = idx(['adresse', 'address']);
+  const iCompanions = idx(['accompagnants', 'companions', 'nombre', 'nb', 'invites', 'invités', 'plus']);
   const out: ImportedContact[] = [];
   for (let i = 1; i < lines.length; i++) {
     const row = lines[i].split(/[,;\t]/).map(c => c.trim());
     const get = (index: number) => (index >= 0 && index < row.length ? row[index] : '') || '';
     const first = get(iFirst);
     const last = get(iLast);
-    if (!first && !last && !get(iEmail) && !get(iPhone)) continue;
-    out.push({
-      firstName: first,
-      lastName: last,
-      email: get(iEmail),
-      phone: get(iPhone).replace(/\s/g, ''),
-      address: iAddr >= 0 ? get(iAddr) : undefined
-    });
+    const email = get(iEmail);
+    const phone = get(iPhone).replace(/\s/g, '');
+    const address = iAddr >= 0 ? get(iAddr) : undefined;
+    if (!first && !last && !email && !phone) continue;
+    const main: ImportedContact = { firstName: first, lastName: last, email, phone, address };
+    out.push(main);
+    const compRaw = iCompanions >= 0 ? get(iCompanions) : '';
+    if (!compRaw) continue;
+    const compNum = parseInt(compRaw, 10);
+    if (!Number.isNaN(compNum) && compNum > 0) {
+      for (let k = 1; k < compNum; k++) {
+        out.push({
+          firstName: `Invité ${k + 1}`,
+          lastName: last || '—',
+          email,
+          phone,
+          address
+        });
+      }
+      continue;
+    }
+    const names = compRaw.split(/[,;\/]+/).map(s => s.trim()).filter(Boolean);
+    for (const name of names) {
+      const parts = name.split(/\s+/).filter(Boolean);
+      const cFirst = parts[0] || 'Invité';
+      const cLast = parts.slice(1).join(' ') || last || '—';
+      out.push({ firstName: cFirst, lastName: cLast, email, phone, address });
+    }
   }
   return out;
 }
 
-/** Détecte le type de fichier et parse. */
+/** Détecte le type de fichier et parse. Accepte .vcf, .csv, .txt (CSV). */
 export function parseContactFile(file: File): Promise<ImportedContact[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -92,7 +117,6 @@ export function parseContactFile(file: File): Promise<ImportedContact[]> {
       const name = (file.name || '').toLowerCase();
       try {
         if (name.endsWith('.vcf')) resolve(parseVcf(text));
-        else if (name.endsWith('.csv')) resolve(parseCsv(text));
         else resolve(parseCsv(text));
       } catch (e) {
         reject(e);
@@ -104,35 +128,40 @@ export function parseContactFile(file: File): Promise<ImportedContact[]> {
 }
 
 /**
- * Contact Picker API : ouvre la liste des contacts de l'appareil.
- * L'utilisateur peut cocher plusieurs contacts à importer, puis valider.
- * Supporté : Chrome Android (HTTPS, geste utilisateur requis).
+ * Contact Picker API : ouvre la liste des contacts de l'appareil (natif du navigateur).
+ * L'utilisateur sélectionne un ou plusieurs contacts puis valide.
+ * Supporté : Chrome Android (HTTPS, geste utilisateur requis). Non supporté : Safari iOS, Firefox.
  */
 export async function pickContactsFromDevice(): Promise<ImportedContact[]> {
   const nav = navigator as any;
-  if (!nav.contacts || typeof nav.contacts.select !== 'function') return [];
-  const props = ['name', 'email', 'tel', 'address'] as const;
-  const contacts = await nav.contacts.select(props, { multiple: true });
-  return (contacts || []).map((c: any) => {
-    const name = (c.name && c.name[0]) || '';
-    const parts = name.split(/\s+/).filter(Boolean);
-    const first = parts[0] || '';
-    const last = parts.slice(1).join(' ') || '';
-    const addr = c.address && c.address[0];
-    const addressStr = addr && typeof addr === 'object'
-      ? [addr.addressLine, addr.city, addr.region, addr.postalCode, addr.country].filter(Boolean).join(', ')
-      : (typeof addr === 'string' ? addr : undefined);
-    return {
-      firstName: first,
-      lastName: last,
-      email: (c.email && c.email[0]) || '',
-      phone: (c.tel && c.tel[0]) || '',
-      address: addressStr
-    };
-  });
+  const contactsApi = nav.contacts;
+  if (!contactsApi || typeof contactsApi.select !== 'function') return [];
+  try {
+    const props = ['name', 'email', 'tel', 'address'] as const;
+    const contacts = await contactsApi.select(props, { multiple: true });
+    return (contacts || []).map((c: any) => {
+      const name = (c.name && c.name[0]) || '';
+      const parts = name.split(/\s+/).filter(Boolean);
+      const first = parts[0] || '';
+      const last = parts.slice(1).join(' ') || '';
+      const addr = c.address && c.address[0];
+      const addressStr = addr && typeof addr === 'object'
+        ? [addr.addressLine, addr.city, addr.region, addr.postalCode, addr.country].filter(Boolean).join(', ')
+        : (typeof addr === 'string' ? addr : undefined);
+      return {
+        firstName: first,
+        lastName: last,
+        email: (c.email && c.email[0]) || '',
+        phone: (c.tel && c.tel[0]) || '',
+        address: addressStr
+      };
+    });
+  } catch {
+    return [];
+  }
 }
 
 export function isContactPickerAvailable(): boolean {
   const nav = navigator as any;
-  return !!(nav.contacts && nav.contacts.select);
+  return !!(nav.contacts && typeof nav.contacts.select === 'function');
 }
