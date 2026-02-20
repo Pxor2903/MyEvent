@@ -45,4 +45,5 @@ targets:
       - path: MyEventNative/Info.plist
     frameworks:
       - Contacts.framework
+      - ContactsUI.framework
       - PhotosUI.framework
