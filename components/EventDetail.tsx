@@ -2,14 +2,13 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Event, User, ChatMessage, SubEvent, Guest, Organizer, Permission, KeyMoment } from '@/core/types';
 import { dbService, supabase } from '@/api';
 import { generateSharePassword } from '@/utils/sharePassword';
+import { isContactComplete, deduplicateContacts, type ImportedContact } from '@/utils/contactImport';
 import {
-  parseContactFile,
-  pickContactsFromDevice,
-  isContactPickerAvailable,
-  isContactComplete,
-  type ImportedContact
-} from '@/utils/contactImport';
-import { isNativePlatform, loadNativeContacts } from '@/utils/nativeContacts';
+  getAvailableSources,
+  importFromDevice,
+  importFromFile,
+  importFromGoogle
+} from '@/utils/contactImportService';
 import { Input } from './Input';
 
 interface EventDetailProps {
@@ -280,12 +279,14 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
     setSeqForm({ title: '', date: '', location: '' });
   };
 
-  /** Option A : clic → permission Contacts → liste avec recherche → coche → import. */
+  const importSources = getAvailableSources();
+
+  /** Import depuis l’appareil (Picker ou liste native Capacitor). */
   const handleImportFromDevice = async () => {
-    if (isNativePlatform()) {
-      setLoadingNativeContacts(true);
-      try {
-        const result = await loadNativeContacts();
+    setLoadingNativeContacts(true);
+    try {
+      const result = await importFromDevice();
+      if (result.type === 'native') {
         if (result.permissionDenied) {
           alert('Accès aux contacts refusé. Tu peux l’autoriser dans Réglages du téléphone, ou ajouter des invités à la main.');
           return;
@@ -293,25 +294,36 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
         setDeviceContactList(result.contacts);
         setDeviceContactSelected(new Set());
         setDeviceContactSearch('');
-      } catch (e) {
-        console.error(e);
-        alert('Impossible d’accéder aux contacts. Vérifie les autorisations.');
-      } finally {
-        setLoadingNativeContacts(false);
+      } else {
+        if (result.contacts.length) setImportedContacts(result.contacts);
+        else alert('Aucun contact sélectionné ou accès non disponible. Utilisez l’import de fichier ou l’ajout à la main.');
       }
-      return;
-    }
-    try {
-      const contacts = await pickContactsFromDevice();
-      if (contacts.length) setImportedContacts(contacts);
-      else alert('Aucun contact sélectionné ou accès non disponible. Utilisez l’import de fichier ou l’ajout à la main.');
     } catch (e) {
       console.error(e);
       alert('Impossible d’accéder aux contacts. Utilisez l’import de fichier ou l’ajout à la main.');
+    } finally {
+      setLoadingNativeContacts(false);
     }
   };
 
-  const hasContactSource = isContactPickerAvailable() || isNativePlatform();
+  /** Import depuis Google (People API). */
+  const handleImportFromGoogle = async () => {
+    setLoadingNativeContacts(true);
+    try {
+      const { contacts, error } = await importFromGoogle();
+      if (error) {
+        alert(error);
+        return;
+      }
+      if (contacts.length) setImportedContacts(contacts);
+      else alert('Aucun contact trouvé dans votre compte Google.');
+    } catch (e) {
+      console.error(e);
+      alert('Impossible d’importer depuis Google.');
+    } finally {
+      setLoadingNativeContacts(false);
+    }
+  };
   const toggleDeviceContact = (index: number) => {
     setDeviceContactSelected(prev => {
       const next = new Set(prev);
@@ -325,7 +337,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
     const selected = Array.from(deviceContactSelected)
       .map(i => deviceContactList[i])
       .filter(Boolean);
-    setImportedContacts(selected);
+    setImportedContacts(deduplicateContacts(selected));
     setDeviceContactList(null);
     setDeviceContactSelected(new Set());
     setDeviceContactSearch('');
@@ -336,7 +348,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
     e.target.value = '';
     if (!file) return;
     try {
-      const contacts = await parseContactFile(file);
+      const contacts = await importFromFile(file);
       if (contacts.length) setImportedContacts(contacts);
       else alert('Aucun contact trouvé dans le fichier.');
     } catch (err) {
@@ -1450,38 +1462,50 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
                         Importer depuis un fichier (CSV ou vCard)
                       </button>
-                      <p className="text-xs text-slate-500">Colonnes reconnues : Prénom, Nom, Email, Téléphone, Adresse. Optionnel : Accompagnants. Export Excel/Sheets en CSV possible.</p>
+                      <p className="text-xs text-slate-500">Colonnes : Prénom, Nom, Email, Téléphone, Adresse. Optionnel : Accompagnants.</p>
 
-                      {hasContactSource ? (
+                      {importSources.fromDevice ? (
                         <button
                           type="button"
                           disabled={loadingNativeContacts}
                           onClick={handleImportFromDevice}
                           className="w-full min-h-[48px] py-3 px-4 rounded-xl border-2 border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 hover:border-slate-300 disabled:opacity-70 flex items-center justify-center gap-2"
                         >
-                          {loadingNativeContacts ? 'Chargement…' : 'Choisir dans les contacts de l’appareil'}
+                          {loadingNativeContacts ? 'Chargement…' : 'Depuis mon téléphone'}
                         </button>
-                      ) : (
+                      ) : null}
+
+                      <button
+                        type="button"
+                        disabled={loadingNativeContacts}
+                        onClick={handleImportFromGoogle}
+                        className="w-full min-h-[48px] py-3 px-4 rounded-xl border-2 border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 hover:border-slate-300 disabled:opacity-70 flex items-center justify-center gap-2"
+                      >
+                        {loadingNativeContacts ? 'Chargement…' : 'Importer depuis Google'}
+                      </button>
+
+                      {!importSources.fromDevice ? (
                         <div className="rounded-xl bg-slate-100 border border-slate-200 p-3 text-xs text-slate-600">
                           <p className="font-medium text-slate-700">Sur cet appareil</p>
-                          <p className="mt-1">L’accès direct au carnet d’adresses n’est pas disponible (Safari, ordinateur…). Utilisez l’import de fichier ci-dessus ou l’ajout à la main.</p>
+                          <p className="mt-1">L’accès direct au carnet n’est pas disponible (Safari, ordinateur…). Utilisez un fichier, Google ou l’ajout à la main.</p>
                         </div>
-                      )}
+                      ) : null}
 
                       <div className="flex flex-col gap-2 pt-1">
                         <button type="button" onClick={() => { setShowImportGuestsModal(false); setShowGuestModal(true); }} className="w-full min-h-[44px] py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
                           Ajouter un invité à la main
                         </button>
                         <button type="button" onClick={handleShare} className="w-full min-h-[44px] py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
-                          Partager l’invitation (co-organisateur)
+                          Partager l’invitation (lien)
                         </button>
                       </div>
 
                       <details className="group">
                         <summary className="text-xs font-medium text-indigo-600 cursor-pointer list-none py-1">Comment exporter mes contacts ?</summary>
                         <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 space-y-2">
-                          <p><strong>Excel / Google Sheets :</strong> Fichier → Télécharger → CSV.</p>
-                          <p><strong>iPhone / Android :</strong> App Contacts → Partager / Exporter → fichier .vcf.</p>
+                          <p><strong>Exporter depuis iCloud / iPhone :</strong> App Contacts → Sélectionner → Partager → Fichier .vcf.</p>
+                          <p><strong>Exporter depuis Google :</strong> contacts.google.com → Exporter → vCard ou CSV.</p>
+                          <p><strong>Excel / Google Sheets :</strong> Fichier → Télécharger → CSV (colonnes Prénom, Nom, Email, Tél).</p>
                           <p><strong>Mac / PC :</strong> Contacts ou Outlook → Exporter en .vcf ou .csv.</p>
                         </div>
                       </details>

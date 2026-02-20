@@ -23,6 +23,56 @@ export function isContactComplete(c: ImportedContact): boolean {
   return !!trim(c.firstName) && !!trim(c.lastName) && (!!trim(c.email) || !!trim(c.phone));
 }
 
+/** Normalise un numéro vers E.164 (digits + leading +). FR : 0xxxxxxxx → +33xxxxxxxx. */
+export function normalizePhoneE164(phone: string): string {
+  const raw = (phone || '').replace(/\s/g, '').replace(/[.\-()]/g, '');
+  const digits = raw.replace(/\D/g, '');
+  if (!digits.length) return '';
+  if (raw.startsWith('+')) {
+    return '+' + digits;
+  }
+  if (digits.startsWith('33') && digits.length >= 11) return '+' + digits;
+  if (digits.startsWith('0') && digits.length === 10) return '+33' + digits.slice(1);
+  if (digits.length >= 10) return '+' + digits;
+  return digits;
+}
+
+/** Normalise un contact : téléphone E.164, email en minuscules, trim. */
+export function normalizeContact(c: ImportedContact): ImportedContact {
+  const phone = trim(c.phone);
+  const email = trim(c.email).toLowerCase();
+  return {
+    firstName: trim(c.firstName),
+    lastName: trim(c.lastName),
+    email,
+    phone: phone ? normalizePhoneE164(phone) : '',
+    address: c.address ? trim(c.address) : undefined
+  };
+}
+
+/** Clé de déduplication : phone_normalized ou email_lowercase (au moins un non vide). */
+function dedupeKey(c: ImportedContact): string {
+  const p = normalizePhoneE164(c.phone || '');
+  const e = (c.email || '').trim().toLowerCase();
+  if (p) return 'p:' + p;
+  if (e) return 'e:' + e;
+  return 'n:' + (c.firstName + ' ' + c.lastName).toLowerCase();
+}
+
+/** Déduplique une liste de contacts (phone normalisé + email lowercase). Garde la première occurrence. */
+export function deduplicateContacts(contacts: ImportedContact[]): ImportedContact[] {
+  const seen = new Set<string>();
+  const out: ImportedContact[] = [];
+  for (const c of contacts) {
+    const n = normalizeContact(c);
+    const key = dedupeKey(n);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(n);
+  }
+  return out;
+}
+
 /** Parse un fichier vCard (VCF). Retourne une liste de contacts. */
 export function parseVcf(text: string): ImportedContact[] {
   const out: ImportedContact[] = [];
