@@ -7,7 +7,7 @@
     <meta name="description" content="myEvent — Gérez vos événements comme un pro. Organisation, équipe et messagerie.">
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="myEvent">
     <title>myEvent</title>
     <link rel="manifest" href="/manifest.webmanifest">
@@ -23,7 +23,10 @@
             font-family: 'Plus Jakarta Sans', sans-serif;
             background-color: #f8fafc;
             -webkit-tap-highlight-color: transparent;
-            user-select: none;
+        }
+        input, textarea, [contenteditable="true"] {
+            user-select: text;
+            -webkit-user-select: text;
         }
         .toast-enter { transform: translateY(100%); opacity: 0; }
         .toast-enter-active { transform: translateY(0); opacity: 1; transition: all 0.3s ease; }

@@ -19,6 +19,7 @@
 		4ED597D59BB825E9E41F5FED /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0AA3B3C942D75D5CCF22116 /* Config.swift */; };
 		4FE445E4D832860A18DBFA20 /* ChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50760981786552C69953917A /* ChatService.swift */; };
 		5E9C9A97ED258D45BEE16716 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B6503F4AD4C5C58A46CABC1 /* KeychainHelper.swift */; };
+		626E39FAED39D896708D6A3A /* NativeContactPickerBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9276CBABAF73A06FFDC36175 /* NativeContactPickerBridge.swift */; };
 		74E89D40DE748CBC32C24BB6 /* RegisterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AEC77AF40B91B53EFC0FF5C /* RegisterView.swift */; };
 		7A34190D5719CCF27BA87500 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32BE0EB5532B3652EC25FC37 /* MainTabView.swift */; };
 		8B87C33704953BA49FFC142E /* PrimaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8759C5A8C50C751EAE5775B /* PrimaryButton.swift */; };
@@ -76,6 +77,7 @@
 		8CAD187DB6B095B116595194 /* LoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
 		8EFE8F4E0775586A104D5C56 /* MyEventNativeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyEventNativeApp.swift; sourceTree = "<group>"; };
 		90E3FF55EAEBDAE6E325310F /* description */ = {isa = PBXFileReference; path = description; sourceTree = "<group>"; };
+		9276CBABAF73A06FFDC36175 /* NativeContactPickerBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeContactPickerBridge.swift; sourceTree = "<group>"; };
 		9553354427D275D319F13268 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		95989B9C2A0E08E4C6DB0277 /* main */ = {isa = PBXFileReference; path = main; sourceTree = "<group>"; };
 		97EBB4C1BEB60FF92725D76B /* README.sample */ = {isa = PBXFileReference; path = README.sample; sourceTree = "<group>"; };
@@ -180,6 +182,7 @@
 			isa = PBXGroup;
 			children = (
 				29EFD3EC3BC5E73E4DD55A5C /* ContactImportSheet.swift */,
+				9276CBABAF73A06FFDC36175 /* NativeContactPickerBridge.swift */,
 			);
 			path = Contacts;
 			sourceTree = "<group>";
@@ -629,6 +632,7 @@
 				08527424FA5DC5000171E4AD /* LoginView.swift in Sources */,
 				7A34190D5719CCF27BA87500 /* MainTabView.swift in Sources */,
 				FF21628B40BA1951B263DFAB /* MyEventNativeApp.swift in Sources */,
+				626E39FAED39D896708D6A3A /* NativeContactPickerBridge.swift in Sources */,
 				8B87C33704953BA49FFC142E /* PrimaryButton.swift in Sources */,
 				437242DFFEEF8BFD8F53A309 /* ProfilesService.swift in Sources */,
 				74E89D40DE748CBC32C24BB6 /* RegisterView.swift in Sources */,

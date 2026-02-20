@@ -631,9 +631,9 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
   };
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-w-0">
+    <div className="flex flex-col h-full min-h-0 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-w-0">
       {/* HEADER */}
-      <div className="relative h-48 flex-shrink-0">
+      <div className="relative h-40 sm:h-48 flex-shrink-0">
         <img src={event.image || `https://picsum.photos/seed/${event.id}/1200/400`} className="w-full h-full object-cover" alt="" />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent" />
         <button type="button" onClick={onBack} className="absolute top-3 left-3 sm:top-4 sm:left-4 p-3 sm:p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center bg-white/90 text-slate-800 rounded-xl hover:bg-white" aria-label="Retour">
@@ -644,15 +644,15 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
           </button>
         )}
-        <div className="absolute bottom-4 left-4 right-4">
-          <h1 className="text-2xl font-semibold text-white truncate">{event.title}</h1>
-          <p className="text-white/80 text-sm mt-0.5">{event.isDateTBD ? "À confirmer" : formatDate(event.startDate)} · {event.location || "Lieu à définir"}</p>
+        <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-4">
+          <h1 className="text-xl sm:text-2xl font-semibold text-white truncate">{event.title}</h1>
+          <p className="text-white/80 text-xs sm:text-sm mt-0.5 truncate">{event.isDateTBD ? "À confirmer" : formatDate(event.startDate)} · {event.location || "Lieu à définir"}</p>
         </div>
       </div>
 
       {!selectedSubId ? (
         <>
-          <nav className="flex gap-1 px-3 sm:px-4 pt-2 pb-1 border-b border-slate-200 overflow-x-auto no-scrollbar -webkit-overflow-scrolling-touch" aria-label="Onglets">
+          <nav className="flex gap-0 sm:gap-1 px-2 sm:px-4 pt-2 pb-1 border-b border-slate-200 overflow-x-auto no-scrollbar overflow-y-hidden" style={{ WebkitOverflowScrolling: 'touch' }} aria-label="Onglets">
             {[
               { id: 'overview', label: "Vue d'ensemble" },
               { id: 'program', label: 'Programme' },
@@ -661,7 +661,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
               ...(canViewBudget ? [{ id: 'budget', label: 'Budget' }] : [])
             ].map(tab => (
               (tab.id !== 'settings' || isOwner) && (
-                <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id as any)} className={`py-3 px-4 text-sm font-medium rounded-t-lg whitespace-nowrap relative ${activeTab === tab.id ? 'text-indigo-600 bg-slate-50' : 'text-slate-500 hover:text-slate-700'}`}>
+                <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id as any)} className={`py-3 px-3 sm:px-4 text-xs sm:text-sm font-medium rounded-t-lg whitespace-nowrap relative min-h-[44px] flex items-center ${activeTab === tab.id ? 'text-indigo-600 bg-slate-50' : 'text-slate-500 hover:text-slate-700'}`}>
                   {tab.label}
                   {tab.id === 'settings' && pendingOrganizers.length > 0 && <span className="absolute top-2 right-1 w-2 h-2 bg-red-500 rounded-full" />}
                   {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-t" />}
@@ -984,13 +984,13 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       ) : (
         /* VUE SÉQUENCE */
         <div className="flex-1 flex flex-col bg-white min-w-0 animate-in slide-in-from-right-8 duration-500">
-           <header className="px-8 py-6 bg-gray-900 text-white flex items-center justify-between gap-4">
-              <div className="flex items-center gap-6 min-w-0 flex-1">
-                 <button type="button" onClick={() => setSelectedSubId(null)} className="p-3 bg-white/10 rounded-2xl hover:bg-white/20 transition-all" aria-label="Retour au programme">
+           <header className="px-4 sm:px-6 md:px-8 py-4 sm:py-6 bg-gray-900 text-white flex items-center justify-between gap-3 sm:gap-4">
+              <div className="flex items-center gap-3 sm:gap-6 min-w-0 flex-1">
+                 <button type="button" onClick={() => setSelectedSubId(null)} className="min-w-[44px] min-h-[44px] p-3 flex items-center justify-center bg-white/10 rounded-xl sm:rounded-2xl hover:bg-white/20 transition-all" aria-label="Retour au programme">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7"/></svg>
                  </button>
                  <div className="min-w-0">
-                    <h2 className="text-xl font-black truncate">{currentSub?.title}</h2>
+                    <h2 className="text-lg sm:text-xl font-black truncate">{currentSub?.title}</h2>
                     <p className="text-white/40 text-[9px] font-black uppercase tracking-widest">Séquence du programme</p>
                  </div>
               </div>
@@ -1001,20 +1001,20 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
               )}
            </header>
 
-           <nav className="flex px-4 border-b border-gray-100 bg-gray-50/30 overflow-x-auto no-scrollbar">
-              <button key="sequence" type="button" onClick={() => setSubTab('sequence')} className={`py-5 px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap ${subTab === 'sequence' ? 'text-indigo-600' : 'text-gray-400'}`}>
+           <nav className="flex px-2 sm:px-4 border-b border-gray-100 bg-gray-50/30 overflow-x-auto no-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <button key="sequence" type="button" onClick={() => setSubTab('sequence')} className={`py-4 sm:py-5 px-4 sm:px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'sequence' ? 'text-indigo-600' : 'text-gray-400'}`}>
                 Séquence
                 {subTab === 'sequence' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-indigo-600 rounded-t-full" />}
               </button>
               {canChatForCurrentSubEvent && (
-                <button key="chat" type="button" onClick={() => setSubTab('chat')} className={`py-5 px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap ${subTab === 'chat' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                <button key="chat" type="button" onClick={() => setSubTab('chat')} className={`py-4 sm:py-5 px-4 sm:px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'chat' ? 'text-indigo-600' : 'text-gray-400'}`}>
                   Chat
                   {subTab === 'chat' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-indigo-600 rounded-t-full" />}
                 </button>
               )}
            </nav>
 
-           <div className="flex-1 p-8 overflow-y-auto min-w-0 space-y-10">
+           <div className="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto min-w-0 space-y-6 sm:space-y-10">
               {subTab === 'sequence' && (
                 <>
                   {/* Infos */}
@@ -1118,10 +1118,10 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
 
       {/* MODALS */}
       {showEventSettingsModal && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center p-6 bg-gray-900/80 backdrop-blur-xl">
-          <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
-            <h3 className="text-2xl font-black text-gray-900 px-10 pt-10 pb-4">Réglages du projet</h3>
-            <nav className="flex px-6 border-b border-gray-100">
+        <div className="fixed inset-0 z-[250] flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 bg-gray-900/80 backdrop-blur-xl">
+          <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-[3rem] shadow-2xl max-h-[90vh] sm:max-h-[85vh] overflow-hidden flex flex-col pb-[env(safe-area-inset-bottom)]">
+            <h3 className="text-xl sm:text-2xl font-black text-gray-900 px-5 sm:px-10 pt-6 sm:pt-10 pb-3 sm:pb-4">Réglages du projet</h3>
+            <nav className="flex px-4 sm:px-6 border-b border-gray-100">
               {(['general', 'appearance'] as const).map((tab) => (
                 <button
                   key={tab}
@@ -1137,7 +1137,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 </button>
               ))}
             </nav>
-            <div className="flex-1 overflow-y-auto p-10 space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-10 space-y-6">
               {eventSettingsTab === 'general' && (
                 <>
                   <Input
@@ -1346,8 +1346,8 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       )}
 
       {showSequenceModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-gray-900/80 backdrop-blur-xl animate-in fade-in">
-           <div className="bg-white w-full max-w-sm rounded-[3rem] p-10 space-y-6 shadow-2xl animate-in zoom-in-95">
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 bg-gray-900/80 backdrop-blur-xl">
+           <div className="bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-[3rem] p-6 sm:p-10 space-y-5 sm:space-y-6 shadow-2xl pb-[env(safe-area-inset-bottom)]">
               <h3 className="text-2xl font-black">Nouvelle Séquence</h3>
               <div className="space-y-4">
                  <Input label="Titre de la séquence" placeholder="Ex: Cocktail de bienvenue" value={seqForm.title} onChange={e => setSeqForm({...seqForm, title: e.target.value})} />
@@ -1363,8 +1363,8 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       )}
 
       {showGuestModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-gray-900/80 backdrop-blur-xl animate-in fade-in">
-           <div className="bg-white w-full max-w-sm rounded-2xl p-6 space-y-6 shadow-xl">
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 bg-gray-900/80 backdrop-blur-xl">
+           <div className="bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 space-y-5 sm:space-y-6 shadow-xl pb-[env(safe-area-inset-bottom)]">
               <h3 className="text-lg font-semibold text-slate-900">Ajouter un participant</h3>
               <div className="space-y-4">
                  <Input label="Prénom" value={guestForm.firstName} onChange={e => setGuestForm({...guestForm, firstName: e.target.value})} />
@@ -1529,8 +1529,8 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       )}
 
       {showMomentModal && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-gray-900/80 backdrop-blur-xl animate-in fade-in">
-           <div className="bg-white w-full max-w-sm rounded-[3rem] p-10 space-y-6 shadow-2xl animate-in zoom-in-95">
+        <div className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 bg-gray-900/80 backdrop-blur-xl">
+           <div className="bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-[3rem] p-6 sm:p-10 space-y-5 sm:space-y-6 shadow-2xl pb-[env(safe-area-inset-bottom)]">
               <h3 className="text-2xl font-black">Nouveau Jalon</h3>
               <div className="space-y-4">
                  <Input label="Heure précise" type="time" value={momentForm.time} onChange={e => setMomentForm({...momentForm, time: e.target.value})} />
