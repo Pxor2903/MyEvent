@@ -2,37 +2,28 @@
  * Option A — Import direct via permissions (iOS CNContactStore / Android ContactsContract).
  * Flux : clic → demande autorisation Contacts → affiche liste avec recherche → coche → importe.
  * Utilisé uniquement en app native (Capacitor iOS/Android).
+ *
+ * Import statique du plugin pour que le pont natif soit enregistré au chargement de l’app (évite
+ * les échecs d’import dynamique dans la WebView iOS). Sur web, le plugin enregistre un stub qui
+ * lance "Not implemented" ; on ne l’appelle que si isNativePlatform().
  */
 
 import { Capacitor } from '@capacitor/core';
+import { Contacts } from '@capacitor-community/contacts';
 import type { ImportedContact } from './contactImport';
 
 export const isNativePlatform = (): boolean => Capacitor.isNativePlatform();
 
-let Contacts: typeof import('@capacitor-community/contacts').Contacts | null = null;
-
-async function getContactsPlugin() {
-  if (Contacts) return Contacts;
-  try {
-    const m = await import('@capacitor-community/contacts');
-    Contacts = m.Contacts;
-    return Contacts;
-  } catch {
-    return null;
-  }
+function getContactsPlugin() {
+  return Capacitor.isNativePlatform() ? Contacts : null;
 }
 
-/** Précharge le plugin pour que le clic « Depuis mon téléphone » déclenche tout de suite la demande de permission. */
-export function preloadContactsPlugin(): void {
-  if (!Capacitor.isNativePlatform()) return;
-  getContactsPlugin().catch(() => {});
-}
+/** Précharge : sur natif le plugin est déjà chargé (import statique). Conservé pour compatibilité. */
+export function preloadContactsPlugin(): void {}
 
-/** True si on est en natif et que le plugin contacts est chargé (pour message UI). */
-export async function isNativeContactsAvailable(): Promise<boolean> {
-  if (!Capacitor.isNativePlatform()) return false;
-  const C = await getContactsPlugin();
-  return !!C;
+/** True si on est en natif (plugin chargé via import statique). */
+export function isNativeContactsAvailable(): boolean {
+  return Capacitor.isNativePlatform();
 }
 
 export type LoadNativeContactsResult = {
@@ -50,7 +41,7 @@ const PERMISSION_REQUEST_TIMEOUT_MS = 15000;
 export async function loadNativeContacts(): Promise<LoadNativeContactsResult> {
   const empty = { contacts: [] as ImportedContact[], permissionDenied: false };
   if (!Capacitor.isNativePlatform()) return empty;
-  const C = await getContactsPlugin();
+  const C = getContactsPlugin();
   if (!C) return empty;
   try {
     const permissionPromise = C.requestPermissions();

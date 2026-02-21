@@ -1,3 +1,6 @@
+/**
+ * Hook : liste des événements de l’utilisateur + abonnement Realtime (insert/update/delete).
+ */
 import { useState, useEffect, useRef } from 'react';
 import type { Event } from '@/core/types';
 import { dbService } from '@/api';

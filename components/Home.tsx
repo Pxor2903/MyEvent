@@ -1,3 +1,6 @@
+/**
+ * Écran principal après connexion : liste des événements (useEvents), création, navigation vers détail.
+ */
 import React, { useState } from 'react';
 import { User, Event, HomeView } from '@/core/types';
 import { Logo } from '@/core/constants';

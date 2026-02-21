@@ -1,5 +1,5 @@
 
-import { Event, Guest } from '../types';
+import type { Event } from '@/core/types';
 
 export const notificationService = {
   async notifyGuestsOfUpdate(event: Event, changeDescription: string): Promise<void> {

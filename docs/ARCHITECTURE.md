@@ -1,6 +1,7 @@
-# Architecture du projet EventMaster
+# Architecture du projet MyEvent (app web)
 
-Ce document décrit l’organisation du code pour faciliter les évolutions sans casser l’existant.
+Ce document décrit l’organisation du **code web** (Vite + React) à la racine du repo.  
+Pour la distinction **app web** vs **app native Swift** (MyEventNative) et les dossiers **ios/** / **android/** (Capacitor), voir **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)**.
 
 ## Principes
 

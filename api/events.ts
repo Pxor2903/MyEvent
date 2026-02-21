@@ -1,3 +1,7 @@
+/**
+ * CRUD événements (Supabase table events), partage (code + mot de passe),
+ * demande de rejoindre en tant qu’organisateur. Gère aussi les invités et sous-événements.
+ */
 import type { Event, Guest, Organizer, SubEvent, User } from '@/core/types';
 import { supabase } from './client';
 

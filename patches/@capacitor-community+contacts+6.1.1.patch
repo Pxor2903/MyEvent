@@ -1,0 +1,30 @@
+diff --git a/node_modules/@capacitor-community/contacts/ios/Plugin/ContactsPlugin.swift b/node_modules/@capacitor-community/contacts/ios/Plugin/ContactsPlugin.swift
+index 4376bb6..9617421 100644
+--- a/node_modules/@capacitor-community/contacts/ios/Plugin/ContactsPlugin.swift
++++ b/node_modules/@capacitor-community/contacts/ios/Plugin/ContactsPlugin.swift
+@@ -39,8 +39,10 @@ public class ContactsPlugin: CAPPlugin, CNContactPickerDelegate {
+     }
+ 
+     @objc override public func requestPermissions(_ call: CAPPluginCall) {
+-        CNContactStore().requestAccess(for: .contacts) { [weak self] _, _  in
+-            self?.checkPermissions(call)
++        DispatchQueue.main.async {
++            CNContactStore().requestAccess(for: .contacts) { [weak self] _, _  in
++                self?.checkPermissions(call)
++            }
+         }
+     }
+ 
+@@ -49,8 +51,10 @@ public class ContactsPlugin: CAPPlugin, CNContactPickerDelegate {
+         if isContactsPermissionGranted() {
+             permissionCallback(call)
+         } else {
+-            CNContactStore().requestAccess(for: .contacts) { [weak self] _, _  in
+-                self?.permissionCallback(call)
++            DispatchQueue.main.async {
++                CNContactStore().requestAccess(for: .contacts) { [weak self] _, _  in
++                    self?.permissionCallback(call)
++                }
+             }
+         }
+     }

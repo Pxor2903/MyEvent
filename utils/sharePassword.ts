@@ -1,3 +1,7 @@
+/**
+ * Génération d’un mot de passe de partage pour les événements (invitation par lien).
+ * Alphanumérique court, sans caractères ambigus (0/O, 1/I).
+ */
 const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const LENGTH = 8;
 

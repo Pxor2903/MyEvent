@@ -12,6 +12,11 @@ dist
 .env
 .env.*
 !.env.example
+
+# Fichiers contenant des secrets (ne jamais versionner)
+*secret*.json
+*secret*.env
+code secret*.json
 dist-ssr
 *.local
 

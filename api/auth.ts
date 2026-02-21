@@ -1,3 +1,7 @@
+/**
+ * Authentification : inscription, connexion (email/mot de passe et OAuth Google/Apple),
+ * récupération du profil courant. Dépend de Supabase Auth et profilesApi.
+ */
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import type { AuthResponse, RegisterData, User } from '@/core/types';
 import { supabase } from './client';

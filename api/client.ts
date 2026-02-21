@@ -1,3 +1,7 @@
+/**
+ * Client Supabase partagé (auth, base de données, Realtime).
+ * Utilise VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY depuis .env.
+ */
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;

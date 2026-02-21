@@ -1,3 +1,7 @@
+/**
+ * Messages du chat : envoi et lecture par événement / canal (table chat_messages).
+ * Utilisé avec Supabase Realtime pour les mises à jour en direct.
+ */
 import type { ChatMessage } from '@/core/types';
 import { supabase } from './client';
 

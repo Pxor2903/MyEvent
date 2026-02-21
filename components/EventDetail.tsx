@@ -1,3 +1,7 @@
+/**
+ * Détail d’un événement : onglets (aperçu, programme, chat, paramètres, budget),
+ * invités (import fichier / Google / appareil), séquences, messagerie temps réel.
+ */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Event, User, ChatMessage, SubEvent, Guest, Organizer, Permission, KeyMoment } from '@/core/types';
 import { dbService, supabase } from '@/api';

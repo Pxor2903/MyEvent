@@ -1,24 +1,62 @@
-# EventMaster Pro
+# MyEvent
 
-Application de gestion d'événements avec authentification Supabase, stockage persistant et messagerie temps réel.
+Application de gestion d'événements : création, partage, invités, séquences et messagerie temps réel. Auth Supabase (email + OAuth Google/Apple), déploiement web et app mobile via **Capacitor** (iOS/Android).
 
-## Run Locally
+---
 
-**Prerequisites:**  Node.js
+## Deux parties du dépôt
 
+- **Application web (celle-ci)** — À la **racine** : Vite + React + TypeScript. App principale (responsive, PWA, base pour Capacitor). **C’est sur cette base que l’équipe travaille.**
+- **Application native Swift (optionnelle)** — Dossier **`MyEventNative/`** : projet Xcode séparé. Ne pas confondre avec **`ios/`** qui est le shell Capacitor (WebView) pour l’app web.
 
-1. Install dependencies:
-   `npm install`
-2. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in a local `.env` file
-3. Apply the SQL schema in `supabase/schema.sql` to your Supabase project
-4. Run the app:
-   `npm run dev`
+Voir **[docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)** pour la structure et le rôle de chaque dossier.
 
-L’app tourne en **HTTPS** en dev. Au premier lancement, accepte le certificat dans le navigateur si demandé.
+---
 
-**Accès depuis le réseau (autre appareil)** : utilise l’URL affichée dans le terminal (ex. `https://192.168.x.x:3000`). Configure les **Redirect URLs** dans Supabase pour cette URL → voir [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+## Prérequis
 
-## Déploiement gratuit sur Vercel (URL fixe)
+Node.js (LTS). Compte Supabase (URL + clé anon).
 
-Pour avoir une URL fixe utilisable partout : **suis le guide pas à pas** → [docs/VERCEL.md](docs/VERCEL.md)  
-(De GitHub → Vercel → variables d’environnement → Supabase → test.)
+---
+
+## Installation et lancement
+
+1. `npm install`
+2. Créer un fichier **`.env`** à la racine avec :
+   - `VITE_SUPABASE_URL=https://xxx.supabase.co`
+   - `VITE_SUPABASE_ANON_KEY=eyJ...`
+3. Appliquer le schéma/migrations dans **`supabase/`** (voir [docs/CONFIGURATION.md](docs/CONFIGURATION.md)).
+4. `npm run dev`
+
+L’app tourne en **HTTPS** (port 3000). Accepter le certificat au premier lancement si demandé.  
+**Réseau local** : utiliser l’URL affichée (ex. `https://192.168.x.x:3000`) et configurer les Redirect URLs dans Supabase.
+
+---
+
+## Scripts
+
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | Serveur de développement |
+| `npm run build` | Build production → `dist/` |
+| `npm run preview` | Prévisualisation du build |
+| `npm run cap:sync` | Build + sync Capacitor (ios/android) |
+| `npm run cap:ios` | Sync + ouvrir Xcode |
+| `npm run cap:android` | Sync + ouvrir Android |
+
+---
+
+## Déploiement
+
+- **Vercel** : [docs/VERCEL.md](docs/VERCEL.md)
+- **Netlify** : config dans `netlify.toml`
+
+---
+
+## Documentation
+
+- **[docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)** — Où est quoi (web vs native).
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — Organisation du code (api, core, components).
+- **[docs/ONBOARDING.md](docs/ONBOARDING.md)** — Prise en main pour nouveaux devs.
+- **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** — Supabase, auth, redirects.
+- **[docs/DEPENDENCIES.md](docs/DEPENDENCIES.md)** — Paquets npm et variables d’environnement.

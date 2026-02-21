@@ -1,7 +1,10 @@
+/**
+ * Composant racine : état auth (currentUser), écrans Login/Register ou Home.
+ * Précharge le plugin Contacts en natif (Capacitor) pour l’import d’invités.
+ */
 import React, { useState, useEffect } from 'react';
 import type { User, AuthMode, RegisterData } from '@/core/types';
 import { authService, supabase } from '@/api';
-import { Capacitor } from '@capacitor/core';
 import { AuthLayout } from './components/AuthLayout';
 import { LoginForm } from './components/LoginForm';
 import { RegisterForm } from './components/RegisterForm';
@@ -16,13 +19,6 @@ const App: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-
-  // Précharge le plugin Contacts en natif pour que la demande d’accès s’affiche (iOS affiche « Contacts » dans Réglages après la 1re demande).
-  useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
-      import('@capacitor-community/contacts').catch(() => {});
-    }
-  }, []);
 
   useEffect(() => {
     let isMounted = true;

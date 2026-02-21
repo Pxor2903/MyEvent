@@ -1,3 +1,7 @@
+/**
+ * Profils utilisateur : lecture et mise à jour (table profiles Supabase).
+ * Utilisé après auth pour stocker nom, email, adresse, etc.
+ */
 import type { User } from '@/core/types';
 import { supabase } from './client';
 

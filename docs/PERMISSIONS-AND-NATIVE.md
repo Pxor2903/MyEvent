@@ -35,7 +35,9 @@ Sur chaque plateforme, l’app **demande l’autorisation** au moment où l’ut
 
 ## Capacitor (web dans coque native)
 
-- **Contacts** : plugin `@capacitor-community/contacts` → demande de permission puis `getContacts()`. Pour un **sélecteur natif** comme sur l’app Swift, il faudrait un plugin personnalisé qui affiche `CNContactPickerViewController` (iOS) et l’équivalent Android, puis renvoie les contacts sélectionnés.
+- **Contacts** : plugin `@capacitor-community/contacts` → demande de permission puis `getContacts()`.
+  - **Correctif iOS** : sur iPhone, la demande d’accès aux contacts doit être exécutée sur le **thread principal**. Le projet applique un **patch** (`patches/@capacitor-community+contacts+6.1.1.patch`) qui enveloppe `CNContactStore().requestAccess` dans `DispatchQueue.main.async`. Après `npm install`, le script `postinstall` réapplique le patch. Si « Contacts » n’apparaît pas dans Réglages > MyEvent, refaire un build natif : `npm run build && npx cap sync ios` puis ouvrir Xcode et lancer sur appareil/simulateur.
+  - Le plugin est importé **statiquement** dans `utils/nativeContacts.ts` pour qu’il soit bien enregistré dans la WebView au chargement (évite les échecs d’import dynamique sur iOS).
 - **Calendrier** : pas de plugin officiel « calendrier ». Un plugin custom peut utiliser EventKit (iOS) et `CalendarContract` (Android) pour demander l’accès et créer des événements.
 
 ---
