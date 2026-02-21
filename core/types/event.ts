@@ -6,6 +6,9 @@ export interface KeyMoment {
   label: string;
 }
 
+/** Nombre de personnes présentes par sous-événement (subEventId → count). */
+export type GuestAttendance = Record<string, number>;
+
 export interface Guest {
   id: string;
   firstName: string;
@@ -15,6 +18,10 @@ export interface Guest {
   status: 'pending' | 'confirmed' | 'declined';
   companions: unknown[];
   linkedSubEventIds: string[];
+  /** Nombre de personnes couvertes par cette invitation (ex. 1 = seul, 2 = couple, 4 = couple + 2 enfants). Défaut 1. */
+  guestCount?: number;
+  /** Présence par sous-événement : subEventId → nombre de personnes présentes. */
+  attendance?: GuestAttendance;
 }
 
 export interface SubEvent {

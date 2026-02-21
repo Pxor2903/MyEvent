@@ -15,6 +15,7 @@ import {
 } from '@/utils/contactImportService';
 import { preloadContactsPlugin } from '@/utils/nativeContacts';
 import { Input } from './Input';
+import { GuestsTable } from './GuestsTable';
 
 interface EventDetailProps {
   event: Event;
@@ -24,9 +25,11 @@ interface EventDetailProps {
 }
 
 export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, onUpdate }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'program' | 'chat' | 'settings' | 'budget'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'program' | 'chat' | 'settings' | 'budget' | 'guests'>('overview');
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
   const [subTab, setSubTab] = useState<'sequence' | 'chat'>('sequence');
+  /** Filtre optionnel pour l’onglet Invités (sous-événement sélectionné depuis le programme). */
+  const [guestsViewSubId, setGuestsViewSubId] = useState<string | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -387,7 +390,9 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       phone: (c.phone || '').trim() || undefined,
       status: 'pending' as const,
       companions: [],
-      linkedSubEventIds: [selectedSubId]
+      linkedSubEventIds: [selectedSubId],
+      guestCount: 1,
+      attendance: {}
     })) as Guest[];
     try {
       const updated = await dbService.updateEventAtomic(event.id, (evt) => ({
@@ -403,6 +408,16 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
     }
   };
 
+  const handleGuestsTableUpdate = async (updated: Event) => {
+    try {
+      const saved = await dbService.updateEventAtomic(event.id, () => updated);
+      onUpdate(saved);
+    } catch (err) {
+      console.error(err);
+      alert('Impossible d’enregistrer les modifications.');
+    }
+  };
+
   const handleAddGuest = async () => {
     if (!canManageGuestsHere || !selectedSubId) return;
     if (!guestForm.firstName.trim()) return;
@@ -414,7 +429,9 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       phone: guestForm.phone?.trim() || undefined,
       status: 'confirmed',
       companions: [],
-      linkedSubEventIds: [selectedSubId]
+      linkedSubEventIds: [selectedSubId],
+      guestCount: 1,
+      attendance: {}
     };
     const updated = await dbService.updateEventAtomic(event.id, (evt) => ({
       ...evt,
@@ -685,12 +702,13 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
             {[
               { id: 'overview', label: "Vue d'ensemble" },
               { id: 'program', label: 'Programme' },
+              { id: 'guests', label: 'Invités' },
               { id: 'chat', label: 'Chat' },
               { id: 'settings', label: 'Équipe' },
               ...(canViewBudget ? [{ id: 'budget', label: 'Budget' }] : [])
             ].map(tab => (
               (tab.id !== 'settings' || isOwner) && (
-                <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id as any)} className={`py-3 px-3 sm:px-4 text-xs sm:text-sm font-medium rounded-t-lg whitespace-nowrap relative min-h-[44px] flex items-center ${activeTab === tab.id ? 'text-indigo-600 bg-slate-50' : 'text-slate-500 hover:text-slate-700'}`}>
+                <button key={tab.id} type="button" onClick={() => { setActiveTab(tab.id as any); if (tab.id !== 'guests') setGuestsViewSubId(null); }} className={`py-3 px-3 sm:px-4 text-xs sm:text-sm font-medium rounded-t-lg whitespace-nowrap relative min-h-[44px] flex items-center ${activeTab === tab.id ? 'text-indigo-600 bg-slate-50' : 'text-slate-500 hover:text-slate-700'}`}>
                   {tab.label}
                   {tab.id === 'settings' && pendingOrganizers.length > 0 && <span className="absolute top-2 right-1 w-2 h-2 bg-red-500 rounded-full" />}
                   {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-t" />}
@@ -707,8 +725,11 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     <h3 className="text-base font-semibold text-slate-900 mb-2">Description du projet</h3>
                     <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">{event.description || "Aucune description."}</p>
                   </div>
-                  <div className="p-5 rounded-xl border border-slate-200 bg-white">
-                    <h3 className="text-base font-semibold text-slate-900 mb-4">Invités</h3>
+                  <button type="button" onClick={() => { setActiveTab('guests'); setGuestsViewSubId(null); }} className="p-5 rounded-xl border border-slate-200 bg-white hover:border-indigo-200 hover:shadow-sm text-left transition-all w-full">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-base font-semibold text-slate-900">Invités</h3>
+                      <span className="text-xs font-medium text-indigo-600">Voir le tableau →</span>
+                    </div>
                     {(() => {
                       const guests = event.guests || [];
                       const confirmed = guests.filter(g => g.status === 'confirmed').length;
@@ -732,7 +753,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                         </div>
                       );
                     })()}
-                  </div>
+                  </button>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                   <div className="lg:col-span-3 rounded-xl border border-slate-200 bg-white overflow-hidden">
@@ -830,6 +851,17 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {activeTab === 'guests' && (
+              <div className="flex flex-col min-h-[400px] -mx-4 sm:-mx-6 -mb-4 sm:-mb-6">
+                <GuestsTable
+                  event={event}
+                  filterSubEventId={guestsViewSubId}
+                  canManage={canManageGuests}
+                  onUpdate={handleGuestsTableUpdate}
+                />
               </div>
             )}
 
@@ -1081,7 +1113,10 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                   <section className="space-y-4">
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Participants</h3>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button type="button" onClick={() => { setSelectedSubId(null); setActiveTab('guests'); setGuestsViewSubId(selectedSubId); }} className="px-4 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-medium hover:bg-indigo-100">
+                          Tableau des invités
+                        </button>
                         <button type="button" onClick={() => setShowImportGuestsModal(true)} disabled={!canManageGuestsHere} className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-50 disabled:opacity-40">
                           Importer contacts
                         </button>

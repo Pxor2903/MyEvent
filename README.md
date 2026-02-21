@@ -44,6 +44,8 @@ L’app tourne en **HTTPS** (port 3000). Accepter le certificat au premier lance
 | `npm run cap:ios` | Sync + ouvrir Xcode |
 | `npm run cap:android` | Sync + ouvrir Android |
 
+Lancer ces commandes depuis la **racine du repo** (dossier où se trouvent `package.json` et `capacitor.config.ts`), pas depuis `MyEventNative/`.
+
 ---
 
 ## Déploiement
