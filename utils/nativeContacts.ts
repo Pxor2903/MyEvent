@@ -40,12 +40,12 @@ export type LoadNativeContactsResult = {
   permissionDenied: boolean;
 };
 
-/** Timeout pour la demande de permission (iOS peut bloquer si la boîte système n’apparaît pas). */
-const PERMISSION_REQUEST_TIMEOUT_MS = 8000;
+/** Timeout pour la demande de permission (laisser le temps à la boîte système d’apparaître). */
+const PERMISSION_REQUEST_TIMEOUT_MS = 15000;
 
 /**
  * Option A : demande la permission Contacts, puis charge la liste.
- * On appelle d’abord checkPermissions() pour éviter de bloquer sur requestPermissions() (iOS).
+ * On appelle requestPermissions() en premier pour que iOS affiche la boîte et ajoute « Contacts » dans Réglages.
  */
 export async function loadNativeContacts(): Promise<LoadNativeContactsResult> {
   const empty = { contacts: [] as ImportedContact[], permissionDenied: false };
@@ -53,25 +53,22 @@ export async function loadNativeContacts(): Promise<LoadNativeContactsResult> {
   const C = await getContactsPlugin();
   if (!C) return empty;
   try {
-    let status = await C.checkPermissions();
-    let allowed = status.contacts === 'granted' || (status.contacts as string) === 'limited';
-    if (!allowed && status.contacts === 'prompt') {
-      const permissionPromise = C.requestPermissions();
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('PERMISSION_TIMEOUT')), PERMISSION_REQUEST_TIMEOUT_MS)
-      );
-      try {
-        status = await Promise.race([permissionPromise, timeoutPromise]);
-        allowed = status.contacts === 'granted' || (status.contacts as string) === 'limited';
-      } catch (e) {
-        if ((e as Error)?.message === 'PERMISSION_TIMEOUT') {
-          throw new Error(
-            'La demande d’accès aux contacts n’a pas abouti. Allez dans Réglages > MyEvent > Contacts pour autoriser l’accès, puis réessayez. Sinon, utilisez « Importer depuis un fichier » (vCard) ou « Importer depuis Google ».'
-          );
-        }
-        throw e;
+    const permissionPromise = C.requestPermissions();
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('PERMISSION_TIMEOUT')), PERMISSION_REQUEST_TIMEOUT_MS)
+    );
+    let status: { contacts: string };
+    try {
+      status = await Promise.race([permissionPromise, timeoutPromise]);
+    } catch (e) {
+      if ((e as Error)?.message === 'PERMISSION_TIMEOUT') {
+        throw new Error(
+          'La demande d’accès aux contacts n’a pas abouti. Ouvrez Réglages > MyEvent : si « Contacts » apparaît, autorisez-le puis réessayez. Sinon, réinstallez l’app ou utilisez « Importer depuis un fichier » (vCard) ou Google.'
+        );
       }
+      throw e;
     }
+    const allowed = status.contacts === 'granted' || (status.contacts as string) === 'limited';
     if (!allowed) {
       return { contacts: [], permissionDenied: true };
     }
