@@ -51,7 +51,7 @@ export async function importFromDevice(): Promise<ImportFromDeviceResult> {
     const result = await withTimeout(
       loadNativeContacts(),
       DEVICE_IMPORT_TIMEOUT_MS,
-      'Délai dépassé. Vérifiez que l’app a bien le plugin Contacts (Capacitor) et les autorisations.'
+      'Délai dépassé. Sur iPhone : Réglages > MyEvent > Contacts pour autoriser l’accès, puis réessayez. Sinon utilisez « Importer depuis un fichier » (vCard) ou « Importer depuis Google ».'
     );
     const contacts = deduplicateContacts(result.contacts);
     return { type: 'native', contacts, permissionDenied: result.permissionDenied };

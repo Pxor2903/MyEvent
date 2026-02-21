@@ -40,9 +40,12 @@ export type LoadNativeContactsResult = {
   permissionDenied: boolean;
 };
 
+/** Timeout pour la demande de permission (iOS peut bloquer si la boîte système n’apparaît pas). */
+const PERMISSION_REQUEST_TIMEOUT_MS = 8000;
+
 /**
  * Option A : demande la permission Contacts, puis charge la liste.
- * À appeler au clic (geste utilisateur). En cas de refus, permissionDenied = true.
+ * On appelle d’abord checkPermissions() pour éviter de bloquer sur requestPermissions() (iOS).
  */
 export async function loadNativeContacts(): Promise<LoadNativeContactsResult> {
   const empty = { contacts: [] as ImportedContact[], permissionDenied: false };
@@ -50,8 +53,25 @@ export async function loadNativeContacts(): Promise<LoadNativeContactsResult> {
   const C = await getContactsPlugin();
   if (!C) return empty;
   try {
-    const status = await C.requestPermissions();
-    const allowed = status.contacts === 'granted' || (status.contacts as string) === 'limited';
+    let status = await C.checkPermissions();
+    let allowed = status.contacts === 'granted' || (status.contacts as string) === 'limited';
+    if (!allowed && status.contacts === 'prompt') {
+      const permissionPromise = C.requestPermissions();
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('PERMISSION_TIMEOUT')), PERMISSION_REQUEST_TIMEOUT_MS)
+      );
+      try {
+        status = await Promise.race([permissionPromise, timeoutPromise]);
+        allowed = status.contacts === 'granted' || (status.contacts as string) === 'limited';
+      } catch (e) {
+        if ((e as Error)?.message === 'PERMISSION_TIMEOUT') {
+          throw new Error(
+            'La demande d’accès aux contacts n’a pas abouti. Allez dans Réglages > MyEvent > Contacts pour autoriser l’accès, puis réessayez. Sinon, utilisez « Importer depuis un fichier » (vCard) ou « Importer depuis Google ».'
+          );
+        }
+        throw e;
+      }
+    }
     if (!allowed) {
       return { contacts: [], permissionDenied: true };
     }

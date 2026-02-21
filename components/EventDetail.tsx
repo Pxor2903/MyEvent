@@ -308,8 +308,11 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
     } catch (e) {
       console.error(e);
       const msg = (e as Error)?.message ?? '';
-      if (msg.includes('Délai') || msg.includes('dépassé') || msg.includes('sélecteur') || msg.includes('Timeout')) alert(msg);
-      else alert('Impossible d’accéder aux contacts. Utilisez l’import de fichier (vCard/CSV) ou l’ajout à la main.');
+      if (msg && (msg.includes('Réglages') || msg.includes('Délai') || msg.includes('dépassé') || msg.includes('sélecteur') || msg.includes('Timeout') || msg.includes('autoriser'))) {
+        alert(msg);
+      } else {
+        alert('Impossible d’accéder aux contacts. Utilisez l’import de fichier (vCard/CSV) ou l’ajout à la main.');
+      }
     } finally {
       setLoadingNativeContacts(false);
     }
