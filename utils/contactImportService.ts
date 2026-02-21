@@ -37,13 +37,31 @@ export type ImportFromDeviceResult =
   | { type: 'picker'; contacts: ImportedContact[] }
   | { type: 'native'; contacts: ImportedContact[]; permissionDenied: boolean };
 
+const DEVICE_IMPORT_TIMEOUT_MS = 20000;
+
+function withTimeout<T>(p: Promise<T>, ms: number, msg: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(msg)), ms))
+  ]);
+}
+
 export async function importFromDevice(): Promise<ImportFromDeviceResult> {
   if (isNativePlatform()) {
-    const result = await loadNativeContacts();
+    const result = await withTimeout(
+      loadNativeContacts(),
+      DEVICE_IMPORT_TIMEOUT_MS,
+      'Délai dépassé. Vérifiez que l’app a bien le plugin Contacts (Capacitor) et les autorisations.'
+    );
     const contacts = deduplicateContacts(result.contacts);
     return { type: 'native', contacts, permissionDenied: result.permissionDenied };
   }
-  const raw = await pickContactsFromDevice();
+  // Picker : appeler select() sans aucun await avant, pour garder le “geste utilisateur” (Chrome Android).
+  const raw = await withTimeout(
+    pickContactsFromDevice(),
+    DEVICE_IMPORT_TIMEOUT_MS,
+    'Le sélecteur de contacts n’a pas répondu. Utilisez Chrome sur Android (HTTPS) ou l’import par fichier.'
+  );
   const contacts = deduplicateContacts(raw);
   return { type: 'picker', contacts };
 }

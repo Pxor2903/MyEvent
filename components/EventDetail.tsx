@@ -9,6 +9,7 @@ import {
   importFromFile,
   importFromGoogle
 } from '@/utils/contactImportService';
+import { preloadContactsPlugin } from '@/utils/nativeContacts';
 import { Input } from './Input';
 
 interface EventDetailProps {
@@ -281,11 +282,17 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
 
   const importSources = getAvailableSources();
 
-  /** Import depuis l’appareil (Picker ou liste native Capacitor). */
+  /** Précharge le plugin contacts à l’ouverture de la modale (Capacitor) pour que le clic ouvre tout de suite la demande de permission. */
+  useEffect(() => {
+    if (showImportGuestsModal && importSources.fromDevice) preloadContactsPlugin();
+  }, [showImportGuestsModal, importSources.fromDevice]);
+
+  /** Import depuis l’appareil (Picker ou liste native Capacitor). On lance l’appel tout de suite pour garder le “geste utilisateur” (Chrome Android). */
   const handleImportFromDevice = async () => {
+    const promise = importFromDevice();
     setLoadingNativeContacts(true);
     try {
-      const result = await importFromDevice();
+      const result = await promise;
       if (result.type === 'native') {
         if (result.permissionDenied) {
           alert('Accès aux contacts refusé. Tu peux l’autoriser dans Réglages du téléphone, ou ajouter des invités à la main.');
@@ -296,11 +303,13 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
         setDeviceContactSearch('');
       } else {
         if (result.contacts.length) setImportedContacts(result.contacts);
-        else alert('Aucun contact sélectionné ou accès non disponible. Utilisez l’import de fichier ou l’ajout à la main.');
+        else alert('Aucun contact sélectionné. Si le sélecteur ne s’est pas ouvert : utilisez Chrome sur Android (HTTPS) ou importez un fichier .vcf/.csv.');
       }
     } catch (e) {
       console.error(e);
-      alert('Impossible d’accéder aux contacts. Utilisez l’import de fichier ou l’ajout à la main.');
+      const msg = (e as Error)?.message ?? '';
+      if (msg.includes('Délai') || msg.includes('dépassé') || msg.includes('sélecteur') || msg.includes('Timeout')) alert(msg);
+      else alert('Impossible d’accéder aux contacts. Utilisez l’import de fichier (vCard/CSV) ou l’ajout à la main.');
     } finally {
       setLoadingNativeContacts(false);
     }

@@ -22,6 +22,12 @@ async function getContactsPlugin() {
   }
 }
 
+/** Précharge le plugin pour que le clic « Depuis mon téléphone » déclenche tout de suite la demande de permission. */
+export function preloadContactsPlugin(): void {
+  if (!Capacitor.isNativePlatform()) return;
+  getContactsPlugin().catch(() => {});
+}
+
 /** True si on est en natif et que le plugin contacts est chargé (pour message UI). */
 export async function isNativeContactsAvailable(): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) return false;
@@ -45,7 +51,7 @@ export async function loadNativeContacts(): Promise<LoadNativeContactsResult> {
   if (!C) return empty;
   try {
     const status = await C.requestPermissions();
-    const allowed = status.contacts === 'granted' || status.contacts === 'limited';
+    const allowed = status.contacts === 'granted' || (status.contacts as string) === 'limited';
     if (!allowed) {
       return { contacts: [], permissionDenied: true };
     }
