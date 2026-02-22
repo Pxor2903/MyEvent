@@ -1,10 +1,10 @@
 /**
  * Tableau des invités : colonnes classiques + nb personnes (éditable) + présence par sous-événement.
- * Mode « tous les invités » ou filtré par un sous-événement. Export Excel / PDF.
+ * Mise à jour immédiate en local, sauvegarde débrayée côté parent. Export Excel / PDF. Suppression d’invités.
  */
 
 import React, { useState, useCallback } from 'react';
-import type { Event, Guest, SubEvent } from '@/core/types';
+import type { Event, Guest } from '@/core/types';
 import { exportGuestsToExcel, exportGuestsToPdf } from '@/utils/exportGuests';
 
 const STATUS_LABELS: Record<Guest['status'], string> = {
@@ -23,9 +23,25 @@ function getAttendance(g: Guest, subEventId: string): number {
   return Math.max(0, Math.min(getGuestCount(g), Number(n)));
 }
 
+type LocalOverrides = Record<string, { guestCount?: number; attendance?: Record<string, number> }>;
+
+function mergeOverrides(event: Event, overrides: LocalOverrides): Event {
+  return {
+    ...event,
+    guests: (event.guests ?? []).map((g) => {
+      const o = overrides[g.id];
+      if (!o) return g;
+      return {
+        ...g,
+        ...(o.guestCount != null && { guestCount: o.guestCount }),
+        ...(o.attendance && { attendance: { ...(g.attendance || {}), ...o.attendance } })
+      };
+    })
+  };
+}
+
 interface GuestsTableProps {
   event: Event;
-  /** Si défini, n’afficher que les invités liés à ce sous-événement. */
   filterSubEventId?: string | null;
   canManage: boolean;
   onUpdate: (updated: Event) => void;
@@ -38,6 +54,8 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
   onUpdate
 }) => {
   const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null);
+  const [localOverrides, setLocalOverrides] = useState<LocalOverrides>({});
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const subEvents = event.subEvents || [];
   const allGuests = event.guests || [];
@@ -48,15 +66,34 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
     ? subEvents.find((s) => s.id === filterSubEventId)
     : null;
 
+  const effectiveGuestCount = useCallback((g: Guest) => {
+    const o = localOverrides[g.id]?.guestCount;
+    if (o !== undefined) return Math.max(1, Math.min(99, o));
+    return getGuestCount(g);
+  }, [localOverrides]);
+
+  const effectiveAttendance = useCallback((g: Guest, subEventId: string) => {
+    const o = localOverrides[g.id]?.attendance?.[subEventId];
+    if (o !== undefined) return Math.max(0, o);
+    return getAttendance(g, subEventId);
+  }, [localOverrides]);
+
+  const applyAndNotify = useCallback((nextOverrides: LocalOverrides) => {
+    setLocalOverrides(nextOverrides);
+    onUpdate(mergeOverrides(event, nextOverrides));
+  }, [event, onUpdate]);
+
   const updateGuest = useCallback(
     (guestId: string, patch: Partial<Guest>) => {
-      const updated = {
-        ...event,
-        guests: event.guests?.map((g) => (g.id === guestId ? { ...g, ...patch } : g)) ?? []
-      };
-      onUpdate(updated);
+      const g = allGuests.find((x) => x.id === guestId);
+      if (!g) return;
+      const next: LocalOverrides = { ...localOverrides };
+      if (!next[guestId]) next[guestId] = {};
+      if (patch.guestCount != null) next[guestId].guestCount = patch.guestCount;
+      if (patch.attendance) next[guestId].attendance = { ...(next[guestId].attendance ?? g.attendance ?? {}), ...patch.attendance };
+      applyAndNotify(next);
     },
-    [event, onUpdate]
+    [event, allGuests, localOverrides, applyAndNotify]
   );
 
   const setGuestCount = useCallback(
@@ -69,13 +106,28 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
 
   const setAttendance = useCallback(
     (g: Guest, subEventId: string, value: number) => {
-      const max = getGuestCount(g);
+      const max = effectiveGuestCount(g);
       const n = Math.max(0, Math.min(max, value));
       updateGuest(g.id, {
         attendance: { ...(g.attendance || {}), [subEventId]: n }
       });
     },
-    [updateGuest]
+    [updateGuest, effectiveGuestCount]
+  );
+
+  const handleDeleteGuest = useCallback(
+    (g: Guest) => {
+      if (!canManage) return;
+      if (!window.confirm(`Supprimer ${g.firstName} ${g.lastName} de la liste des invités ?`)) return;
+      setDeletingId(g.id);
+      const nextGuests = (event.guests ?? []).filter((x) => x.id !== g.id);
+      const nextOverrides = { ...localOverrides };
+      delete nextOverrides[g.id];
+      setLocalOverrides(nextOverrides);
+      onUpdate({ ...event, guests: nextGuests });
+      setDeletingId(null);
+    },
+    [canManage, event, localOverrides, onUpdate]
   );
 
   const handleExportExcel = useCallback(async () => {
@@ -97,6 +149,12 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
   }, [event]);
 
   const columnsForSubEvents = filterSubEventId ? [] : subEvents;
+
+  const effectiveAttendanceForRow = (g: Guest, subEventId: string) => {
+    const max = effectiveGuestCount(g);
+    const raw = effectiveAttendance(g, subEventId);
+    return Math.min(raw, max);
+  };
 
   return (
     <div className="flex flex-col h-full min-h-0 rounded-xl border border-slate-200 bg-white overflow-hidden">
@@ -164,11 +222,12 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
                     </th>
                   ))
                 )}
+                {canManage && <th className="px-2 py-3 font-semibold text-slate-600 text-center w-12" aria-label="Supprimer" />}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {guests.map((g) => {
-                const count = getGuestCount(g);
+                const count = effectiveGuestCount(g);
                 return (
                   <tr key={g.id} className="hover:bg-slate-50/50">
                     <td className="px-3 py-2.5 font-medium text-slate-900">{g.firstName}</td>
@@ -205,18 +264,18 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
                             type="number"
                             min={0}
                             max={count}
-                            value={getAttendance(g, filterSubEventId)}
+                            value={effectiveAttendanceForRow(g, filterSubEventId)}
                             onChange={(e) => setAttendance(g, filterSubEventId, e.target.value === '' ? 0 : parseInt(e.target.value, 10))}
                             className="w-12 text-center rounded-lg border border-slate-200 px-1 py-1 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                             title="Nombre de personnes présentes"
                           />
                         ) : (
-                          <span className="text-slate-700">{getAttendance(g, filterSubEventId)}</span>
+                          <span className="text-slate-700">{effectiveAttendanceForRow(g, filterSubEventId)}</span>
                         )}
                       </td>
                     ) : (
                       columnsForSubEvents.map((s) => {
-                        const present = getAttendance(g, s.id);
+                        const present = effectiveAttendanceForRow(g, s.id);
                         const isLinked = g.linkedSubEventIds.includes(s.id);
                         return (
                           <td key={s.id} className="px-2 py-2.5 text-center">
@@ -238,6 +297,20 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
                           </td>
                         );
                       })
+                    )}
+                    {canManage && (
+                      <td className="px-2 py-2.5 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteGuest(g)}
+                          disabled={deletingId === g.id}
+                          className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          title="Supprimer l’invité"
+                          aria-label="Supprimer"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      </td>
                     )}
                   </tr>
                 );

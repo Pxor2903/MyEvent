@@ -27,9 +27,11 @@ interface EventDetailProps {
 export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, onUpdate }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'program' | 'chat' | 'settings' | 'budget' | 'guests'>('overview');
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
-  const [subTab, setSubTab] = useState<'sequence' | 'chat'>('sequence');
-  /** Filtre optionnel pour l’onglet Invités (sous-événement sélectionné depuis le programme). */
+  const [subTab, setSubTab] = useState<'sequence' | 'chat' | 'guests'>('sequence');
+  /** Filtre optionnel pour l’onglet Invités (niveau événement principal). */
   const [guestsViewSubId, setGuestsViewSubId] = useState<string | null>(null);
+  const guestsTableUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingGuestsUpdateRef = useRef<Event | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -408,15 +410,32 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
     }
   };
 
-  const handleGuestsTableUpdate = async (updated: Event) => {
-    try {
-      const saved = await dbService.updateEventAtomic(event.id, () => updated);
-      onUpdate(saved);
-    } catch (err) {
-      console.error(err);
-      alert('Impossible d’enregistrer les modifications.');
+  const flushGuestsTableUpdate = useCallback(() => {
+    const pending = pendingGuestsUpdateRef.current;
+    if (pendingGuestsUpdateRef.current != null) {
+      pendingGuestsUpdateRef.current = null;
+      if (guestsTableUpdateTimeoutRef.current != null) {
+        clearTimeout(guestsTableUpdateTimeoutRef.current);
+        guestsTableUpdateTimeoutRef.current = null;
+      }
+      dbService.updateEventAtomic(event.id, () => pending).then((saved) => {
+        onUpdate(saved);
+      }).catch((err) => {
+        console.error(err);
+        alert('Impossible d’enregistrer les modifications.');
+      });
     }
-  };
+  }, [event.id, onUpdate]);
+
+  const handleGuestsTableUpdate = useCallback((updated: Event) => {
+    pendingGuestsUpdateRef.current = updated;
+    if (guestsTableUpdateTimeoutRef.current != null) clearTimeout(guestsTableUpdateTimeoutRef.current);
+    guestsTableUpdateTimeoutRef.current = setTimeout(flushGuestsTableUpdate, 500);
+  }, [flushGuestsTableUpdate]);
+
+  useEffect(() => {
+    return () => { flushGuestsTableUpdate(); };
+  }, [flushGuestsTableUpdate]);
 
   const handleAddGuest = async () => {
     if (!canManageGuestsHere || !selectedSubId) return;
@@ -1067,6 +1086,10 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 Séquence
                 {subTab === 'sequence' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-indigo-600 rounded-t-full" />}
               </button>
+              <button key="guests" type="button" onClick={() => setSubTab('guests')} className={`py-4 sm:py-5 px-4 sm:px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'guests' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                Invités
+                {subTab === 'guests' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-indigo-600 rounded-t-full" />}
+              </button>
               {canChatForCurrentSubEvent && (
                 <button key="chat" type="button" onClick={() => setSubTab('chat')} className={`py-4 sm:py-5 px-4 sm:px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'chat' ? 'text-indigo-600' : 'text-gray-400'}`}>
                   Chat
@@ -1114,7 +1137,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Participants</h3>
                       <div className="flex flex-wrap items-center gap-2">
-                        <button type="button" onClick={() => { setSelectedSubId(null); setActiveTab('guests'); setGuestsViewSubId(selectedSubId); }} className="px-4 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-medium hover:bg-indigo-100">
+                        <button type="button" onClick={() => setSubTab('guests')} className="px-4 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-medium hover:bg-indigo-100">
                           Tableau des invités
                         </button>
                         <button type="button" onClick={() => setShowImportGuestsModal(true)} disabled={!canManageGuestsHere} className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-50 disabled:opacity-40">
@@ -1138,6 +1161,17 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     </div>
                   </section>
                 </>
+              )}
+
+              {subTab === 'guests' && selectedSubId && (
+                <div className="flex flex-col min-h-[300px] -mx-4 sm:-mx-6 -mb-4 sm:-mb-6">
+                  <GuestsTable
+                    event={event}
+                    filterSubEventId={selectedSubId}
+                    canManage={canManageGuestsHere}
+                    onUpdate={handleGuestsTableUpdate}
+                  />
+                </div>
               )}
 
               {subTab === 'chat' && canChatForCurrentSubEvent && (
