@@ -165,6 +165,7 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
     }
   }, [event]);
 
+  const isGlobalView = filterSubEventId == null;
   const columnsForSubEvents = filterSubEventId ? [] : subEvents;
 
   const effectiveAttendanceForRow = (g: Guest, subEventId: string) => {
@@ -229,9 +230,8 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
                 <th className="px-3 py-3 font-semibold text-slate-700 whitespace-nowrap">Prénom</th>
                 <th className="px-3 py-3 font-semibold text-slate-700 whitespace-nowrap hidden sm:table-cell">Email</th>
                 <th className="px-3 py-3 font-semibold text-slate-700 whitespace-nowrap hidden md:table-cell">Tél</th>
-                <th className="px-3 py-3 font-semibold text-slate-700 whitespace-nowrap">Statut</th>
-                <th className="px-3 py-3 font-semibold text-slate-700 whitespace-nowrap text-center" title="Nombre de personnes par invitation">Nb pers.</th>
-                {filterSubEventId ? (
+                {!isGlobalView && <th className="px-3 py-3 font-semibold text-slate-700 whitespace-nowrap">Statut</th>}
+                {!isGlobalView && (filterSubEventId ? (
                   <th className="px-3 py-3 font-semibold text-slate-700 whitespace-nowrap text-center">Présents</th>
                 ) : (
                   columnsForSubEvents.map((s) => (
@@ -239,8 +239,8 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
                       <span className="truncate block">{s.title?.slice(0, 12) || '—'}</span>
                     </th>
                   ))
-                )}
-                {canManage && <th className="px-2 py-3 font-semibold text-slate-600 text-center w-12" aria-label="Supprimer" />}
+                ))}
+                {canManage && !isGlobalView && <th className="px-2 py-3 font-semibold text-slate-600 text-center w-12" aria-label="Supprimer" />}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -272,32 +272,21 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
                         g.firstName
                       )}
                     </td>
-                    <td className="px-3 py-2.5 text-slate-600 hidden sm:table-cell truncate max-w-[180px]">{g.email || '—'}</td>
-                    <td className="px-3 py-2.5 text-slate-600 hidden md:table-cell">{g.phone || '—'}</td>
-                    <td className="px-3 py-2.5">
-                      <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-medium ${
-                        g.status === 'confirmed' ? 'bg-emerald-100 text-emerald-800' :
-                        g.status === 'declined' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {STATUS_LABELS[g.status]}
-                      </span>
-                    </td>
-                    <td className="px-2 py-2.5 text-center">
-                      {canEditThis ? (
-                        <input
-                          type="number"
-                          min={1}
-                          max={99}
-                          value={count}
-                          onChange={(e) => setGuestCount(g, e.target.value === '' ? 1 : parseInt(e.target.value, 10))}
-                          className="w-12 text-center rounded-lg border border-slate-200 px-1 py-1 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
-                          title="Nombre de personnes (ex. couple + enfants)"
-                        />
-                      ) : (
-                        <span className="text-slate-700">{count}</span>
-                      )}
-                    </td>
-                    {filterSubEventId ? (
+                    {!isGlobalView && (
+                      <>
+                        <td className="px-3 py-2.5 text-slate-600 hidden sm:table-cell truncate max-w-[180px]">{g.email || '—'}</td>
+                        <td className="px-3 py-2.5 text-slate-600 hidden md:table-cell">{g.phone || '—'}</td>
+                        <td className="px-3 py-2.5">
+                          <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-medium ${
+                            g.status === 'confirmed' ? 'bg-emerald-100 text-emerald-800' :
+                            g.status === 'declined' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {STATUS_LABELS[g.status]}
+                          </span>
+                        </td>
+                      </>
+                    )}
+                    {!isGlobalView && (filterSubEventId ? (
                       <td className="px-2 py-2.5 text-center">
                         {canEditThis ? (
                           <input
@@ -337,8 +326,8 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
                           </td>
                         );
                       })
-                    )}
-                    {canManage && (
+                    ))}
+                    {canManage && !isGlobalView && (
                       <td className="px-2 py-2.5 text-center">
                         <button
                           type="button"
