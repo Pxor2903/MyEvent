@@ -6,7 +6,7 @@
  * Champs possibles: prénom, nom, email, téléphone, adresse.
  */
 
-import type { GuestQualifierKey, SubGuest } from '@/core/types/event';
+import type { SubGuest } from '@/core/types/event';
 
 export interface ImportedContact {
   firstName: string;
@@ -20,8 +20,8 @@ export interface ImportedContact {
   childrenCount?: number;
   /** Détail optionnel des sous-invités. */
   subGuests?: SubGuest[];
-  /** Qualificatifs pour les cartes (Mr & Mme, + enfants, etc.). */
-  qualifiers?: GuestQualifierKey[];
+  /** Qualificatifs pour les cartes (Mr & Mme, + enfants, ou libellés personnalisés). */
+  qualifiers?: string[];
 }
 
 function trim(s: string): string {

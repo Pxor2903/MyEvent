@@ -3,8 +3,8 @@
  * invités (import fichier / Google / appareil), séquences, messagerie temps réel.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import type { Event, User, ChatMessage, SubEvent, Guest, Organizer, Permission, KeyMoment, SubGuest, GuestQualifierKey } from '@/core/types';
-import { QUALIFIER_LABELS, QUALIFIER_OPTIONS } from '@/core/constants/guests';
+import type { Event, User, ChatMessage, SubEvent, Guest, Organizer, Permission, KeyMoment, SubGuest } from '@/core/types';
+import { QUALIFIER_LABELS, QUALIFIER_OPTIONS, formatQualifierLabel } from '@/core/constants/guests';
 import { dbService, supabase } from '@/api';
 import { generateSharePassword } from '@/utils/sharePassword';
 import { isContactComplete, deduplicateContacts, type ImportedContact } from '@/utils/contactImport';
@@ -94,6 +94,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
   const [showSequenceModal, setShowSequenceModal] = useState(false);
   const [seqForm, setSeqForm] = useState({ title: '', date: '', location: '' });
   const [showGuestModal, setShowGuestModal] = useState(false);
+  const [guestCustomQualifierInput, setGuestCustomQualifierInput] = useState('');
   const [guestForm, setGuestForm] = useState<{
     firstName: string;
     lastName: string;
@@ -103,12 +104,13 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
     adultsCount?: number;
     childrenCount?: number;
     subGuests?: SubGuest[];
-    qualifiers?: GuestQualifierKey[];
+    qualifiers?: string[];
   }>({ firstName: '', lastName: '', email: '', phone: '', guestCount: 1, adultsCount: 1, childrenCount: 0, subGuests: [], qualifiers: [] });
   const [showSubEventSettingsModal, setShowSubEventSettingsModal] = useState(false);
   const [subEventEditForm, setSubEventEditForm] = useState({ title: '', date: '', location: '' });
   const [showImportGuestsModal, setShowImportGuestsModal] = useState(false);
   const [importedContacts, setImportedContacts] = useState<ImportedContact[]>([]);
+  const [importedCustomQualifierInputs, setImportedCustomQualifierInputs] = useState<Record<number, string>>({});
   const [showExportHelp, setShowExportHelp] = useState(false);
   const [deviceContactList, setDeviceContactList] = useState<ImportedContact[] | null>(null);
   const [deviceContactSelected, setDeviceContactSelected] = useState<Set<number>>(new Set());
@@ -466,6 +468,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       }));
       onUpdate(updated);
       setImportedContacts([]);
+      setImportedCustomQualifierInputs({});
       setShowImportGuestsModal(false);
     } catch (err) {
       console.error(err);
@@ -1220,7 +1223,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                         <button type="button" onClick={() => setShowImportGuestsModal(true)} disabled={!canManageGuestsHere} className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-50 disabled:opacity-40">
                           Importer contacts
                         </button>
-                        <button type="button" onClick={() => setShowGuestModal(true)} disabled={!canManageGuestsHere} className="px-4 py-2 bg-teal-600 text-white rounded-xl text-xs font-semibold disabled:opacity-40">
+                        <button type="button" onClick={() => { setShowGuestModal(true); setGuestCustomQualifierInput(''); }} disabled={!canManageGuestsHere} className="px-4 py-2 bg-teal-600 text-white rounded-xl text-xs font-semibold disabled:opacity-40">
                           + Invité
                         </button>
                       </div>
@@ -1561,7 +1564,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                  </div>
                  <div>
                    <label className="block text-sm font-medium text-slate-700 mb-2">Qualificatifs (cartons d'invitation)</label>
-                   <div className="flex flex-wrap gap-2">
+                   <div className="flex flex-wrap gap-2 mb-2">
                      {QUALIFIER_OPTIONS.map((key) => (
                        <label key={key} className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer ${(guestForm.qualifiers ?? []).includes(key) ? 'border-teal-500 bg-teal-50 text-teal-800' : 'border-slate-200 bg-white text-slate-600'}`}>
                          <input type="checkbox" checked={(guestForm.qualifiers ?? []).includes(key)} onChange={() => setGuestForm(f => ({ ...f, qualifiers: (f.qualifiers ?? []).includes(key) ? (f.qualifiers ?? []).filter(q => q !== key) : [...(f.qualifiers ?? []), key] }))} className="rounded border-slate-300 text-teal-600" />
@@ -1569,10 +1572,25 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                        </label>
                      ))}
                    </div>
+                   <p className="text-xs text-slate-500 mb-1">Autre : saisir un libellé puis ajouter.</p>
+                   <div className="flex gap-2 flex-wrap items-center">
+                     <input type="text" value={guestCustomQualifierInput} onChange={e => setGuestCustomQualifierInput(e.target.value)} placeholder="Ex : Parrain, Témoin…" className="flex-1 min-w-[120px] rounded-lg border border-slate-200 px-3 py-1.5 text-sm" />
+                     <button type="button" onClick={() => { const v = guestCustomQualifierInput.trim(); if (v && !(guestForm.qualifiers ?? []).includes(v)) setGuestForm(f => ({ ...f, qualifiers: [...(f.qualifiers ?? []), v] })); setGuestCustomQualifierInput(''); }} disabled={!guestCustomQualifierInput.trim()} className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 text-sm hover:bg-slate-50 disabled:opacity-50">Ajouter</button>
+                   </div>
+                   {(guestForm.qualifiers ?? []).filter(q => !QUALIFIER_OPTIONS.includes(q)).length > 0 && (
+                     <div className="flex flex-wrap gap-1.5 mt-2">
+                       {(guestForm.qualifiers ?? []).filter(q => !QUALIFIER_OPTIONS.includes(q)).map(q => (
+                         <span key={q} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 text-slate-700 text-xs">
+                           {formatQualifierLabel(q)}
+                           <button type="button" onClick={() => setGuestForm(f => ({ ...f, qualifiers: (f.qualifiers ?? []).filter(x => x !== q) }))} className="text-slate-400 hover:text-red-600" aria-label="Retirer">×</button>
+                         </span>
+                       ))}
+                     </div>
+                   )}
                  </div>
               </div>
               <div className="flex gap-3">
-                 <button type="button" onClick={() => setShowGuestModal(false)} className="flex-1 py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Annuler</button>
+                 <button type="button" onClick={() => { setShowGuestModal(false); setGuestCustomQualifierInput(''); }} className="flex-1 py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Annuler</button>
                  <button type="button" onClick={handleAddGuest} className="flex-1 py-2.5 bg-teal-600 text-white text-sm font-medium rounded-xl">Enregistrer</button>
               </div>
            </div>
@@ -1678,7 +1696,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                       ) : null}
 
                       <div className="flex flex-col gap-2 pt-1">
-                        <button type="button" onClick={() => { setShowImportGuestsModal(false); setShowGuestModal(true); }} className="w-full min-h-[44px] py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
+                        <button type="button" onClick={() => { setShowImportGuestsModal(false); setShowGuestModal(true); setGuestCustomQualifierInput(''); }} className="w-full min-h-[44px] py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
                           Ajouter un invité à la main
                         </button>
                         <button type="button" onClick={handleShare} className="w-full min-h-[44px] py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
@@ -1721,7 +1739,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                             </div>
                             <div className="sm:col-span-2">
                               <label className="block text-xs font-medium text-slate-600 mb-1">Qualificatifs</label>
-                              <div className="flex flex-wrap gap-1.5">
+                              <div className="flex flex-wrap gap-1.5 mb-1">
                                 {QUALIFIER_OPTIONS.map((key) => (
                                   <label key={key} className={`inline-flex items-center gap-1 px-2 py-1 rounded border text-xs cursor-pointer ${(c.qualifiers ?? []).includes(key) ? 'border-teal-500 bg-teal-50 text-teal-800' : 'border-slate-200'}`}>
                                     <input type="checkbox" checked={(c.qualifiers ?? []).includes(key)} onChange={() => setImportedContacts(prev => prev.map((co, j) => j === i ? { ...co, qualifiers: (co.qualifiers ?? []).includes(key) ? (co.qualifiers ?? []).filter(q => q !== key) : [...(co.qualifiers ?? []), key] } : co))} className="rounded border-slate-300 text-teal-600" />
@@ -1729,6 +1747,21 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                                   </label>
                                 ))}
                               </div>
+                              <p className="text-xs text-slate-500 mb-1">Autre :</p>
+                              <div className="flex gap-2 flex-wrap items-center">
+                                <input type="text" value={importedCustomQualifierInputs[i] ?? ''} onChange={e => setImportedCustomQualifierInputs(prev => ({ ...prev, [i]: e.target.value }))} placeholder="Ex : Parrain…" className="flex-1 min-w-[100px] rounded-lg border border-slate-200 px-2 py-1 text-sm" />
+                                <button type="button" onClick={() => { const v = (importedCustomQualifierInputs[i] ?? '').trim(); if (v && !(c.qualifiers ?? []).includes(v)) { setImportedContacts(prev => prev.map((co, j) => j === i ? { ...co, qualifiers: [...(co.qualifiers ?? []), v] } : co)); setImportedCustomQualifierInputs(prev => ({ ...prev, [i]: '' })); } }} disabled={!(importedCustomQualifierInputs[i] ?? '').trim()} className="px-2 py-1 rounded border border-slate-200 text-slate-600 text-xs hover:bg-slate-50 disabled:opacity-50">Ajouter</button>
+                              </div>
+                              {(c.qualifiers ?? []).filter(q => !QUALIFIER_OPTIONS.includes(q)).length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                  {(c.qualifiers ?? []).filter(q => !QUALIFIER_OPTIONS.includes(q)).map(q => (
+                                    <span key={q} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs">
+                                      {formatQualifierLabel(q)}
+                                      <button type="button" onClick={() => setImportedContacts(prev => prev.map((co, j) => j === i ? { ...co, qualifiers: (co.qualifiers ?? []).filter(x => x !== q) } : co))} className="text-slate-400 hover:text-red-600">×</button>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
                           {!isContactComplete(c) && <span className="text-xs text-amber-600">À compléter</span>}
@@ -1736,7 +1769,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                       ))}
                     </div>
                     <div className="p-4 border-t border-slate-200 flex gap-3 shrink-0">
-                      <button type="button" onClick={() => { setImportedContacts([]); setShowExportHelp(false); setDeviceContactList(null); setShowImportGuestsModal(false); }} className="flex-1 min-h-[48px] py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Annuler</button>
+                      <button type="button" onClick={() => { setImportedContacts([]); setImportedCustomQualifierInputs({}); setShowExportHelp(false); setDeviceContactList(null); setShowImportGuestsModal(false); }} className="flex-1 min-h-[48px] py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Annuler</button>
                       <button type="button" onClick={handleAddAllImportedGuests} className="flex-1 min-h-[48px] py-2.5 bg-teal-600 text-white text-sm font-medium rounded-xl">Ajouter tous à la séquence</button>
                     </div>
                   </>

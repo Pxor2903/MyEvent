@@ -16,8 +16,8 @@ export interface SubGuest {
   age?: number;
 }
 
-/** Qualificatifs pour les cartes d'invitation (ex. "Mr & Mme", "+ enfants"). */
-export type GuestQualifierKey = 'mr_et_mme' | 'plus_enfants' | 'famille' | 'couple' | 'autre';
+/** Clés prédéfinies pour les qualificatifs (cartons d'invitation). Les autres sont des libellés libres. */
+export type GuestQualifierKey = 'mr_et_mme' | 'plus_enfants';
 
 export interface Guest {
   id: string;
@@ -38,8 +38,8 @@ export interface Guest {
   childrenCount?: number;
   /** Détail optionnel : prénoms / âges des sous-invités. */
   subGuests?: SubGuest[];
-  /** Qualificatifs pour les cartes (Mr & Mme, + enfants, etc.). */
-  qualifiers?: GuestQualifierKey[];
+  /** Qualificatifs pour les cartes : clés prédéfinies (mr_et_mme, plus_enfants) ou libellés personnalisés. */
+  qualifiers?: string[];
   /** Présence par sous-événement : subEventId → nombre de personnes présentes. */
   attendance?: GuestAttendance;
 }

@@ -2,8 +2,8 @@
  * Modal fiche invité : affichage et édition (propriétaire ou admin qui a ajouté).
  */
 import React, { useState, useEffect } from 'react';
-import type { Event, Guest, SubGuest, GuestQualifierKey } from '@/core/types';
-import { canEditGuest, QUALIFIER_LABELS, QUALIFIER_OPTIONS } from '@/core/constants/guests';
+import type { Event, Guest, SubGuest } from '@/core/types';
+import { canEditGuest, QUALIFIER_LABELS, QUALIFIER_OPTIONS, formatQualifierLabel } from '@/core/constants/guests';
 import { Input } from './Input';
 
 const STATUS_OPTIONS: { value: Guest['status']; label: string }[] = [
@@ -38,9 +38,10 @@ export const GuestDetailModal: React.FC<GuestDetailModalProps> = ({
     guestCount: guestFromEvent.guestCount ?? 1,
     adultsCount: guestFromEvent.adultsCount ?? 1,
     childrenCount: guestFromEvent.childrenCount ?? 0,
-    qualifiers: (guestFromEvent.qualifiers ?? []) as GuestQualifierKey[],
+    qualifiers: guestFromEvent.qualifiers ?? [],
     subGuests: (guestFromEvent.subGuests ?? []) as SubGuest[]
   });
+  const [customQualifierInput, setCustomQualifierInput] = useState('');
 
   useEffect(() => {
     setForm({
@@ -52,7 +53,7 @@ export const GuestDetailModal: React.FC<GuestDetailModalProps> = ({
       guestCount: guestFromEvent.guestCount ?? 1,
       adultsCount: guestFromEvent.adultsCount ?? 1,
       childrenCount: guestFromEvent.childrenCount ?? 0,
-      qualifiers: (guestFromEvent.qualifiers ?? []) as GuestQualifierKey[],
+      qualifiers: guestFromEvent.qualifiers ?? [],
       subGuests: (guestFromEvent.subGuests ?? []) as SubGuest[]
     });
   }, [guestFromEvent.id]);
@@ -81,12 +82,25 @@ export const GuestDetailModal: React.FC<GuestDetailModalProps> = ({
     onClose();
   };
 
-  const toggleQualifier = (key: GuestQualifierKey) => {
+  const toggleQualifier = (key: string) => {
     if (!canEdit) return;
     setForm((prev) => ({
       ...prev,
       qualifiers: prev.qualifiers.includes(key) ? prev.qualifiers.filter((q) => q !== key) : [...prev.qualifiers, key]
     }));
+  };
+
+  const addCustomQualifier = () => {
+    const label = customQualifierInput.trim();
+    if (!label || !canEdit) return;
+    if (form.qualifiers.includes(label)) return;
+    setForm((prev) => ({ ...prev, qualifiers: [...prev.qualifiers, label] }));
+    setCustomQualifierInput('');
+  };
+
+  const removeQualifier = (q: string) => {
+    if (!canEdit) return;
+    setForm((prev) => ({ ...prev, qualifiers: prev.qualifiers.filter((x) => x !== q) }));
   };
 
   const updateSubGuest = (index: number, patch: Partial<SubGuest>) => {
@@ -155,7 +169,7 @@ export const GuestDetailModal: React.FC<GuestDetailModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Qualificatifs (cartons d'invitation)</label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mb-2">
               {QUALIFIER_OPTIONS.map((key) => (
                 <label key={key} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm cursor-pointer ${form.qualifiers.includes(key) ? 'border-teal-500 bg-teal-50 text-teal-800' : 'border-slate-200 bg-white text-slate-600'}`}>
                   <input type="checkbox" checked={form.qualifiers.includes(key)} onChange={() => toggleQualifier(key)} disabled={!canEdit} className="rounded border-slate-300 text-teal-600" />
@@ -163,6 +177,29 @@ export const GuestDetailModal: React.FC<GuestDetailModalProps> = ({
                 </label>
               ))}
             </div>
+            <p className="text-xs text-slate-500 mb-1">Autre : saisir un libellé puis ajouter.</p>
+            <div className="flex gap-2 flex-wrap items-center">
+              <input
+                type="text"
+                value={customQualifierInput}
+                onChange={(e) => setCustomQualifierInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomQualifier())}
+                placeholder="Ex : Parrain, Témoin…"
+                disabled={!canEdit}
+                className="flex-1 min-w-[120px] rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
+              />
+              <button type="button" onClick={addCustomQualifier} disabled={!canEdit || !customQualifierInput.trim()} className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 text-sm hover:bg-slate-50 disabled:opacity-50">Ajouter</button>
+            </div>
+            {form.qualifiers.filter((q) => !QUALIFIER_OPTIONS.includes(q)).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {form.qualifiers.filter((q) => !QUALIFIER_OPTIONS.includes(q)).map((q) => (
+                  <span key={q} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 text-slate-700 text-xs">
+                    {formatQualifierLabel(q)}
+                    {canEdit && <button type="button" onClick={() => removeQualifier(q)} className="text-slate-400 hover:text-red-600" aria-label="Retirer">×</button>}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>

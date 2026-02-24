@@ -5,7 +5,7 @@
 
 import React, { useState, useCallback } from 'react';
 import type { Event, Guest } from '@/core/types';
-import { canEditGuest } from '@/core/constants/guests';
+import { canEditGuest, formatQualifierLabel } from '@/core/constants/guests';
 import { exportGuestsToExcel, exportGuestsToPdf } from '@/utils/exportGuests';
 
 const STATUS_LABELS: Record<Guest['status'], string> = {
@@ -74,6 +74,11 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
   if (filterAddedByUserId != null) {
     guests = guests.filter((g) => (g.addedByUserId ?? event.creatorId) === filterAddedByUserId);
   }
+  guests = [...guests].sort((a, b) => {
+    const ln = (a.lastName || '').localeCompare(b.lastName || '', 'fr');
+    if (ln !== 0) return ln;
+    return (a.firstName || '').localeCompare(b.firstName || '', 'fr');
+  });
   const currentSub = filterSubEventId
     ? subEvents.find((s) => s.id === filterSubEventId)
     : null;
@@ -219,8 +224,9 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
           <table className="w-full text-left text-sm border-collapse">
             <thead className="sticky top-0 bg-slate-100 border-b border-slate-200 z-10">
               <tr>
-                <th className="px-3 py-3 font-semibold text-slate-700 whitespace-nowrap">Prénom</th>
+                <th className="px-2 py-3 font-semibold text-slate-700 whitespace-nowrap max-w-[140px]">Étiquettes</th>
                 <th className="px-3 py-3 font-semibold text-slate-700 whitespace-nowrap">Nom</th>
+                <th className="px-3 py-3 font-semibold text-slate-700 whitespace-nowrap">Prénom</th>
                 <th className="px-3 py-3 font-semibold text-slate-700 whitespace-nowrap hidden sm:table-cell">Email</th>
                 <th className="px-3 py-3 font-semibold text-slate-700 whitespace-nowrap hidden md:table-cell">Tél</th>
                 <th className="px-3 py-3 font-semibold text-slate-700 whitespace-nowrap">Statut</th>
@@ -243,22 +249,27 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
                 const canEditThis = canEditGuest(g, currentUserId, event);
                 return (
                   <tr key={g.id} className="hover:bg-slate-50/50">
-                    <td className="px-3 py-2.5 font-medium text-slate-900">
-                      {onGuestClick ? (
-                        <button type="button" onClick={() => onGuestClick(g)} className="text-left hover:text-teal-600 underline decoration-teal-200 hover:decoration-teal-500">
-                          {g.firstName}
-                        </button>
-                      ) : (
-                        g.firstName
-                      )}
+                    <td className="px-2 py-2.5 text-slate-600 text-xs max-w-[140px]">
+                      {(g.qualifiers && g.qualifiers.length > 0)
+                        ? g.qualifiers.map((q) => formatQualifierLabel(q)).join(', ')
+                        : '—'}
                     </td>
-                    <td className="px-3 py-2.5 text-slate-800">
+                    <td className="px-3 py-2.5 font-medium text-slate-900">
                       {onGuestClick ? (
                         <button type="button" onClick={() => onGuestClick(g)} className="text-left hover:text-teal-600 underline decoration-teal-200 hover:decoration-teal-500">
                           {g.lastName}
                         </button>
                       ) : (
                         g.lastName
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-slate-800">
+                      {onGuestClick ? (
+                        <button type="button" onClick={() => onGuestClick(g)} className="text-left hover:text-teal-600 underline decoration-teal-200 hover:decoration-teal-500">
+                          {g.firstName}
+                        </button>
+                      ) : (
+                        g.firstName
                       )}
                     </td>
                     <td className="px-3 py-2.5 text-slate-600 hidden sm:table-cell truncate max-w-[180px]">{g.email || '—'}</td>

@@ -2,7 +2,8 @@
  * Export de la liste d’invités en Excel (xlsx) ou PDF.
  */
 
-import type { Event, Guest, SubEvent } from '@/core/types';
+import type { Event, Guest } from '@/core/types';
+import { formatQualifierLabel } from '@/core/constants/guests';
 
 function getGuestCount(g: Guest): number {
   return Math.max(1, Math.min(99, g.guestCount ?? 1));
@@ -14,13 +15,18 @@ function getAttendance(g: Guest, subEventId: string): number {
   return Math.max(0, Math.min(getGuestCount(g), Number(n)));
 }
 
-/** Construit les lignes pour export (tous invités + colonnes par sous-événement). */
+/** Construit les lignes pour export (tous invités triés par nom, colonne Étiquettes). */
 export function buildExportRows(event: Event): { headers: string[]; rows: (string | number)[][] } {
   const subEvents = event.subEvents || [];
-  const guests = event.guests || [];
+  const guests = [...(event.guests || [])].sort((a, b) => {
+    const ln = (a.lastName || '').localeCompare(b.lastName || '', 'fr');
+    if (ln !== 0) return ln;
+    return (a.firstName || '').localeCompare(b.firstName || '', 'fr');
+  });
   const headers = [
-    'Prénom',
     'Nom',
+    'Prénom',
+    'Étiquettes',
     'Email',
     'Téléphone',
     'Statut',
@@ -33,9 +39,13 @@ export function buildExportRows(event: Event): { headers: string[]; rows: (strin
       (sum, s) => sum + getAttendance(g, s.id),
       0
     );
+    const etiquettes = (g.qualifiers && g.qualifiers.length > 0)
+      ? g.qualifiers.map((q) => formatQualifierLabel(q)).join(', ')
+      : '';
     return [
-      g.firstName,
       g.lastName,
+      g.firstName,
+      etiquettes,
       g.email || '',
       g.phone || '',
       g.status,
