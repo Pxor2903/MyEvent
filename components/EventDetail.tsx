@@ -78,6 +78,11 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
   const [guestsViewSubId, setGuestsViewSubId] = useState<string | null>(null);
   const [guestsViewFilterAddedBy, setGuestsViewFilterAddedBy] = useState<string | null>(null);
   const [selectedGuestForDetail, setSelectedGuestForDetail] = useState<Guest | null>(null);
+  /** Séquence cible pour ajout/import depuis l’onglet Invités (sans séquence sélectionnée). */
+  const [addGuestTargetSubId, setAddGuestTargetSubId] = useState<string | null>(null);
+  const [importTargetSubId, setImportTargetSubId] = useState<string | null>(null);
+  /** Séquence choisie dans le menu de l’onglet Invités (pour ajouter / importer). */
+  const [guestsTabSequenceId, setGuestsTabSequenceId] = useState<string | null>(null);
   const guestsTableUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingGuestsUpdateRef = useRef<Event | null>(null);
 
@@ -443,7 +448,8 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
   };
 
   const handleAddAllImportedGuests = async () => {
-    if (!canManageGuestsHere || !selectedSubId) return;
+    const targetSubId = importTargetSubId ?? selectedSubId;
+    if (!canManageGuests || !targetSubId) return;
     const toAdd = importedContacts.map(c => ({
       id: crypto.randomUUID(),
       firstName: (c.firstName || '').trim() || 'Prénom',
@@ -452,7 +458,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       phone: (c.phone || '').trim() || undefined,
       status: 'pending' as const,
       companions: [],
-      linkedSubEventIds: [selectedSubId],
+      linkedSubEventIds: [targetSubId],
       addedByUserId: user.id,
       guestCount: (c.adultsCount ?? 1) + (c.childrenCount ?? 0) || 1,
       adultsCount: c.adultsCount ?? 1,
@@ -469,6 +475,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       onUpdate(updated);
       setImportedContacts([]);
       setImportedCustomQualifierInputs({});
+      setImportTargetSubId(null);
       setShowImportGuestsModal(false);
     } catch (err) {
       console.error(err);
@@ -503,8 +510,15 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
     return () => { flushGuestsTableUpdate(); };
   }, [flushGuestsTableUpdate]);
 
+  useEffect(() => {
+    const subs = event.subEvents || [];
+    if (subs.length === 0) setGuestsTabSequenceId(null);
+    else if (!guestsTabSequenceId || !subs.some((s) => s.id === guestsTabSequenceId)) setGuestsTabSequenceId(subs[0].id);
+  }, [event.subEvents, guestsTabSequenceId]);
+
   const handleAddGuest = async () => {
-    if (!canManageGuestsHere || !selectedSubId) return;
+    const targetSubId = addGuestTargetSubId ?? selectedSubId;
+    if (!canManageGuests || !targetSubId) return;
     if (!guestForm.firstName.trim()) return;
     const newGuest: Guest = {
       id: crypto.randomUUID(),
@@ -514,7 +528,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       phone: guestForm.phone?.trim() || undefined,
       status: 'confirmed',
       companions: [],
-      linkedSubEventIds: [selectedSubId],
+      linkedSubEventIds: [targetSubId],
       addedByUserId: user.id,
       guestCount: (guestForm.adultsCount ?? 1) + (guestForm.childrenCount ?? 0) || 1,
       adultsCount: guestForm.adultsCount ?? 1,
@@ -529,6 +543,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
     }));
     onUpdate(updated);
     setShowGuestModal(false);
+    setAddGuestTargetSubId(null);
     setGuestForm({ firstName: '', lastName: '', email: '', phone: '', guestCount: 1, adultsCount: 1, childrenCount: 0, subGuests: [], qualifiers: [] });
   };
 
@@ -952,6 +967,53 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                   filterAddedByUserId={guestsViewFilterAddedBy}
                   onFilterAddedByChange={setGuestsViewFilterAddedBy}
                 />
+                {canManageGuests && (
+                  <div className="flex flex-wrap items-center gap-3 px-4 sm:px-6 pb-3">
+                    {(event.subEvents?.length ?? 0) === 0 ? (
+                      <p className="text-sm text-slate-500">Ajoutez une séquence au programme pour pouvoir ajouter des invités.</p>
+                    ) : (
+                      <>
+                        {(event.subEvents?.length ?? 0) > 1 && (
+                          <label className="flex items-center gap-2 text-sm text-slate-700">
+                            <span>Séquence :</span>
+                            <select
+                              value={guestsTabSequenceId ?? ''}
+                              onChange={(e) => setGuestsTabSequenceId(e.target.value || null)}
+                              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm bg-white"
+                            >
+                              {event.subEvents?.map((s) => (
+                                <option key={s.id} value={s.id}>{s.title || 'Sans titre'}</option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setImportTargetSubId(guestsTabSequenceId);
+                            setShowImportGuestsModal(true);
+                          }}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                          Importer des contacts
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddGuestTargetSubId(guestsTabSequenceId);
+                            setShowGuestModal(true);
+                            setGuestCustomQualifierInput('');
+                          }}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-600 text-white text-sm font-medium hover:bg-teal-700"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+                          Ajouter un invité
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
                 <GuestsTable
                   event={event}
                   filterSubEventId={guestsViewSubId}
