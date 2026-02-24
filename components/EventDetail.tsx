@@ -82,7 +82,6 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
   const [addGuestTargetSubId, setAddGuestTargetSubId] = useState<string | null>(null);
   const [importTargetSubId, setImportTargetSubId] = useState<string | null>(null);
   /** Séquence choisie dans le menu de l’onglet Invités (pour ajouter / importer). */
-  const [guestsTabSequenceId, setGuestsTabSequenceId] = useState<string | null>(null);
   const [showAddFromGlobalListModal, setShowAddFromGlobalListModal] = useState(false);
   const [addFromGlobalSelectedIds, setAddFromGlobalSelectedIds] = useState<Set<string>>(new Set());
   const guestsTableUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -511,12 +510,6 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
   useEffect(() => {
     return () => { flushGuestsTableUpdate(); };
   }, [flushGuestsTableUpdate]);
-
-  useEffect(() => {
-    const subs = event.subEvents || [];
-    if (subs.length === 0) setGuestsTabSequenceId(null);
-    else if (!guestsTabSequenceId || !subs.some((s) => s.id === guestsTabSequenceId)) setGuestsTabSequenceId(subs[0].id);
-  }, [event.subEvents, guestsTabSequenceId]);
 
   const handleAddGuest = async () => {
     const targetSubId = addGuestTargetSubId ?? selectedSubId;
@@ -997,24 +990,11 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                       <p className="text-sm text-slate-500">Ajoutez une séquence au programme pour pouvoir ajouter des invités.</p>
                     ) : (
                       <>
-                        {(event.subEvents?.length ?? 0) > 1 && (
-                          <label className="flex items-center gap-2 text-sm text-slate-700">
-                            <span>Séquence :</span>
-                            <select
-                              value={guestsTabSequenceId ?? ''}
-                              onChange={(e) => setGuestsTabSequenceId(e.target.value || null)}
-                              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm bg-white"
-                            >
-                              {event.subEvents?.map((s) => (
-                                <option key={s.id} value={s.id}>{s.title || 'Sans titre'}</option>
-                              ))}
-                            </select>
-                          </label>
-                        )}
                         <button
                           type="button"
                           onClick={() => {
-                            setImportTargetSubId(guestsTabSequenceId);
+                            const target = guestsViewSubId ?? event.subEvents?.[0]?.id;
+                            setImportTargetSubId(target ?? null);
                             setShowImportGuestsModal(true);
                           }}
                           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50"
@@ -1025,7 +1005,8 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                         <button
                           type="button"
                           onClick={() => {
-                            setAddGuestTargetSubId(guestsTabSequenceId);
+                            const target = guestsViewSubId ?? event.subEvents?.[0]?.id;
+                            setAddGuestTargetSubId(target ?? null);
                             setShowGuestModal(true);
                             setGuestCustomQualifierInput('');
                           }}
