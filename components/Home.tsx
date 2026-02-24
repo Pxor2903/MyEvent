@@ -100,7 +100,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
           <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">En cours</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {tbdEvents.map(e => (
-              <button key={e.id} type="button" onClick={() => { setSelectedId(e.id); setView('event-detail'); }} className="text-left rounded-2xl overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">
+              <button key={e.id} type="button" onClick={() => { setSelectedId(e.id); setView('event-detail'); }} className="text-left rounded-2xl overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2">
                 <EventCard event={e} />
               </button>
             ))}
@@ -112,7 +112,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
         <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">À venir</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {upcomingEvents.map(e => (
-            <button key={e.id} type="button" onClick={() => { setSelectedId(e.id); setView('event-detail'); }} className="text-left rounded-2xl overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">
+            <button key={e.id} type="button" onClick={() => { setSelectedId(e.id); setView('event-detail'); }} className="text-left rounded-2xl overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2">
               <EventCard event={e} />
             </button>
           ))}
@@ -121,7 +121,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
               <p className="text-sm font-medium text-slate-600 mb-1">Aucun événement</p>
               <p className="text-sm mb-6">Créez-en un ou rejoignez-en un avec une invitation.</p>
               <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                <button type="button" onClick={() => setView('create-event')} className="min-h-[48px] px-5 py-3 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 active:bg-indigo-800">
+                <button type="button" onClick={() => setView('create-event')} className="min-h-[48px] px-5 py-3 bg-teal-600 text-white text-sm font-semibold rounded-xl hover:bg-teal-700 active:bg-teal-800">
                   Créer un événement
                 </button>
                 <button type="button" onClick={() => setShowJoinModal(true)} className="min-h-[48px] px-5 py-3 border-2 border-slate-200 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50">
@@ -138,7 +138,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
           <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Passés</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {pastEvents.map(e => (
-              <button key={e.id} type="button" onClick={() => { setSelectedId(e.id); setView('event-detail'); }} className="text-left rounded-2xl overflow-hidden opacity-90 hover:opacity-100 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">
+              <button key={e.id} type="button" onClick={() => { setSelectedId(e.id); setView('event-detail'); }} className="text-left rounded-2xl overflow-hidden opacity-90 hover:opacity-100 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2">
                 <EventCard event={e} />
               </button>
             ))}
@@ -153,13 +153,13 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
             <p className="text-sm text-slate-500">Clé et mot de passe reçus par invitation.</p>
             <Input label="Clé" placeholder="Ex: ABC12XYZ34" value={joinData.code} onChange={e => setJoinData({ ...joinData, code: e.target.value.toUpperCase() })} />
             <Input label="Mot de passe" placeholder="Ex: ABCD1234" type="text" autoComplete="off" value={joinData.password} onChange={e => setJoinData({ ...joinData, password: e.target.value })} />
-            <button type="button" onClick={handlePasteInvitation} className="w-full py-2.5 rounded-xl border border-dashed border-slate-200 text-slate-500 text-sm hover:border-indigo-300 hover:text-indigo-600">
+            <button type="button" onClick={handlePasteInvitation} className="w-full py-2.5 rounded-xl border border-dashed border-slate-200 text-slate-500 text-sm hover:border-teal-300 hover:text-teal-600">
               Coller l'invitation
             </button>
             {joinError && <p className="text-sm text-red-600">{joinError}</p>}
             <div className="flex gap-2 pt-2">
               <button type="button" onClick={() => setShowJoinModal(false)} className="flex-1 py-2.5 text-slate-600 text-sm font-medium rounded-xl hover:bg-slate-100">Annuler</button>
-              <button type="button" onClick={handleJoin} className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700">Rejoindre</button>
+              <button type="button" onClick={handleJoin} className="flex-1 py-2.5 bg-teal-600 text-white text-sm font-medium rounded-xl hover:bg-teal-700">Rejoindre</button>
             </div>
           </div>
         </div>
@@ -171,7 +171,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
     <div className="min-h-screen min-h-[100dvh] bg-slate-50 flex flex-col">
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-50 pt-[env(safe-area-inset-top)]" aria-label="Navigation">
         <div className="max-w-4xl mx-auto px-3 sm:px-4 h-14 min-h-[56px] flex justify-between items-center">
-          <button type="button" onClick={() => setView('dashboard')} className="min-w-[44px] min-h-[44px] flex items-center justify-center -m-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-lg" aria-label="Accueil">
+          <button type="button" onClick={() => setView('dashboard')} className="min-w-[44px] min-h-[44px] flex items-center justify-center -m-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded-lg" aria-label="Accueil">
             <Logo />
           </button>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -192,7 +192,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
               <button type="button" onClick={() => setShowJoinModal(true)} className="min-h-[44px] px-4 py-2.5 border border-slate-200 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 active:bg-slate-100">
                 Rejoindre
               </button>
-              <button type="button" onClick={() => setView('create-event')} className="min-h-[44px] px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 active:bg-indigo-800 flex items-center gap-2">
+              <button type="button" onClick={() => setView('create-event')} className="min-h-[44px] px-4 py-2.5 bg-teal-600 text-white text-sm font-medium rounded-xl hover:bg-teal-700 active:bg-teal-800 flex items-center gap-2">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
                 Nouveau
               </button>

@@ -71,7 +71,7 @@ export async function exportGuestsToPdf(event: Event, filename?: string): Promis
     body: rows.map((r) => r.map(String)),
     startY: 22,
     styles: { fontSize: 8 },
-    headStyles: { fillColor: [99, 102, 241] },
+    headStyles: { fillColor: [13, 148, 136] },
     margin: { left: 14 }
   });
   const name = filename || `invites-${event.title.replace(/[^a-z0-9]/gi, '-').slice(0, 30)}.pdf`;

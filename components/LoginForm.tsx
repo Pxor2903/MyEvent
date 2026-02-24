@@ -63,7 +63,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSocialSubmit, 
         <button
           type="submit"
           disabled={isAnyLoading}
-          className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          className="w-full py-3 px-4 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {isLoading ? (
             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -102,7 +102,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSocialSubmit, 
 
       <p className="text-center text-sm text-slate-500">
         Pas encore de compte ?{' '}
-        <button type="button" onClick={onSwitch} className="text-indigo-600 font-medium hover:underline">
+        <button type="button" onClick={onSwitch} className="text-teal-600 font-medium hover:underline">
           S’inscrire
         </button>
       </p>

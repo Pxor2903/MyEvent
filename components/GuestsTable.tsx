@@ -5,6 +5,7 @@
 
 import React, { useState, useCallback } from 'react';
 import type { Event, Guest } from '@/core/types';
+import { canEditGuest } from '@/core/constants/guests';
 import { exportGuestsToExcel, exportGuestsToPdf } from '@/utils/exportGuests';
 
 const STATUS_LABELS: Record<Guest['status'], string> = {
@@ -43,15 +44,23 @@ function mergeOverrides(event: Event, overrides: LocalOverrides): Event {
 interface GuestsTableProps {
   event: Event;
   filterSubEventId?: string | null;
+  /** Filtre par responsable : n'afficher que les invités ajoutés par cet userId (null = vue d'ensemble). */
+  filterAddedByUserId?: string | null;
   canManage: boolean;
+  /** Id de l'utilisateur connecté (pour droits par invité). */
+  currentUserId: string;
   onUpdate: (updated: Event) => void;
+  onGuestClick?: (guest: Guest) => void;
 }
 
 export const GuestsTable: React.FC<GuestsTableProps> = ({
   event,
   filterSubEventId,
+  filterAddedByUserId,
   canManage,
-  onUpdate
+  currentUserId,
+  onUpdate,
+  onGuestClick
 }) => {
   const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null);
   const [localOverrides, setLocalOverrides] = useState<LocalOverrides>({});
@@ -59,9 +68,12 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
 
   const subEvents = event.subEvents || [];
   const allGuests = event.guests || [];
-  const guests = filterSubEventId
+  let guests = filterSubEventId
     ? allGuests.filter((g) => g.linkedSubEventIds.includes(filterSubEventId))
     : allGuests;
+  if (filterAddedByUserId != null) {
+    guests = guests.filter((g) => (g.addedByUserId ?? event.creatorId) === filterAddedByUserId);
+  }
   const currentSub = filterSubEventId
     ? subEvents.find((s) => s.id === filterSubEventId)
     : null;
@@ -117,7 +129,7 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
 
   const handleDeleteGuest = useCallback(
     (g: Guest) => {
-      if (!canManage) return;
+      if (!canManage || !canEditGuest(g, currentUserId, event)) return;
       if (!window.confirm(`Supprimer ${g.firstName} ${g.lastName} de la liste des invités ?`)) return;
       setDeletingId(g.id);
       const nextGuests = (event.guests ?? []).filter((x) => x.id !== g.id);
@@ -127,7 +139,7 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
       onUpdate({ ...event, guests: nextGuests });
       setDeletingId(null);
     },
-    [canManage, event, localOverrides, onUpdate]
+    [canManage, currentUserId, event, localOverrides, onUpdate]
   );
 
   const handleExportExcel = useCallback(async () => {
@@ -228,10 +240,27 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
             <tbody className="divide-y divide-slate-100">
               {guests.map((g) => {
                 const count = effectiveGuestCount(g);
+                const canEditThis = canEditGuest(g, currentUserId, event);
                 return (
                   <tr key={g.id} className="hover:bg-slate-50/50">
-                    <td className="px-3 py-2.5 font-medium text-slate-900">{g.firstName}</td>
-                    <td className="px-3 py-2.5 text-slate-800">{g.lastName}</td>
+                    <td className="px-3 py-2.5 font-medium text-slate-900">
+                      {onGuestClick ? (
+                        <button type="button" onClick={() => onGuestClick(g)} className="text-left hover:text-teal-600 underline decoration-teal-200 hover:decoration-teal-500">
+                          {g.firstName}
+                        </button>
+                      ) : (
+                        g.firstName
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-slate-800">
+                      {onGuestClick ? (
+                        <button type="button" onClick={() => onGuestClick(g)} className="text-left hover:text-teal-600 underline decoration-teal-200 hover:decoration-teal-500">
+                          {g.lastName}
+                        </button>
+                      ) : (
+                        g.lastName
+                      )}
+                    </td>
                     <td className="px-3 py-2.5 text-slate-600 hidden sm:table-cell truncate max-w-[180px]">{g.email || '—'}</td>
                     <td className="px-3 py-2.5 text-slate-600 hidden md:table-cell">{g.phone || '—'}</td>
                     <td className="px-3 py-2.5">
@@ -243,14 +272,14 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
                       </span>
                     </td>
                     <td className="px-2 py-2.5 text-center">
-                      {canManage ? (
+                      {canEditThis ? (
                         <input
                           type="number"
                           min={1}
                           max={99}
                           value={count}
                           onChange={(e) => setGuestCount(g, e.target.value === '' ? 1 : parseInt(e.target.value, 10))}
-                          className="w-12 text-center rounded-lg border border-slate-200 px-1 py-1 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                          className="w-12 text-center rounded-lg border border-slate-200 px-1 py-1 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
                           title="Nombre de personnes (ex. couple + enfants)"
                         />
                       ) : (
@@ -259,14 +288,14 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
                     </td>
                     {filterSubEventId ? (
                       <td className="px-2 py-2.5 text-center">
-                        {canManage ? (
+                        {canEditThis ? (
                           <input
                             type="number"
                             min={0}
                             max={count}
                             value={effectiveAttendanceForRow(g, filterSubEventId)}
                             onChange={(e) => setAttendance(g, filterSubEventId, e.target.value === '' ? 0 : parseInt(e.target.value, 10))}
-                            className="w-12 text-center rounded-lg border border-slate-200 px-1 py-1 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                            className="w-12 text-center rounded-lg border border-slate-200 px-1 py-1 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
                             title="Nombre de personnes présentes"
                           />
                         ) : (
@@ -281,14 +310,14 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
                           <td key={s.id} className="px-2 py-2.5 text-center">
                             {!isLinked ? (
                               <span className="text-slate-300">—</span>
-                            ) : canManage ? (
+                            ) : canEditThis ? (
                               <input
                                 type="number"
                                 min={0}
                                 max={count}
                                 value={present}
                                 onChange={(e) => setAttendance(g, s.id, e.target.value === '' ? 0 : parseInt(e.target.value, 10))}
-                                className="w-10 text-center rounded-lg border border-slate-200 px-1 py-1 text-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                                className="w-10 text-center rounded-lg border border-slate-200 px-1 py-1 text-xs focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
                                 title={`Présents · ${s.title}`}
                               />
                             ) : (
@@ -303,8 +332,8 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
                         <button
                           type="button"
                           onClick={() => handleDeleteGuest(g)}
-                          disabled={deletingId === g.id}
-                          className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          disabled={deletingId === g.id || !canEditThis}
+                          className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Supprimer l’invité"
                           aria-label="Supprimer"
                         >

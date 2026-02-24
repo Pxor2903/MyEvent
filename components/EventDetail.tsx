@@ -3,7 +3,8 @@
  * invités (import fichier / Google / appareil), séquences, messagerie temps réel.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import type { Event, User, ChatMessage, SubEvent, Guest, Organizer, Permission, KeyMoment } from '@/core/types';
+import type { Event, User, ChatMessage, SubEvent, Guest, Organizer, Permission, KeyMoment, SubGuest, GuestQualifierKey } from '@/core/types';
+import { QUALIFIER_LABELS, QUALIFIER_OPTIONS } from '@/core/constants/guests';
 import { dbService, supabase } from '@/api';
 import { generateSharePassword } from '@/utils/sharePassword';
 import { isContactComplete, deduplicateContacts, type ImportedContact } from '@/utils/contactImport';
@@ -16,6 +17,7 @@ import {
 import { preloadContactsPlugin } from '@/utils/nativeContacts';
 import { Input } from './Input';
 import { GuestsTable } from './GuestsTable';
+import { GuestDetailModal } from './GuestDetailModal';
 
 interface EventDetailProps {
   event: Event;
@@ -24,12 +26,58 @@ interface EventDetailProps {
   onUpdate: (updated: Event | null) => void;
 }
 
+/** Barre de filtrage par responsable (qui a ajouté les invités) dans l'onglet Invités. */
+function GuestsTableSegmentBar({
+  event,
+  filterSubEventId,
+  filterAddedByUserId,
+  onFilterAddedByChange
+}: {
+  event: Event;
+  filterSubEventId: string | null;
+  filterAddedByUserId: string | null;
+  onFilterAddedByChange: (id: string | null) => void;
+}) {
+  const baseGuests = filterSubEventId
+    ? (event.guests || []).filter((g) => g.linkedSubEventIds.includes(filterSubEventId))
+    : event.guests || [];
+  const uniqueAddedBy = Array.from(new Set(baseGuests.map((g) => g.addedByUserId ?? event.creatorId)));
+  const options = [
+    { userId: null as string | null, label: 'Vue d\'ensemble' },
+    ...uniqueAddedBy.map((userId) => {
+      const org = (event.organizers || []).find((o) => o.userId === userId);
+      return { userId, label: userId === event.creatorId ? 'Propriétaire' : org ? `${org.firstName} ${org.lastName}` : 'Co-organisateur' };
+    })
+  ];
+  if (options.length <= 1) return null;
+  return (
+    <div className="flex flex-wrap gap-2 px-4 sm:px-6 pb-3">
+      {options.map((opt) => (
+        <button
+          key={opt.userId ?? 'all'}
+          type="button"
+          onClick={() => onFilterAddedByChange(opt.userId)}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            filterAddedByUserId === opt.userId
+              ? 'bg-teal-600 text-white'
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, onUpdate }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'program' | 'chat' | 'settings' | 'budget' | 'guests'>('overview');
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
   const [subTab, setSubTab] = useState<'sequence' | 'chat' | 'guests'>('sequence');
   /** Filtre optionnel pour l’onglet Invités (niveau événement principal). */
   const [guestsViewSubId, setGuestsViewSubId] = useState<string | null>(null);
+  const [guestsViewFilterAddedBy, setGuestsViewFilterAddedBy] = useState<string | null>(null);
+  const [selectedGuestForDetail, setSelectedGuestForDetail] = useState<Guest | null>(null);
   const guestsTableUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingGuestsUpdateRef = useRef<Event | null>(null);
 
@@ -46,7 +94,17 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
   const [showSequenceModal, setShowSequenceModal] = useState(false);
   const [seqForm, setSeqForm] = useState({ title: '', date: '', location: '' });
   const [showGuestModal, setShowGuestModal] = useState(false);
-  const [guestForm, setGuestForm] = useState({ firstName: '', lastName: '', email: '', phone: '' });
+  const [guestForm, setGuestForm] = useState<{
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    guestCount?: number;
+    adultsCount?: number;
+    childrenCount?: number;
+    subGuests?: SubGuest[];
+    qualifiers?: GuestQualifierKey[];
+  }>({ firstName: '', lastName: '', email: '', phone: '', guestCount: 1, adultsCount: 1, childrenCount: 0, subGuests: [], qualifiers: [] });
   const [showSubEventSettingsModal, setShowSubEventSettingsModal] = useState(false);
   const [subEventEditForm, setSubEventEditForm] = useState({ title: '', date: '', location: '' });
   const [showImportGuestsModal, setShowImportGuestsModal] = useState(false);
@@ -393,7 +451,12 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       status: 'pending' as const,
       companions: [],
       linkedSubEventIds: [selectedSubId],
-      guestCount: 1,
+      addedByUserId: user.id,
+      guestCount: (c.adultsCount ?? 1) + (c.childrenCount ?? 0) || 1,
+      adultsCount: c.adultsCount ?? 1,
+      childrenCount: c.childrenCount ?? 0,
+      subGuests: c.subGuests?.length ? c.subGuests : undefined,
+      qualifiers: c.qualifiers?.length ? c.qualifiers : undefined,
       attendance: {}
     })) as Guest[];
     try {
@@ -449,7 +512,12 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       status: 'confirmed',
       companions: [],
       linkedSubEventIds: [selectedSubId],
-      guestCount: 1,
+      addedByUserId: user.id,
+      guestCount: (guestForm.adultsCount ?? 1) + (guestForm.childrenCount ?? 0) || 1,
+      adultsCount: guestForm.adultsCount ?? 1,
+      childrenCount: guestForm.childrenCount ?? 0,
+      subGuests: guestForm.subGuests?.length ? guestForm.subGuests : undefined,
+      qualifiers: guestForm.qualifiers?.length ? guestForm.qualifiers : undefined,
       attendance: {}
     };
     const updated = await dbService.updateEventAtomic(event.id, (evt) => ({
@@ -458,7 +526,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
     }));
     onUpdate(updated);
     setShowGuestModal(false);
-    setGuestForm({ firstName: '', lastName: '', email: '', phone: '' });
+    setGuestForm({ firstName: '', lastName: '', email: '', phone: '', guestCount: 1, adultsCount: 1, childrenCount: 0, subGuests: [], qualifiers: [] });
   };
 
   const handleApprove = async (userId: string, approve: boolean, permissions?: Permission[], allowedSubEventIds?: string[]) => {
@@ -727,10 +795,10 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
               ...(canViewBudget ? [{ id: 'budget', label: 'Budget' }] : [])
             ].map(tab => (
               (tab.id !== 'settings' || isOwner) && (
-                <button key={tab.id} type="button" onClick={() => { setActiveTab(tab.id as any); if (tab.id !== 'guests') setGuestsViewSubId(null); }} className={`py-3 px-3 sm:px-4 text-xs sm:text-sm font-medium rounded-t-lg whitespace-nowrap relative min-h-[44px] flex items-center ${activeTab === tab.id ? 'text-indigo-600 bg-slate-50' : 'text-slate-500 hover:text-slate-700'}`}>
+                <button key={tab.id} type="button" onClick={() => { setActiveTab(tab.id as any); if (tab.id !== 'guests') setGuestsViewSubId(null); }} className={`py-3 px-3 sm:px-4 text-xs sm:text-sm font-medium rounded-t-lg whitespace-nowrap relative min-h-[44px] flex items-center ${activeTab === tab.id ? 'text-teal-600 bg-slate-50' : 'text-slate-500 hover:text-slate-700'}`}>
                   {tab.label}
                   {tab.id === 'settings' && pendingOrganizers.length > 0 && <span className="absolute top-2 right-1 w-2 h-2 bg-red-500 rounded-full" />}
-                  {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-t" />}
+                  {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-600 rounded-t" />}
                 </button>
               )
             ))}
@@ -744,10 +812,10 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     <h3 className="text-base font-semibold text-slate-900 mb-2">Description du projet</h3>
                     <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">{event.description || "Aucune description."}</p>
                   </div>
-                  <button type="button" onClick={() => { setActiveTab('guests'); setGuestsViewSubId(null); }} className="p-5 rounded-xl border border-slate-200 bg-white hover:border-indigo-200 hover:shadow-sm text-left transition-all w-full">
+                  <button type="button" onClick={() => { setActiveTab('guests'); setGuestsViewSubId(null); }} className="p-5 rounded-xl border border-slate-200 bg-white hover:border-teal-200 hover:shadow-sm text-left transition-all w-full">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-base font-semibold text-slate-900">Invités</h3>
-                      <span className="text-xs font-medium text-indigo-600">Voir le tableau →</span>
+                      <span className="text-xs font-medium text-teal-600">Voir le tableau →</span>
                     </div>
                     {(() => {
                       const guests = event.guests || [];
@@ -778,7 +846,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                   <div className="lg:col-span-3 rounded-xl border border-slate-200 bg-white overflow-hidden">
                     <button type="button" onClick={() => { setActiveTab('program'); setSelectedSubId(null); }} className="w-full text-left px-4 py-3 border-b border-slate-100 flex items-center justify-between group hover:bg-slate-50">
                       <h3 className="text-sm font-semibold text-slate-900">Programme</h3>
-                      <span className="text-xs text-slate-500 group-hover:text-indigo-600">Voir tout →</span>
+                      <span className="text-xs text-slate-500 group-hover:text-teal-600">Voir tout →</span>
                     </button>
                     <div className="p-2 max-h-[320px] overflow-y-auto">
                       {(() => {
@@ -808,7 +876,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                   </div>
                   {canViewBudget && (
                     <div className="lg:col-span-2">
-                      <button type="button" onClick={() => setActiveTab('budget')} className="w-full h-full min-h-[240px] rounded-xl border border-slate-200 bg-white p-4 flex flex-col items-center justify-center gap-3 hover:border-indigo-200 hover:shadow-md transition-all">
+                      <button type="button" onClick={() => setActiveTab('budget')} className="w-full h-full min-h-[240px] rounded-xl border border-slate-200 bg-white p-4 flex flex-col items-center justify-center gap-3 hover:border-teal-200 hover:shadow-md transition-all">
                         <h3 className="text-sm font-semibold text-slate-900 w-full">Budget</h3>
                         {event.budget > 0 ? (
                           <>
@@ -831,12 +899,12 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     </div>
                   )}
                 </div>
-                <div className="p-5 rounded-xl border border-indigo-100 bg-indigo-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="p-5 rounded-xl border border-teal-100 bg-teal-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-medium text-indigo-900">Inviter des co-organisateurs</p>
-                    <p className="text-xs text-indigo-600 mt-0.5">Partagez l'accès pour travailler à plusieurs.</p>
+                    <p className="text-sm font-medium text-teal-900">Inviter des co-organisateurs</p>
+                    <p className="text-xs text-teal-600 mt-0.5">Partagez l'accès pour travailler à plusieurs.</p>
                   </div>
-                  <button type="button" onClick={handleShare} className="px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 shrink-0">Partager l'invitation</button>
+                  <button type="button" onClick={handleShare} className="px-4 py-2.5 bg-teal-600 text-white text-sm font-medium rounded-xl hover:bg-teal-700 shrink-0">Partager l'invitation</button>
                 </div>
               </div>
             )}
@@ -845,7 +913,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-slate-900">Budget du projet</h2>
-                  <button type="button" onClick={() => setActiveTab('overview')} className="text-sm text-indigo-600 font-medium hover:underline">← Vue d'ensemble</button>
+                  <button type="button" onClick={() => setActiveTab('overview')} className="text-sm text-teal-600 font-medium hover:underline">← Vue d'ensemble</button>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-white p-6">
                   <p className="text-sm text-slate-500 mb-2">Budget total</p>
@@ -859,12 +927,12 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-slate-900">Programme</h3>
-                  <button type="button" onClick={() => setShowSequenceModal(true)} disabled={!canManageProgram} className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">+ Séquence</button>
+                  <button type="button" onClick={() => setShowSequenceModal(true)} disabled={!canManageProgram} className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-xl hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed">+ Séquence</button>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {event.subEvents.map(sub => (
-                    <button key={sub.id} type="button" onClick={() => { setSelectedSubId(sub.id); setSubTab('sequence'); }} className="p-4 rounded-xl border border-slate-200 bg-white hover:border-indigo-300 hover:shadow-md text-left transition-all">
-                      <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md">{sub.date ? new Date(sub.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBD'}</span>
+                    <button key={sub.id} type="button" onClick={() => { setSelectedSubId(sub.id); setSubTab('sequence'); }} className="p-4 rounded-xl border border-slate-200 bg-white hover:border-teal-300 hover:shadow-md text-left transition-all">
+                      <span className="text-xs font-medium text-teal-600 bg-teal-50 px-2 py-1 rounded-md">{sub.date ? new Date(sub.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBD'}</span>
                       <h4 className="text-base font-semibold text-slate-900 mt-2 truncate">{sub.title}</h4>
                       <p className="text-slate-500 text-xs mt-1 truncate flex items-center gap-1"><svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>{sub.location || "Lieu global"}</p>
                     </button>
@@ -875,11 +943,20 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
 
             {activeTab === 'guests' && (
               <div className="flex flex-col min-h-[400px] -mx-4 sm:-mx-6 -mb-4 sm:-mb-6">
+                <GuestsTableSegmentBar
+                  event={event}
+                  filterSubEventId={guestsViewSubId}
+                  filterAddedByUserId={guestsViewFilterAddedBy}
+                  onFilterAddedByChange={setGuestsViewFilterAddedBy}
+                />
                 <GuestsTable
                   event={event}
                   filterSubEventId={guestsViewSubId}
+                  filterAddedByUserId={guestsViewFilterAddedBy}
                   canManage={canManageGuests}
+                  currentUserId={user.id}
                   onUpdate={handleGuestsTableUpdate}
+                  onGuestClick={(g) => setSelectedGuestForDetail(g)}
                 />
               </div>
             )}
@@ -893,9 +970,9 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                        <div className="p-4 bg-gray-50 rounded-2xl flex items-start justify-between gap-2">
                           <div className="min-w-0">
                              <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Clé de partage</p>
-                             <p className="font-black text-indigo-600 text-lg break-all">{event.shareCode}</p>
+                             <p className="font-black text-teal-600 text-lg break-all">{event.shareCode}</p>
                           </div>
-                          <button type="button" onClick={() => handleCopy(event.shareCode, 'code')} className="p-2 rounded-xl text-gray-400 hover:bg-gray-200 hover:text-indigo-600 flex-shrink-0" title="Copier">
+                          <button type="button" onClick={() => handleCopy(event.shareCode, 'code')} className="p-2 rounded-xl text-gray-400 hover:bg-gray-200 hover:text-teal-600 flex-shrink-0" title="Copier">
                             {copiedField === 'code' ? (
                               <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
                             ) : (
@@ -912,24 +989,24 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                                    <div className="flex-1 min-w-0">
                                      <Input label="" placeholder="Nouveau mot de passe" value={newPasswordValue} onChange={e => setNewPasswordValue(e.target.value)} type="text" autoComplete="off" />
                                    </div>
-                                   <button type="button" onClick={() => setNewPasswordValue(generateSharePassword())} className="px-3 py-3 rounded-2xl border-2 border-gray-200 text-gray-600 text-xs font-black uppercase hover:border-indigo-300 hover:text-indigo-600 whitespace-nowrap">Générer</button>
+                                   <button type="button" onClick={() => setNewPasswordValue(generateSharePassword())} className="px-3 py-3 rounded-2xl border-2 border-gray-200 text-gray-600 text-xs font-black uppercase hover:border-teal-300 hover:text-teal-600 whitespace-nowrap">Générer</button>
                                  </div>
                                  <div className="flex gap-2">
                                    <button type="button" onClick={cancelEditPassword} disabled={savingPassword} className="px-3 py-1.5 text-gray-500 text-xs font-bold uppercase disabled:opacity-50">Annuler</button>
-                                   <button type="button" onClick={saveNewPassword} disabled={savingPassword} className="px-4 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase disabled:opacity-50">
+                                   <button type="button" onClick={saveNewPassword} disabled={savingPassword} className="px-4 py-1.5 bg-teal-600 text-white rounded-xl text-xs font-black uppercase disabled:opacity-50">
                                      {savingPassword ? 'Enregistrement…' : 'Enregistrer'}
                                    </button>
                                  </div>
                                </div>
                              ) : (
                                <>
-                                 <p className="font-black text-indigo-600 text-lg break-all">{event.sharePassword ?? ''}</p>
-                                 <button type="button" onClick={startEditPassword} className="mt-2 text-indigo-600 text-[10px] font-black uppercase hover:underline">Modifier le mot de passe</button>
+                                 <p className="font-black text-teal-600 text-lg break-all">{event.sharePassword ?? ''}</p>
+                                 <button type="button" onClick={startEditPassword} className="mt-2 text-teal-600 text-[10px] font-black uppercase hover:underline">Modifier le mot de passe</button>
                                </>
                              )}
                           </div>
                           {!editingPassword && (
-                            <button type="button" onClick={() => handleCopy(event.sharePassword ?? '', 'password')} className="p-2 rounded-xl text-gray-400 hover:bg-gray-200 hover:text-indigo-600 flex-shrink-0" title="Copier">
+                            <button type="button" onClick={() => handleCopy(event.sharePassword ?? '', 'password')} className="p-2 rounded-xl text-gray-400 hover:bg-gray-200 hover:text-teal-600 flex-shrink-0" title="Copier">
                               {copiedField === 'password' ? (
                                 <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
                               ) : (
@@ -939,7 +1016,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                           )}
                        </div>
                     </div>
-                    <button onClick={handleShare} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-indigo-100 active:scale-95">
+                    <button onClick={handleShare} className="bg-teal-600 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-teal-100 active:scale-95">
                       Partager l’invitation
                     </button>
                  </div>
@@ -979,7 +1056,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                           </thead>
                           <tbody className="divide-y divide-gray-50">
                              <tr>
-                                <td className="px-6 py-4 font-black text-indigo-600">{user.firstName} (Vous)</td>
+                                <td className="px-6 py-4 font-black text-teal-600">{user.firstName} (Vous)</td>
                                 <td className="px-6 py-4 text-[10px] font-black text-gray-300 uppercase">Propriétaire</td>
                                 <td className="px-6 py-4 text-[10px] text-gray-300">—</td>
                              </tr>
@@ -994,7 +1071,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                                         setEditRightsPermissions(o.permissions || []);
                                         setEditRightsSubEventIds(o.allowedSubEventIds || []);
                                       }}
-                                      className="text-indigo-600 font-bold text-[10px] uppercase hover:underline"
+                                      className="text-teal-600 font-bold text-[10px] uppercase hover:underline"
                                     >
                                       Modifier
                                     </button>
@@ -1011,11 +1088,11 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
             {activeTab === 'chat' && (
               <div className="flex flex-col bg-white rounded-2xl sm:rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm min-h-[280px] h-[min(500px,70dvh)] sm:h-[500px] max-h-[calc(100dvh-12rem)]">
                  {typingNames.length > 0 && (
-                   <div className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-indigo-50/80 border-b border-indigo-100 text-xs sm:text-sm text-indigo-700 shrink-0">
+                   <div className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-teal-50/80 border-b border-teal-100 text-xs sm:text-sm text-teal-700 shrink-0">
                      <span className="inline-flex gap-1" aria-hidden>
-                       <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                       <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                       <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                       <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                       <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                       <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: '300ms' }} />
                      </span>
                      <span className="font-medium truncate">
                        {typingNames.length === 1
@@ -1030,7 +1107,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     {messages.map(m => (
                       <div key={m.id} className={`flex flex-col ${m.senderId === user.id ? 'items-end' : 'items-start'}`}>
                          <span className="text-[9px] font-black text-gray-300 mb-1 uppercase">{m.senderName}</span>
-                         <div className={`px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl max-w-[85%] text-sm shadow-sm break-words ${m.senderId === user.id ? 'bg-indigo-600 text-white' : 'bg-gray-50 text-gray-700'}`}>
+                         <div className={`px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl max-w-[85%] text-sm shadow-sm break-words ${m.senderId === user.id ? 'bg-teal-600 text-white' : 'bg-gray-50 text-gray-700'}`}>
                             {m.text}
                          </div>
                       </div>
@@ -1038,7 +1115,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                  </div>
                  <form onSubmit={handleSendMessage} className="p-3 sm:p-4 bg-gray-50/50 border-t border-gray-100 flex gap-2 sm:gap-3 shrink-0 pb-[env(safe-area-inset-bottom)] sm:pb-4">
                     <input
-                      className="flex-1 min-w-0 bg-white border-2 border-gray-100 rounded-xl sm:rounded-2xl px-4 py-3 sm:px-6 text-base sm:text-sm outline-none focus:border-indigo-500 transition-all disabled:opacity-60"
+                      className="flex-1 min-w-0 bg-white border-2 border-gray-100 rounded-xl sm:rounded-2xl px-4 py-3 sm:px-6 text-base sm:text-sm outline-none focus:border-teal-500 transition-all disabled:opacity-60"
                       placeholder={canSendChat ? "Message d'équipe..." : "Accès messagerie restreint"}
                       value={newMessage}
                       onChange={e => {
@@ -1051,7 +1128,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     <button
                       type="submit"
                       disabled={!canSendChat}
-                      className="min-w-[44px] min-h-[44px] p-3 sm:p-4 bg-indigo-600 text-white rounded-xl sm:rounded-2xl shadow-lg shadow-indigo-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
+                      className="min-w-[44px] min-h-[44px] p-3 sm:p-4 bg-teal-600 text-white rounded-xl sm:rounded-2xl shadow-lg shadow-teal-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
                       aria-label="Envoyer"
                     >
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 19l9-2-9-18-9 18 9-2zm0 0v-8"/></svg>
@@ -1082,18 +1159,18 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
            </header>
 
            <nav className="flex px-2 sm:px-4 border-b border-gray-100 bg-gray-50/30 overflow-x-auto no-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
-              <button key="sequence" type="button" onClick={() => setSubTab('sequence')} className={`py-4 sm:py-5 px-4 sm:px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'sequence' ? 'text-indigo-600' : 'text-gray-400'}`}>
+              <button key="sequence" type="button" onClick={() => setSubTab('sequence')} className={`py-4 sm:py-5 px-4 sm:px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'sequence' ? 'text-teal-600' : 'text-gray-400'}`}>
                 Séquence
-                {subTab === 'sequence' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-indigo-600 rounded-t-full" />}
+                {subTab === 'sequence' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-teal-600 rounded-t-full" />}
               </button>
-              <button key="guests" type="button" onClick={() => setSubTab('guests')} className={`py-4 sm:py-5 px-4 sm:px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'guests' ? 'text-indigo-600' : 'text-gray-400'}`}>
+              <button key="guests" type="button" onClick={() => setSubTab('guests')} className={`py-4 sm:py-5 px-4 sm:px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'guests' ? 'text-teal-600' : 'text-gray-400'}`}>
                 Invités
-                {subTab === 'guests' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-indigo-600 rounded-t-full" />}
+                {subTab === 'guests' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-teal-600 rounded-t-full" />}
               </button>
               {canChatForCurrentSubEvent && (
-                <button key="chat" type="button" onClick={() => setSubTab('chat')} className={`py-4 sm:py-5 px-4 sm:px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'chat' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                <button key="chat" type="button" onClick={() => setSubTab('chat')} className={`py-4 sm:py-5 px-4 sm:px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'chat' ? 'text-teal-600' : 'text-gray-400'}`}>
                   Chat
-                  {subTab === 'chat' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-indigo-600 rounded-t-full" />}
+                  {subTab === 'chat' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-teal-600 rounded-t-full" />}
                 </button>
               )}
            </nav>
@@ -1115,7 +1192,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                   <section className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Déroulé précis</h3>
-                      <button type="button" onClick={() => setShowMomentModal(true)} disabled={!canManageProgramHere} className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-40">
+                      <button type="button" onClick={() => setShowMomentModal(true)} disabled={!canManageProgramHere} className="bg-teal-50 text-teal-600 px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-40">
                         + Jalon
                       </button>
                     </div>
@@ -1123,8 +1200,8 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                       <div className="absolute left-2 top-2 bottom-2 w-px bg-slate-200" aria-hidden />
                       {currentSub?.keyMoments.map(m => (
                         <div key={m.id} className="relative pl-8 flex items-center gap-4">
-                          <span className="absolute left-0 w-4 h-4 bg-indigo-600 rounded-full border-2 border-white shadow" />
-                          <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md min-w-[4rem] text-center">{m.time || '--:--'}</span>
+                          <span className="absolute left-0 w-4 h-4 bg-teal-600 rounded-full border-2 border-white shadow" />
+                          <span className="text-xs font-medium text-teal-600 bg-teal-50 px-2 py-1 rounded-md min-w-[4rem] text-center">{m.time || '--:--'}</span>
                           <p className="font-medium text-slate-800">{m.label}</p>
                         </div>
                       ))}
@@ -1137,13 +1214,13 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Participants</h3>
                       <div className="flex flex-wrap items-center gap-2">
-                        <button type="button" onClick={() => setSubTab('guests')} className="px-4 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-medium hover:bg-indigo-100">
+                        <button type="button" onClick={() => setSubTab('guests')} className="px-4 py-2 rounded-xl border border-teal-200 bg-teal-50 text-teal-700 text-xs font-medium hover:bg-teal-100">
                           Tableau des invités
                         </button>
                         <button type="button" onClick={() => setShowImportGuestsModal(true)} disabled={!canManageGuestsHere} className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-50 disabled:opacity-40">
                           Importer contacts
                         </button>
-                        <button type="button" onClick={() => setShowGuestModal(true)} disabled={!canManageGuestsHere} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold disabled:opacity-40">
+                        <button type="button" onClick={() => setShowGuestModal(true)} disabled={!canManageGuestsHere} className="px-4 py-2 bg-teal-600 text-white rounded-xl text-xs font-semibold disabled:opacity-40">
                           + Invité
                         </button>
                       </div>
@@ -1165,11 +1242,20 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
 
               {subTab === 'guests' && selectedSubId && (
                 <div className="flex flex-col min-h-[300px] -mx-4 sm:-mx-6 -mb-4 sm:-mb-6">
+                  <GuestsTableSegmentBar
+                    event={event}
+                    filterSubEventId={selectedSubId}
+                    filterAddedByUserId={guestsViewFilterAddedBy}
+                    onFilterAddedByChange={setGuestsViewFilterAddedBy}
+                  />
                   <GuestsTable
                     event={event}
                     filterSubEventId={selectedSubId}
+                    filterAddedByUserId={guestsViewFilterAddedBy}
                     canManage={canManageGuestsHere}
+                    currentUserId={user.id}
                     onUpdate={handleGuestsTableUpdate}
+                    onGuestClick={(g) => setSelectedGuestForDetail(g)}
                   />
                 </div>
               )}
@@ -1178,11 +1264,11 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 <div className="flex flex-col bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm min-h-[280px] h-[min(400px,60dvh)]">
                   <p className="px-4 py-2 text-xs text-slate-500 border-b border-slate-100">Chat réservé aux admins de cette séquence.</p>
                   {typingNames.length > 0 && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50/80 border-b border-indigo-100 text-xs text-indigo-700 shrink-0">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-teal-50/80 border-b border-teal-100 text-xs text-teal-700 shrink-0">
                       <span className="inline-flex gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: '300ms' }} />
                       </span>
                       <span className="font-medium truncate">{typingNames.length === 1 ? `${typingNames[0]} écrit...` : `${typingNames[0]} et ${typingNames.length - 1} autre(s) écrivent...`}</span>
                     </div>
@@ -1191,20 +1277,20 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     {messages.map(m => (
                       <div key={m.id} className={`flex flex-col ${m.senderId === user.id ? 'items-end' : 'items-start'}`}>
                         <span className="text-[9px] font-medium text-slate-400 mb-1">{m.senderName}</span>
-                        <div className={`px-4 py-2.5 rounded-xl max-w-[85%] text-sm break-words ${m.senderId === user.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-800'}`}>{m.text}</div>
+                        <div className={`px-4 py-2.5 rounded-xl max-w-[85%] text-sm break-words ${m.senderId === user.id ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-800'}`}>{m.text}</div>
                       </div>
                     ))}
                   </div>
                   <form onSubmit={handleSendMessage} className="p-3 bg-slate-50 border-t border-slate-200 flex gap-2 shrink-0">
                     <input
-                      className="flex-1 min-w-0 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500 disabled:opacity-60"
+                      className="flex-1 min-w-0 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-teal-500 disabled:opacity-60"
                       placeholder="Message..."
                       value={newMessage}
                       onChange={e => { setNewMessage(e.target.value); reportTyping(); }}
                       disabled={!canSendChat}
                       aria-label="Message"
                     />
-                    <button type="submit" disabled={!canSendChat} className="min-w-[44px] min-h-[44px] p-3 bg-indigo-600 text-white rounded-xl disabled:opacity-40 flex items-center justify-center" aria-label="Envoyer">
+                    <button type="submit" disabled={!canSendChat} className="min-w-[44px] min-h-[44px] p-3 bg-teal-600 text-white rounded-xl disabled:opacity-40 flex items-center justify-center" aria-label="Envoyer">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9-2-9-18-9 18 9-2zm0 0v-8"/></svg>
                     </button>
                   </form>
@@ -1227,7 +1313,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                   onClick={() => setEventSettingsTab(tab)}
                   className={`py-4 px-6 text-[11px] font-black uppercase tracking-widest border-b-2 transition-colors ${
                     eventSettingsTab === tab
-                      ? 'border-indigo-600 text-indigo-600'
+                      ? 'border-teal-600 text-teal-600'
                       : 'border-transparent text-gray-400 hover:text-gray-600'
                   }`}
                 >
@@ -1248,7 +1334,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        className="w-5 h-5 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
                         checked={eventEditForm.isDateTBD}
                         onChange={e => setEventEditForm(prev => ({ ...prev, isDateTBD: e.target.checked }))}
                       />
@@ -1288,14 +1374,14 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     onChange={handleEventImageSelect}
                   />
                   <div
-                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('ring-2', 'ring-indigo-500', 'bg-indigo-50/50'); }}
-                    onDragLeave={(e) => { e.currentTarget.classList.remove('ring-2', 'ring-indigo-500', 'bg-indigo-50/50'); }}
+                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('ring-2', 'ring-teal-500', 'bg-teal-50/50'); }}
+                    onDragLeave={(e) => { e.currentTarget.classList.remove('ring-2', 'ring-teal-500', 'bg-teal-50/50'); }}
                     onDrop={handleEventImageDrop}
                     onClick={() => eventImageInputRef.current?.click()}
-                    className="border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center cursor-pointer hover:border-indigo-300 hover:bg-gray-50/50 transition-all min-h-[180px] flex flex-col items-center justify-center gap-3"
+                    className="border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center cursor-pointer hover:border-teal-300 hover:bg-gray-50/50 transition-all min-h-[180px] flex flex-col items-center justify-center gap-3"
                   >
                     {imageUploading ? (
-                      <div className="w-10 h-10 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto" />
+                      <div className="w-10 h-10 border-2 border-teal-200 border-t-teal-600 rounded-full animate-spin mx-auto" />
                     ) : eventEditForm.image ? (
                       <div className="w-full rounded-xl overflow-hidden border border-gray-100 h-32">
                         <img src={eventEditForm.image} alt="Aperçu" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -1319,7 +1405,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
               <button type="button" onClick={() => setShowEventSettingsModal(false)} className="flex-1 py-4 font-bold text-gray-400 text-[10px] uppercase rounded-2xl border border-gray-200">
                 Annuler
               </button>
-              <button type="button" onClick={handleSaveEventSettings} className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-indigo-100">
+              <button type="button" onClick={handleSaveEventSettings} className="flex-[2] py-4 bg-teal-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-teal-100">
                 Enregistrer
               </button>
             </div>
@@ -1337,7 +1423,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 <label key={p} className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
-                    className="mt-1 w-4 h-4 rounded border-gray-300 text-indigo-600"
+                    className="mt-1 w-4 h-4 rounded border-gray-300 text-teal-600"
                     checked={approvePermissions.includes(p)}
                     onChange={() => togglePermission(p, approvePermissions, setApprovePermissions)}
                   />
@@ -1353,7 +1439,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     <label key={sub.id} className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        className="w-4 h-4 rounded border-gray-300 text-indigo-600"
+                        className="w-4 h-4 rounded border-gray-300 text-teal-600"
                         checked={approveSubEventIds.includes(sub.id)}
                         onChange={() => toggleSubEvent(sub.id, approveSubEventIds, setApproveSubEventIds)}
                       />
@@ -1387,7 +1473,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 <label key={p} className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
-                    className="mt-1 w-4 h-4 rounded border-gray-300 text-indigo-600"
+                    className="mt-1 w-4 h-4 rounded border-gray-300 text-teal-600"
                     checked={editRightsPermissions.includes(p)}
                     onChange={() => togglePermission(p, editRightsPermissions, setEditRightsPermissions)}
                   />
@@ -1403,7 +1489,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     <label key={sub.id} className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        className="w-4 h-4 rounded border-gray-300 text-indigo-600"
+                        className="w-4 h-4 rounded border-gray-300 text-teal-600"
                         checked={editRightsSubEventIds.includes(sub.id)}
                         onChange={() => toggleSubEvent(sub.id, editRightsSubEventIds, setEditRightsSubEventIds)}
                       />
@@ -1415,7 +1501,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
             )}
             <div className="flex gap-4 pt-2">
               <button type="button" onClick={() => setEditRightsOrganizer(null)} className="flex-1 py-3 font-bold text-gray-400 text-[10px] uppercase rounded-2xl border border-gray-200">Annuler</button>
-              <button type="button" onClick={handleSaveEditRights} className="flex-[2] py-3 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase">Enregistrer</button>
+              <button type="button" onClick={handleSaveEditRights} className="flex-[2] py-3 bg-teal-600 text-white rounded-2xl font-black text-[10px] uppercase">Enregistrer</button>
             </div>
           </div>
         </div>
@@ -1432,7 +1518,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
             </div>
             <div className="flex gap-3">
               <button type="button" onClick={() => setShowSubEventSettingsModal(false)} className="flex-1 py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Annuler</button>
-              <button type="button" onClick={handleSaveSubEventSettings} className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl">Enregistrer</button>
+              <button type="button" onClick={handleSaveSubEventSettings} className="flex-1 py-2.5 bg-teal-600 text-white text-sm font-medium rounded-xl">Enregistrer</button>
             </div>
             {canManageProgramHere && (
               <button type="button" onClick={handleDeleteSubEvent} className="w-full py-2.5 text-red-600 text-sm font-medium rounded-xl border border-red-200 hover:bg-red-50">
@@ -1454,7 +1540,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
               </div>
               <div className="flex gap-4">
                  <button onClick={() => setShowSequenceModal(false)} className="flex-1 py-4 font-bold text-gray-400 text-[10px] uppercase">Annuler</button>
-                 <button onClick={handleAddSequence} className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-indigo-100">Ajouter</button>
+                 <button onClick={handleAddSequence} className="flex-[2] py-4 bg-teal-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-teal-100">Ajouter</button>
               </div>
            </div>
         </div>
@@ -1462,17 +1548,32 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
 
       {showGuestModal && (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 bg-gray-900/80 backdrop-blur-xl">
-           <div className="bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 space-y-5 sm:space-y-6 shadow-xl pb-[env(safe-area-inset-bottom)]">
+           <div className="bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 space-y-5 sm:space-y-6 shadow-xl max-h-[90vh] overflow-y-auto pb-[env(safe-area-inset-bottom)]">
               <h3 className="text-lg font-semibold text-slate-900">Ajouter un participant</h3>
               <div className="space-y-4">
                  <Input label="Prénom" value={guestForm.firstName} onChange={e => setGuestForm({...guestForm, firstName: e.target.value})} />
                  <Input label="Nom" value={guestForm.lastName} onChange={e => setGuestForm({...guestForm, lastName: e.target.value})} />
                  <Input label="Email" type="email" value={guestForm.email} onChange={e => setGuestForm({...guestForm, email: e.target.value})} />
                  <Input label="Téléphone" type="tel" value={guestForm.phone} onChange={e => setGuestForm({...guestForm, phone: e.target.value})} />
+                 <div className="grid grid-cols-2 gap-3">
+                   <Input label="Adultes" type="number" min={1} max={99} value={String(guestForm.adultsCount ?? 1)} onChange={e => setGuestForm({...guestForm, adultsCount: parseInt(e.target.value, 10) || 1})} />
+                   <Input label="Enfants" type="number" min={0} max={99} value={String(guestForm.childrenCount ?? 0)} onChange={e => setGuestForm({...guestForm, childrenCount: Math.max(0, parseInt(e.target.value, 10) || 0)})} />
+                 </div>
+                 <div>
+                   <label className="block text-sm font-medium text-slate-700 mb-2">Qualificatifs (cartons d'invitation)</label>
+                   <div className="flex flex-wrap gap-2">
+                     {QUALIFIER_OPTIONS.map((key) => (
+                       <label key={key} className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer ${(guestForm.qualifiers ?? []).includes(key) ? 'border-teal-500 bg-teal-50 text-teal-800' : 'border-slate-200 bg-white text-slate-600'}`}>
+                         <input type="checkbox" checked={(guestForm.qualifiers ?? []).includes(key)} onChange={() => setGuestForm(f => ({ ...f, qualifiers: (f.qualifiers ?? []).includes(key) ? (f.qualifiers ?? []).filter(q => q !== key) : [...(f.qualifiers ?? []), key] }))} className="rounded border-slate-300 text-teal-600" />
+                         {QUALIFIER_LABELS[key]}
+                       </label>
+                     ))}
+                   </div>
+                 </div>
               </div>
               <div className="flex gap-3">
                  <button type="button" onClick={() => setShowGuestModal(false)} className="flex-1 py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Annuler</button>
-                 <button type="button" onClick={handleAddGuest} className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl">Enregistrer</button>
+                 <button type="button" onClick={handleAddGuest} className="flex-1 py-2.5 bg-teal-600 text-white text-sm font-medium rounded-xl">Enregistrer</button>
               </div>
            </div>
         </div>
@@ -1511,9 +1612,9 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                           key={idx}
                           type="button"
                           onClick={() => toggleDeviceContact(idx)}
-                          className={`w-full flex items-center gap-3 px-4 py-3.5 sm:py-3 rounded-xl text-left border min-h-[52px] sm:min-h-0 ${selected ? 'border-indigo-300 bg-indigo-50' : 'border-slate-100 hover:bg-slate-50'}`}
+                          className={`w-full flex items-center gap-3 px-4 py-3.5 sm:py-3 rounded-xl text-left border min-h-[52px] sm:min-h-0 ${selected ? 'border-teal-300 bg-teal-50' : 'border-slate-100 hover:bg-slate-50'}`}
                         >
-                          <span className={`w-6 h-6 sm:w-5 sm:h-5 rounded border-2 flex items-center justify-center shrink-0 ${selected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
+                          <span className={`w-6 h-6 sm:w-5 sm:h-5 rounded border-2 flex items-center justify-center shrink-0 ${selected ? 'bg-teal-600 border-teal-600' : 'border-slate-300'}`}>
                             {selected && <svg className="w-3.5 h-3.5 sm:w-3 sm:h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
                           </span>
                           <div className="min-w-0 flex-1">
@@ -1526,7 +1627,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 </div>
                 <div className="p-4 border-t border-slate-200 flex gap-3 shrink-0">
                   <button type="button" onClick={() => { setDeviceContactList(null); setDeviceContactSelected(new Set()); setDeviceContactSearch(''); }} className="flex-1 min-h-[48px] py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Annuler</button>
-                  <button type="button" onClick={confirmDeviceSelection} disabled={deviceContactSelected.size === 0} className="flex-1 min-h-[48px] py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed">
+                  <button type="button" onClick={confirmDeviceSelection} disabled={deviceContactSelected.size === 0} className="flex-1 min-h-[48px] py-2.5 bg-teal-600 text-white text-sm font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed">
                     Valider ({deviceContactSelected.size})
                   </button>
                 </div>
@@ -1542,7 +1643,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                       <button
                         type="button"
                         onClick={() => importFileInputRef.current?.click()}
-                        className="w-full min-h-[48px] py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold flex items-center justify-center gap-2 shadow-sm"
+                        className="w-full min-h-[48px] py-3 px-4 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold flex items-center justify-center gap-2 shadow-sm"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
                         Importer depuis un fichier (CSV ou vCard)
@@ -1586,7 +1687,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                       </div>
 
                       <details className="group">
-                        <summary className="text-xs font-medium text-indigo-600 cursor-pointer list-none py-1">Comment exporter mes contacts ?</summary>
+                        <summary className="text-xs font-medium text-teal-600 cursor-pointer list-none py-1">Comment exporter mes contacts ?</summary>
                         <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 space-y-2">
                           <p><strong>Exporter depuis iCloud / iPhone :</strong> App Contacts → Sélectionner → Partager → Fichier .vcf.</p>
                           <p><strong>Exporter depuis Google :</strong> contacts.google.com → Exporter → vCard ou CSV.</p>
@@ -1614,6 +1715,21 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                             <Input label="Nom" value={c.lastName} onChange={e => updateImportedContact(i, 'lastName', e.target.value)} />
                             <Input label="Email" type="email" value={c.email} onChange={e => updateImportedContact(i, 'email', e.target.value)} className="sm:col-span-2" />
                             <Input label="Téléphone" type="tel" value={c.phone} onChange={e => updateImportedContact(i, 'phone', e.target.value)} className="sm:col-span-2" />
+                            <div className="sm:col-span-2 flex gap-4 items-end">
+                              <Input label="Adultes" type="number" min={1} max={99} value={String(c.adultsCount ?? 1)} onChange={e => setImportedContacts(prev => prev.map((co, j) => j === i ? { ...co, adultsCount: parseInt(e.target.value, 10) || 1 } : co))} className="w-20" />
+                              <Input label="Enfants" type="number" min={0} max={99} value={String(c.childrenCount ?? 0)} onChange={e => setImportedContacts(prev => prev.map((co, j) => j === i ? { ...co, childrenCount: Math.max(0, parseInt(e.target.value, 10) || 0) } : co))} className="w-20" />
+                            </div>
+                            <div className="sm:col-span-2">
+                              <label className="block text-xs font-medium text-slate-600 mb-1">Qualificatifs</label>
+                              <div className="flex flex-wrap gap-1.5">
+                                {QUALIFIER_OPTIONS.map((key) => (
+                                  <label key={key} className={`inline-flex items-center gap-1 px-2 py-1 rounded border text-xs cursor-pointer ${(c.qualifiers ?? []).includes(key) ? 'border-teal-500 bg-teal-50 text-teal-800' : 'border-slate-200'}`}>
+                                    <input type="checkbox" checked={(c.qualifiers ?? []).includes(key)} onChange={() => setImportedContacts(prev => prev.map((co, j) => j === i ? { ...co, qualifiers: (co.qualifiers ?? []).includes(key) ? (co.qualifiers ?? []).filter(q => q !== key) : [...(co.qualifiers ?? []), key] } : co))} className="rounded border-slate-300 text-teal-600" />
+                                    {QUALIFIER_LABELS[key]}
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
                           </div>
                           {!isContactComplete(c) && <span className="text-xs text-amber-600">À compléter</span>}
                         </div>
@@ -1621,7 +1737,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     </div>
                     <div className="p-4 border-t border-slate-200 flex gap-3 shrink-0">
                       <button type="button" onClick={() => { setImportedContacts([]); setShowExportHelp(false); setDeviceContactList(null); setShowImportGuestsModal(false); }} className="flex-1 min-h-[48px] py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200">Annuler</button>
-                      <button type="button" onClick={handleAddAllImportedGuests} className="flex-1 min-h-[48px] py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl">Ajouter tous à la séquence</button>
+                      <button type="button" onClick={handleAddAllImportedGuests} className="flex-1 min-h-[48px] py-2.5 bg-teal-600 text-white text-sm font-medium rounded-xl">Ajouter tous à la séquence</button>
                     </div>
                   </>
                 )}
@@ -1646,10 +1762,20 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
               </div>
               <div className="flex gap-4">
                  <button onClick={() => setShowMomentModal(false)} className="flex-1 py-4 font-bold text-gray-400 text-[10px] uppercase">Annuler</button>
-                 <button onClick={handleAddKeyMoment} className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-indigo-100">Confirmer</button>
+                 <button onClick={handleAddKeyMoment} className="flex-[2] py-4 bg-teal-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-teal-100">Confirmer</button>
               </div>
            </div>
         </div>
+      )}
+
+      {selectedGuestForDetail && (
+        <GuestDetailModal
+          guest={selectedGuestForDetail}
+          event={event}
+          currentUserId={user.id}
+          onSave={(updated) => { handleGuestsTableUpdate(updated); onUpdate(updated); setSelectedGuestForDetail(null); }}
+          onClose={() => setSelectedGuestForDetail(null)}
+        />
       )}
 
       <style dangerouslySetInnerHTML={{ __html: `

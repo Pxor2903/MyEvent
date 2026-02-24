@@ -1,8 +1,8 @@
 /* myEvent — design system + base */
 :root {
   /* Couleurs sémantiques */
-  --color-primary: 99 102 241;
-  --color-primary-hover: 79 70 229;
+  --color-primary: 13 148 136;
+  --color-primary-hover: 15 118 110;
   --color-surface: 255 255 255;
   --color-surface-elevated: 255 255 255;
   --color-background: 248 250 252;
@@ -78,7 +78,7 @@ input:focus, button:focus {
   outline: none;
 }
 input:focus-visible, button:focus-visible {
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.4);
 }
 
 /* Toast */
