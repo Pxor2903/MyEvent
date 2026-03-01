@@ -100,6 +100,8 @@ export interface Event {
   currency?: string;
   /** Montant alloué par sous-événement (subEventId → montant). */
   subEventBudgets?: Record<string, number>;
+  /** Frais globaux (pour tout l'événement, hors sous-événements). Ex. assurance, location salle. */
+  globalBudgetAllocations?: BudgetAllocation[];
   subEvents: SubEvent[];
   guests: Guest[];
   isGuestChatEnabled: boolean;

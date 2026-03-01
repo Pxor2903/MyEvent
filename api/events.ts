@@ -26,6 +26,7 @@ type DbEvent = {
   budget: number;
   currency: string | null;
   sub_event_budgets: Record<string, number> | null;
+  global_budget_allocations: { id: string; label: string; amount: number }[] | null;
   sub_events: SubEvent[];
   guests: Guest[];
   is_guest_chat_enabled: boolean;
@@ -52,6 +53,7 @@ function fromDb(row: DbEvent): Event {
     budget: row.budget ?? 0,
     currency: row.currency ?? 'EUR',
     subEventBudgets: row.sub_event_budgets ?? undefined,
+    globalBudgetAllocations: row.global_budget_allocations ?? undefined,
     subEvents: row.sub_events ?? [],
     guests: row.guests ?? [],
     isGuestChatEnabled: row.is_guest_chat_enabled,
@@ -80,6 +82,7 @@ function toDb(event: Event): DbEvent {
     budget: event.budget ?? 0,
     currency: event.currency ?? 'EUR',
     sub_event_budgets: event.subEventBudgets ?? undefined,
+    global_budget_allocations: event.globalBudgetAllocations ?? undefined,
     sub_events: event.subEvents ?? [],
     guests: event.guests ?? [],
     is_guest_chat_enabled: event.isGuestChatEnabled ?? true,

@@ -940,6 +940,13 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                   }));
                   onUpdate(updated);
                 }}
+                onSaveGlobalAllocations={async (allocations) => {
+                  const updated = await dbService.updateEventAtomic(event.id, (evt) => ({
+                    ...evt,
+                    globalBudgetAllocations: allocations
+                  }));
+                  onUpdate(updated);
+                }}
                 onBack={() => setActiveTab('overview')}
               />
             )}
