@@ -20,7 +20,9 @@ import { GuestsTable } from './GuestsTable';
 import { GuestDetailModal } from './GuestDetailModal';
 import { EventBudgetPage } from './EventBudgetPage';
 import { SubEventBudgetPage } from './SubEventBudgetPage';
+import { BudgetPieChart, type PieSegment } from './BudgetPieChart';
 import { getCurrencySymbol } from '@/core/constants/currencies';
+import { CHART_PALETTE, UNALLOCATED_COLOR } from '@/core/constants/chartColors';
 import type { BudgetAllocation } from '@/core/types';
 
 interface EventDetailProps {
@@ -896,15 +898,42 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                       <button type="button" onClick={() => setActiveTab('budget')} className="w-full h-full min-h-[240px] rounded-xl border border-slate-200 bg-white p-4 flex flex-col items-center justify-center gap-3 hover:border-teal-200 hover:shadow-md transition-all">
                         <h3 className="text-sm font-semibold text-slate-900 w-full">Budget</h3>
                         {event.budget > 0 ? (
-                          <>
-                            <div
-                              className="w-32 h-32 rounded-full flex-shrink-0 border-4 border-white shadow-md"
-                              style={{ background: `conic-gradient(#6366f1 0deg 360deg)` }}
-                              aria-hidden
-                            />
-                            <p className="text-xl font-semibold text-slate-900">{event.budget.toLocaleString('fr-FR')} {getCurrencySymbol(event.currency ?? 'EUR')}</p>
-                            <p className="text-xs text-slate-500">Cliquer pour le détail</p>
-                          </>
+                          (() => {
+                            const budget = event.budget ?? 0;
+                            const globalAllocations = event.globalBudgetAllocations ?? [];
+                            const subEvents = event.subEvents ?? [];
+                            let colorIndex = 0;
+                            const overviewSegments: PieSegment[] = [
+                              ...globalAllocations.filter((a) => a.amount > 0).map((a) => ({
+                                label: (a.label || 'Sans nom').trim(),
+                                value: a.amount,
+                                color: a.color || CHART_PALETTE[colorIndex++ % CHART_PALETTE.length]
+                              })),
+                              ...subEvents.flatMap((sub) =>
+                                (sub.budgetAllocations ?? [])
+                                  .filter((a) => a.amount > 0)
+                                  .map((a) => ({
+                                    label: (a.label || 'Sans nom').trim(),
+                                    value: a.amount,
+                                    color: a.color || sub.color || CHART_PALETTE[colorIndex++ % CHART_PALETTE.length]
+                                  }))
+                              ),
+                              ...((() => {
+                                const totalInPostes = globalAllocations.reduce((s, a) => s + a.amount, 0) + subEvents.reduce((s, sub) => s + (sub.budgetAllocations ?? []).reduce((t, a) => t + a.amount, 0), 0);
+                                const unallocated = Math.max(0, budget - totalInPostes);
+                                return unallocated > 0 ? [{ label: 'Non alloué', value: unallocated, color: UNALLOCATED_COLOR }] : [];
+                              })())
+                            ];
+                            return (
+                              <>
+                                <div className="shrink-0">
+                                  <BudgetPieChart segments={overviewSegments} total={budget} size={128} strokeWidth={20} interactive={false} />
+                                </div>
+                                <p className="text-xl font-semibold text-slate-900">{event.budget.toLocaleString('fr-FR')} {getCurrencySymbol(event.currency ?? 'EUR')}</p>
+                                <p className="text-xs text-slate-500">Cliquer pour le détail</p>
+                              </>
+                            );
+                          })()
                         ) : (
                           <>
                             <div className="w-32 h-32 rounded-full bg-slate-100 flex items-center justify-center" aria-hidden><span className="text-3xl text-slate-300">{getCurrencySymbol(event.currency ?? 'EUR')}</span></div>
@@ -948,6 +977,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                   onUpdate(updated);
                 }}
                 onBack={() => setActiveTab('overview')}
+                onNavigateToSubEventBudget={hasPermission('edit_details') || hasPermission('view_budget') ? (subEventId) => { setSelectedSubId(subEventId); setActiveTab('program'); setSubTab('budget'); } : undefined}
               />
             )}
 
@@ -1394,6 +1424,15 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     }));
                     onUpdate(updated);
                   }}
+                  onSaveSubEventColor={selectedSubId ? async (color) => {
+                    const updated = await dbService.updateEventAtomic(event.id, (evt) => ({
+                      ...evt,
+                      subEvents: evt.subEvents.map((s) =>
+                        s.id === selectedSubId ? { ...s, color } : s
+                      )
+                    }));
+                    onUpdate(updated);
+                  } : undefined}
                 />
               )}
 

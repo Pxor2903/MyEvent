@@ -5,7 +5,9 @@ import React, { useState, useEffect } from 'react';
 import type { Event, SubEvent, BudgetAllocation } from '@/core/types';
 import { BudgetPieChart, type PieSegment } from './BudgetPieChart';
 import { CURRENCIES, getCurrencySymbol } from '@/core/constants/currencies';
+import { CHART_PALETTE, UNALLOCATED_COLOR } from '@/core/constants/chartColors';
 import { Input } from './Input';
+import { ColorSwatchPicker } from './ColorSwatchPicker';
 
 interface EventBudgetPageProps {
   event: Event;
@@ -14,6 +16,8 @@ interface EventBudgetPageProps {
   onSaveBudget: (amount: number, currency: string, subEventBudgets: Record<string, number>) => Promise<void>;
   onSaveGlobalAllocations?: (allocations: BudgetAllocation[]) => Promise<void>;
   onBack?: () => void;
+  /** Desktop: clic sur un segment du camembert → aller au budget de la séquence. */
+  onNavigateToSubEventBudget?: (subEventId: string) => void;
 }
 
 export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
@@ -22,7 +26,8 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
   onUpdate,
   onSaveBudget,
   onSaveGlobalAllocations,
-  onBack
+  onBack,
+  onNavigateToSubEventBudget
 }) => {
   const budget = event.budget ?? 0;
   const currency = event.currency ?? 'EUR';
@@ -39,6 +44,8 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
   const [globalEditId, setGlobalEditId] = useState<string | null>(null);
   const [newGlobalLabel, setNewGlobalLabel] = useState('');
   const [newGlobalAmount, setNewGlobalAmount] = useState('');
+  const [newGlobalColor, setNewGlobalColor] = useState<string>(CHART_PALETTE[0]);
+  const [editGlobalColor, setEditGlobalColor] = useState<string>(CHART_PALETTE[0]);
 
   useEffect(() => {
     setLocalDispatch(event.subEventBudgets ?? {});
@@ -53,31 +60,29 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
   const totalAllocated = totalGlobal + totalSequences;
   const unallocated = Math.max(0, budget - totalAllocated);
 
-  // Agrégation des postes : frais globaux + postes de toutes les séquences
-  const byLabel = new Map<string, number>();
-  localGlobalAllocations.forEach((a) => {
-    const key = (a.label || 'Sans nom').trim();
-    byLabel.set(key, (byLabel.get(key) ?? 0) + a.amount);
-  });
-  subEvents.forEach((s) => {
-    (s.budgetAllocations ?? []).forEach((a) => {
-      const key = (a.label || 'Sans nom').trim();
-      byLabel.set(key, (byLabel.get(key) ?? 0) + a.amount);
-    });
-  });
-  const totalInPostes = Array.from(byLabel.values()).reduce((a, b) => a + b, 0);
+  // Un segment par allocation (frais globaux + chaque poste des séquences) pour couleurs et clic
+  const totalInPostes =
+    localGlobalAllocations.reduce((s, a) => s + a.amount, 0) +
+    subEvents.reduce((s, sub) => s + (sub.budgetAllocations ?? []).reduce((t, a) => t + a.amount, 0), 0);
   const unallocatedPostes = Math.max(0, budget - totalInPostes);
-
-  const POSTE_CHART_COLORS = ['#0d9488', '#14b8a6', '#2dd4bf', '#5eead4', '#99f6e4', '#64748b', '#94a3b8', '#f59e0b', '#f97316'];
+  let colorIndex = 0;
   const pieSegments: PieSegment[] = [
-    ...Array.from(byLabel.entries())
-      .filter(([, value]) => value > 0)
-      .map(([label, value], i) => ({
-        label,
-        value,
-        color: POSTE_CHART_COLORS[i % POSTE_CHART_COLORS.length]
-      })),
-    ...(unallocatedPostes > 0 ? [{ label: 'Non alloué', value: unallocatedPostes, color: '#e2e8f0' }] : [])
+    ...localGlobalAllocations.filter((a) => a.amount > 0).map((a) => ({
+      label: (a.label || 'Sans nom').trim(),
+      value: a.amount,
+      color: a.color || CHART_PALETTE[colorIndex++ % CHART_PALETTE.length]
+    })),
+    ...subEvents.flatMap((sub) =>
+      (sub.budgetAllocations ?? [])
+        .filter((a) => a.amount > 0)
+        .map((a) => ({
+          label: (a.label || 'Sans nom').trim(),
+          value: a.amount,
+          color: a.color || sub.color || CHART_PALETTE[colorIndex++ % CHART_PALETTE.length],
+          subEventId: sub.id
+        }))
+    ),
+    ...(unallocatedPostes > 0 ? [{ label: 'Non alloué', value: unallocatedPostes, color: UNALLOCATED_COLOR }] : [])
   ];
 
   const handleSaveAdjust = async () => {
@@ -117,9 +122,10 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
     const label = newGlobalLabel.trim();
     const amount = parseFloat(newGlobalAmount) || 0;
     if (!label || !onSaveGlobalAllocations) return;
-    const next = [...localGlobalAllocations, { id: crypto.randomUUID(), label, amount }];
+    const next = [...localGlobalAllocations, { id: crypto.randomUUID(), label, amount, color: newGlobalColor }];
     setNewGlobalLabel('');
     setNewGlobalAmount('');
+    setNewGlobalColor(CHART_PALETTE[0]);
     setLocalGlobalAllocations(next);
     setSaving(true);
     try {
@@ -130,8 +136,8 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
     }
   };
 
-  const handleUpdateGlobal = async (id: string, label: string, amount: number) => {
-    const next = localGlobalAllocations.map((a) => (a.id === id ? { ...a, label, amount } : a));
+  const handleUpdateGlobal = async (id: string, label: string, amount: number, color?: string) => {
+    const next = localGlobalAllocations.map((a) => (a.id === id ? { ...a, label, amount, ...(color != null && { color }) } : a));
     setGlobalEditId(null);
     await handleSaveGlobalAllocations(next);
   };
@@ -153,7 +159,15 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
 
       <div className="rounded-xl border border-slate-200 bg-white p-6 flex flex-col sm:flex-row gap-6 items-start">
         <div className="shrink-0">
-          <BudgetPieChart segments={pieSegments} total={budget > 0 ? budget : 1} size={180} strokeWidth={28} />
+          <BudgetPieChart
+            segments={pieSegments}
+            total={budget > 0 ? budget : 1}
+            size={180}
+            strokeWidth={28}
+            formatValue={(v) => `${v.toLocaleString('fr-FR')} ${symbol}`}
+            onSegmentClick={onNavigateToSubEventBudget ? (seg) => seg.subEventId && onNavigateToSubEventBudget(seg.subEventId) : undefined}
+            interactive={true}
+          />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm text-slate-500 mb-1">Budget total</p>
@@ -180,6 +194,45 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
               Répartition du budget ci-dessous (frais globaux + séquences). La somme peut être inférieure au budget total.
             </p>
           )}
+        </div>
+      </div>
+
+      {/* Liste des frais regroupés par séquence (mobile) */}
+      <div className="block sm:hidden rounded-xl border border-slate-200 bg-white p-6">
+        <h3 className="text-base font-semibold text-slate-900 mb-3">Détail des frais</h3>
+        <div className="space-y-4">
+          {localGlobalAllocations.length > 0 && (
+            <div>
+              <h4 className="text-sm font-medium text-slate-600 mb-2">Frais globaux</h4>
+              <ul className="space-y-2">
+                {localGlobalAllocations.map((a) => (
+                  <li key={a.id} className="flex items-center gap-2 text-sm">
+                    <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: a.color || CHART_PALETTE[0] }} />
+                    <span className="font-medium text-slate-800">{a.label}</span>
+                    <span className="text-slate-600">{a.amount.toLocaleString('fr-FR')} {symbol}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {subEvents.map((sub) => {
+            const allocs = (sub.budgetAllocations ?? []).filter((a) => a.amount > 0);
+            if (allocs.length === 0) return null;
+            return (
+              <div key={sub.id}>
+                <h4 className="text-sm font-medium text-slate-600 mb-2">{sub.title || 'Séquence'}</h4>
+                <ul className="space-y-2">
+                  {allocs.map((a) => (
+                    <li key={a.id} className="flex items-center gap-2 text-sm">
+                      <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: a.color || sub.color || CHART_PALETTE[0] }} />
+                      <span className="font-medium text-slate-800">{a.label}</span>
+                      <span className="text-slate-600">{a.amount.toLocaleString('fr-FR')} {symbol}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -211,16 +264,21 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
                       className="w-28 rounded-lg border border-slate-200 px-3 py-2 text-sm"
                     />
                     <span className="text-slate-500 text-sm">{symbol}</span>
-                    <button type="button" onClick={() => { const label = (document.getElementById(`global-edit-label-${a.id}`) as HTMLInputElement)?.value?.trim() ?? a.label; const amount = parseFloat((document.getElementById(`global-edit-amount-${a.id}`) as HTMLInputElement)?.value ?? '0') || 0; handleUpdateGlobal(a.id, label, amount); }} className="text-sm text-teal-600 font-medium">OK</button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500">Couleur</span>
+                      <ColorSwatchPicker value={editGlobalColor} onChange={setEditGlobalColor} />
+                    </div>
+                    <button type="button" onClick={() => { const label = (document.getElementById(`global-edit-label-${a.id}`) as HTMLInputElement)?.value?.trim() ?? a.label; const amount = parseFloat((document.getElementById(`global-edit-amount-${a.id}`) as HTMLInputElement)?.value ?? '0') || 0; handleUpdateGlobal(a.id, label, amount, editGlobalColor); }} className="text-sm text-teal-600 font-medium">OK</button>
                     <button type="button" onClick={() => setGlobalEditId(null)} className="text-sm text-slate-500">Annuler</button>
                   </>
                 ) : (
                   <>
+                    <span className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: a.color || CHART_PALETTE[0] }} />
                     <span className="font-medium text-slate-900 min-w-[120px]">{a.label}</span>
                     <span className="text-slate-700">{a.amount.toLocaleString('fr-FR')} {symbol}</span>
                     {canEdit && onSaveGlobalAllocations && (
                       <>
-                        <button type="button" onClick={() => setGlobalEditId(a.id)} className="text-xs text-teal-600 font-medium hover:underline">Modifier</button>
+                        <button type="button" onClick={() => { setGlobalEditId(a.id); setEditGlobalColor(a.color || CHART_PALETTE[0]); }} className="text-xs text-teal-600 font-medium hover:underline">Modifier</button>
                         <button type="button" onClick={() => handleDeleteGlobal(a.id)} className="text-xs text-red-600 font-medium hover:underline">Supprimer</button>
                       </>
                     )}
@@ -234,6 +292,10 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
               <input type="text" value={newGlobalLabel} onChange={(e) => setNewGlobalLabel(e.target.value)} placeholder="Ex. Assurance, Location salle..." className="rounded-lg border border-slate-200 px-3 py-2 text-sm w-44" />
               <input type="number" min={0} step={100} value={newGlobalAmount} onChange={(e) => setNewGlobalAmount(e.target.value)} placeholder="Montant" className="rounded-lg border border-slate-200 px-3 py-2 text-sm w-28" />
               <span className="text-slate-500 text-sm">{symbol}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500">Couleur</span>
+                <ColorSwatchPicker value={newGlobalColor} onChange={setNewGlobalColor} />
+              </div>
               <button type="button" onClick={handleAddGlobal} disabled={saving || !newGlobalLabel.trim()} className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-xl hover:bg-teal-700 disabled:opacity-50">Ajouter un frais</button>
             </div>
           )}

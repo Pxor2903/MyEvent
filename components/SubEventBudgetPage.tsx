@@ -1,19 +1,21 @@
 /**
- * Page Budget d'un sous-événement : camembert des postes, liste des allocations (ajout / édition / suppression).
+ * Page Budget d'un sous-événement : couleur de la séquence, camembert, postes avec dérivés de couleur.
  */
 import React, { useState } from 'react';
 import type { SubEvent, BudgetAllocation } from '@/core/types';
 import { BudgetPieChart, type PieSegment } from './BudgetPieChart';
 import { getCurrencySymbol } from '@/core/constants/currencies';
-
-const ALLOCATION_COLORS = ['#0d9488', '#14b8a6', '#2dd4bf', '#5eead4', '#99f6e4', '#64748b', '#94a3b8', '#f59e0b'];
+import { CHART_PALETTE, deriveShades } from '@/core/constants/chartColors';
+import { ColorSwatchPicker } from './ColorSwatchPicker';
 
 interface SubEventBudgetPageProps {
   subEvent: SubEvent;
   currency: string;
-  allocatedFromParent: number; // montant alloué à cette séquence depuis l'événement global
+  allocatedFromParent: number;
   canEdit: boolean;
   onSaveAllocations: (allocations: BudgetAllocation[]) => Promise<void>;
+  /** Sauvegarder la couleur de la séquence (pour le camembert global). */
+  onSaveSubEventColor?: (color: string) => Promise<void>;
 }
 
 export const SubEventBudgetPage: React.FC<SubEventBudgetPageProps> = ({
@@ -21,14 +23,19 @@ export const SubEventBudgetPage: React.FC<SubEventBudgetPageProps> = ({
   currency,
   allocatedFromParent,
   canEdit,
-  onSaveAllocations
+  onSaveAllocations,
+  onSaveSubEventColor
 }) => {
   const symbol = getCurrencySymbol(currency);
   const allocations = subEvent.budgetAllocations ?? [];
+  const sequenceColor = subEvent.color || CHART_PALETTE[0];
+  const shades = deriveShades(sequenceColor, 5);
   const totalAllocated = allocations.reduce((s, a) => s + a.amount, 0);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editColor, setEditColor] = useState(sequenceColor);
   const [newLabel, setNewLabel] = useState('');
   const [newAmount, setNewAmount] = useState('');
+  const [newColor, setNewColor] = useState(sequenceColor);
   const [saving, setSaving] = useState(false);
 
   const pieSegments: PieSegment[] = allocations
@@ -36,16 +43,17 @@ export const SubEventBudgetPage: React.FC<SubEventBudgetPageProps> = ({
     .map((a, i) => ({
       label: a.label,
       value: a.amount,
-      color: ALLOCATION_COLORS[i % ALLOCATION_COLORS.length]
+      color: a.color || shades[i % shades.length]
     }));
 
   const handleAdd = async () => {
     const label = newLabel.trim();
     const amount = parseFloat(newAmount) || 0;
     if (!label) return;
-    const next: BudgetAllocation[] = [...allocations, { id: crypto.randomUUID(), label, amount }];
+    const next: BudgetAllocation[] = [...allocations, { id: crypto.randomUUID(), label, amount, color: newColor }];
     setNewLabel('');
     setNewAmount('');
+    setNewColor(shades[allocations.length % shades.length]);
     setSaving(true);
     try {
       await onSaveAllocations(next);
@@ -54,8 +62,8 @@ export const SubEventBudgetPage: React.FC<SubEventBudgetPageProps> = ({
     }
   };
 
-  const handleUpdate = async (id: string, label: string, amount: number) => {
-    const next = allocations.map((a) => (a.id === id ? { ...a, label, amount } : a));
+  const handleUpdate = async (id: string, label: string, amount: number, color?: string) => {
+    const next = allocations.map((a) => (a.id === id ? { ...a, label, amount, ...(color != null && { color }) } : a));
     setEditingId(null);
     setSaving(true);
     try {
@@ -82,6 +90,13 @@ export const SubEventBudgetPage: React.FC<SubEventBudgetPageProps> = ({
         <p className="text-sm text-slate-500">
           Montant alloué à cette séquence (depuis le budget global) : {allocatedFromParent.toLocaleString('fr-FR')} {symbol}
         </p>
+      )}
+
+      {canEdit && onSaveSubEventColor && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-sm font-medium text-slate-700 mb-2">Couleur de la séquence (camembert global)</p>
+          <ColorSwatchPicker value={sequenceColor} onChange={(c) => { onSaveSubEventColor(c); }} />
+        </div>
       )}
 
       <div className="rounded-xl border border-slate-200 bg-white p-6 flex flex-col sm:flex-row gap-6 items-start">
@@ -124,12 +139,16 @@ export const SubEventBudgetPage: React.FC<SubEventBudgetPageProps> = ({
                     className="w-28 rounded-lg border border-slate-200 px-3 py-2 text-sm"
                   />
                   <span className="text-slate-500 text-sm">{symbol}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500">Couleur</span>
+                    <ColorSwatchPicker baseColor={sequenceColor} shadeCount={5} value={editColor} onChange={setEditColor} />
+                  </div>
                   <button
                     type="button"
                     onClick={() => {
                       const label = (document.getElementById(`edit-label-${a.id}`) as HTMLInputElement)?.value?.trim() ?? a.label;
                       const amount = parseFloat((document.getElementById(`edit-amount-${a.id}`) as HTMLInputElement)?.value ?? '0') || 0;
-                      handleUpdate(a.id, label, amount);
+                      handleUpdate(a.id, label, amount, editColor);
                     }}
                     className="text-sm text-teal-600 font-medium"
                   >
@@ -141,13 +160,14 @@ export const SubEventBudgetPage: React.FC<SubEventBudgetPageProps> = ({
                 </>
               ) : (
                 <>
+                  <span className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: a.color || shades[0] }} />
                   <span className="font-medium text-slate-900 min-w-[120px]">{a.label}</span>
                   <span className="text-slate-700">{a.amount.toLocaleString('fr-FR')} {symbol}</span>
                   {canEdit && (
                     <>
                       <button
                         type="button"
-                        onClick={() => setEditingId(a.id)}
+                        onClick={() => { setEditingId(a.id); setEditColor(a.color || shades[0]); }}
                         className="text-xs text-teal-600 font-medium hover:underline"
                       >
                         Modifier
@@ -185,6 +205,10 @@ export const SubEventBudgetPage: React.FC<SubEventBudgetPageProps> = ({
               className="rounded-lg border border-slate-200 px-3 py-2 text-sm w-28"
             />
             <span className="text-slate-500 text-sm">{symbol}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500">Couleur</span>
+              <ColorSwatchPicker baseColor={sequenceColor} shadeCount={5} value={newColor} onChange={setNewColor} />
+            </div>
             <button
               type="button"
               onClick={handleAdd}

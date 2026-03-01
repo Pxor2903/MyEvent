@@ -44,11 +44,13 @@ export interface Guest {
   attendance?: GuestAttendance;
 }
 
-/** Poste d'allocation de budget dans un sous-événement (ex. Fleurs 2000 €). */
+/** Poste d'allocation de budget (ex. Fleurs 2000 €). */
 export interface BudgetAllocation {
   id: string;
   label: string;
   amount: number;
+  /** Couleur affichée dans le camembert (hex). */
+  color?: string;
 }
 
 export interface SubEvent {
@@ -58,6 +60,8 @@ export interface SubEvent {
   location?: string;
   estimatedGuests: number;
   keyMoments: KeyMoment[];
+  /** Couleur de la séquence dans le camembert (hex). Dérivés pour les postes. */
+  color?: string;
   /** Répartition du budget par poste (ex. Fleurs, Traiteur). */
   budgetAllocations?: BudgetAllocation[];
 }
