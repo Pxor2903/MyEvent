@@ -46,6 +46,7 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
   const [newGlobalAmount, setNewGlobalAmount] = useState('');
   const [newGlobalColor, setNewGlobalColor] = useState<string>(CHART_PALETTE[0]);
   const [editGlobalColor, setEditGlobalColor] = useState<string>(CHART_PALETTE[0]);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     setLocalDispatch(event.subEventBudgets ?? {});
@@ -108,11 +109,16 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
 
   const handleSaveGlobalAllocations = async (allocations: BudgetAllocation[]) => {
     if (!onSaveGlobalAllocations) return;
+    const previous = localGlobalAllocations;
     setLocalGlobalAllocations(allocations);
+    setSaveError(null);
     setSaving(true);
     try {
       await onSaveGlobalAllocations(allocations);
       onUpdate({ ...event, globalBudgetAllocations: allocations });
+    } catch (err) {
+      setLocalGlobalAllocations(previous);
+      setSaveError(err instanceof Error ? err.message : 'Erreur d\'enregistrement. Vérifiez que la base de données est à jour (migration global_budget_allocations).');
     } finally {
       setSaving(false);
     }
@@ -126,11 +132,16 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
     setNewGlobalLabel('');
     setNewGlobalAmount('');
     setNewGlobalColor(CHART_PALETTE[0]);
+    const previous = localGlobalAllocations;
     setLocalGlobalAllocations(next);
+    setSaveError(null);
     setSaving(true);
     try {
       await onSaveGlobalAllocations(next);
       onUpdate({ ...event, globalBudgetAllocations: next });
+    } catch (err) {
+      setLocalGlobalAllocations(previous);
+      setSaveError(err instanceof Error ? err.message : 'Erreur d\'enregistrement. Vérifiez que la base de données est à jour (migration global_budget_allocations).');
     } finally {
       setSaving(false);
     }
@@ -145,6 +156,13 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
   const handleDeleteGlobal = async (id: string) => {
     await handleSaveGlobalAllocations(localGlobalAllocations.filter((a) => a.id !== id));
   };
+
+  useEffect(() => {
+    if (saveError) {
+      const t = setTimeout(() => setSaveError(null), 8000);
+      return () => clearTimeout(t);
+    }
+  }, [saveError]);
 
   return (
     <div className="space-y-6">
@@ -235,6 +253,12 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
           })}
         </div>
       </div>
+
+      {saveError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          {saveError}
+        </div>
+      )}
 
       <div className="rounded-xl border border-slate-200 bg-white p-6">
         <h3 className="text-base font-semibold text-slate-900 mb-4">Répartition du budget</h3>
