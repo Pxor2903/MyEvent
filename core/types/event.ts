@@ -44,6 +44,13 @@ export interface Guest {
   attendance?: GuestAttendance;
 }
 
+/** Poste d'allocation de budget dans un sous-événement (ex. Fleurs 2000 €). */
+export interface BudgetAllocation {
+  id: string;
+  label: string;
+  amount: number;
+}
+
 export interface SubEvent {
   id: string;
   title: string;
@@ -51,6 +58,8 @@ export interface SubEvent {
   location?: string;
   estimatedGuests: number;
   keyMoments: KeyMoment[];
+  /** Répartition du budget par poste (ex. Fleurs, Traiteur). */
+  budgetAllocations?: BudgetAllocation[];
 }
 
 export type Permission =
@@ -87,6 +96,10 @@ export interface Event {
   category: 'Business' | 'Social' | 'Sport' | 'Culture';
   generalGuestsCount: number;
   budget: number;
+  /** Code devise (EUR, USD, etc.). */
+  currency?: string;
+  /** Montant alloué par sous-événement (subEventId → montant). */
+  subEventBudgets?: Record<string, number>;
   subEvents: SubEvent[];
   guests: Guest[];
   isGuestChatEnabled: boolean;

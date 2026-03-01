@@ -18,6 +18,10 @@ import { preloadContactsPlugin } from '@/utils/nativeContacts';
 import { Input } from './Input';
 import { GuestsTable } from './GuestsTable';
 import { GuestDetailModal } from './GuestDetailModal';
+import { EventBudgetPage } from './EventBudgetPage';
+import { SubEventBudgetPage } from './SubEventBudgetPage';
+import { getCurrencySymbol } from '@/core/constants/currencies';
+import type { BudgetAllocation } from '@/core/types';
 
 interface EventDetailProps {
   event: Event;
@@ -73,7 +77,7 @@ function GuestsTableSegmentBar({
 export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, onUpdate }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'program' | 'chat' | 'settings' | 'budget' | 'guests'>('overview');
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
-  const [subTab, setSubTab] = useState<'sequence' | 'chat' | 'guests'>('sequence');
+  const [subTab, setSubTab] = useState<'sequence' | 'chat' | 'guests' | 'budget'>('sequence');
   /** Filtre optionnel pour l’onglet Invités (niveau événement principal). */
   const [guestsViewSubId, setGuestsViewSubId] = useState<string | null>(null);
   const [guestsViewFilterAddedBy, setGuestsViewFilterAddedBy] = useState<string | null>(null);
@@ -898,12 +902,12 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                               style={{ background: `conic-gradient(#6366f1 0deg 360deg)` }}
                               aria-hidden
                             />
-                            <p className="text-xl font-semibold text-slate-900">{event.budget.toLocaleString('fr-FR')} €</p>
+                            <p className="text-xl font-semibold text-slate-900">{event.budget.toLocaleString('fr-FR')} {getCurrencySymbol(event.currency ?? 'EUR')}</p>
                             <p className="text-xs text-slate-500">Cliquer pour le détail</p>
                           </>
                         ) : (
                           <>
-                            <div className="w-32 h-32 rounded-full bg-slate-100 flex items-center justify-center" aria-hidden><span className="text-3xl text-slate-300">€</span></div>
+                            <div className="w-32 h-32 rounded-full bg-slate-100 flex items-center justify-center" aria-hidden><span className="text-3xl text-slate-300">{getCurrencySymbol(event.currency ?? 'EUR')}</span></div>
                             <p className="text-sm text-slate-500">Aucun budget renseigné</p>
                             <p className="text-xs text-slate-400">Cliquer pour gérer</p>
                           </>
@@ -923,17 +927,21 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
             )}
 
             {activeTab === 'budget' && canViewBudget && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-slate-900">Budget du projet</h2>
-                  <button type="button" onClick={() => setActiveTab('overview')} className="text-sm text-teal-600 font-medium hover:underline">← Vue d'ensemble</button>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-6">
-                  <p className="text-sm text-slate-500 mb-2">Budget total</p>
-                  <p className="text-3xl font-semibold text-slate-900">{event.budget.toLocaleString('fr-FR')} €</p>
-                  <p className="mt-4 text-xs text-slate-400">La répartition des dépenses par poste sera disponible dans une prochaine version.</p>
-                </div>
-              </div>
+              <EventBudgetPage
+                event={event}
+                canEdit={hasPermission('edit_details')}
+                onUpdate={(updated) => onUpdate(updated)}
+                onSaveBudget={async (amount, currency, subEventBudgets) => {
+                  const updated = await dbService.updateEventAtomic(event.id, (evt) => ({
+                    ...evt,
+                    budget: amount,
+                    currency,
+                    subEventBudgets
+                  }));
+                  onUpdate(updated);
+                }}
+                onBack={() => setActiveTab('overview')}
+              />
             )}
 
             {activeTab === 'program' && (
@@ -1237,6 +1245,12 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 Invités
                 {subTab === 'guests' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-teal-600 rounded-t-full" />}
               </button>
+              {canViewBudget && (
+                <button key="budget" type="button" onClick={() => setSubTab('budget')} className={`py-4 sm:py-5 px-4 sm:px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'budget' ? 'text-teal-600' : 'text-gray-400'}`}>
+                  Budget
+                  {subTab === 'budget' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-teal-600 rounded-t-full" />}
+                </button>
+              )}
               {canChatForCurrentSubEvent && (
                 <button key="chat" type="button" onClick={() => setSubTab('chat')} className={`py-4 sm:py-5 px-4 sm:px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'chat' ? 'text-teal-600' : 'text-gray-400'}`}>
                   Chat
@@ -1358,6 +1372,24 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 </div>
               )}
 
+              {subTab === 'budget' && canViewBudget && selectedSubId && currentSub && (
+                <SubEventBudgetPage
+                  subEvent={currentSub}
+                  currency={event.currency ?? 'EUR'}
+                  allocatedFromParent={event.subEventBudgets?.[selectedSubId] ?? 0}
+                  canEdit={canManageProgramHere}
+                  onSaveAllocations={async (allocations: BudgetAllocation[]) => {
+                    const updated = await dbService.updateEventAtomic(event.id, (evt) => ({
+                      ...evt,
+                      subEvents: evt.subEvents.map((s) =>
+                        s.id === selectedSubId ? { ...s, budgetAllocations: allocations } : s
+                      )
+                    }));
+                    onUpdate(updated);
+                  }}
+                />
+              )}
+
               {subTab === 'chat' && canChatForCurrentSubEvent && (
                 <div className="flex flex-col bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm min-h-[280px] h-[min(400px,60dvh)]">
                   <p className="px-4 py-2 text-xs text-slate-500 border-b border-slate-100">Chat réservé aux admins de cette séquence.</p>
@@ -1454,7 +1486,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     onChange={e => setEventEditForm(prev => ({ ...prev, location: e.target.value }))}
                   />
                   <Input
-                    label="Budget (€)"
+                    label={`Budget (${getCurrencySymbol(event.currency ?? 'EUR')})`}
                     type="number"
                     min="0"
                     value={eventEditForm.budget}
