@@ -91,4 +91,6 @@ export interface Event {
   guests: Guest[];
   isGuestChatEnabled: boolean;
   date?: string;
+  /** Timestamp de dernière mise à jour (pour verrouillage optimiste, concurrence). */
+  updatedAt?: string;
 }

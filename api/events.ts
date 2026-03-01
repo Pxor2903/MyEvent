@@ -27,6 +27,7 @@ type DbEvent = {
   sub_events: SubEvent[];
   guests: Guest[];
   is_guest_chat_enabled: boolean;
+  updated_at: string | null;
 };
 
 function fromDb(row: DbEvent): Event {
@@ -50,7 +51,8 @@ function fromDb(row: DbEvent): Event {
     subEvents: row.sub_events ?? [],
     guests: row.guests ?? [],
     isGuestChatEnabled: row.is_guest_chat_enabled,
-    date: row.start_date ?? undefined
+    date: row.start_date ?? undefined,
+    updatedAt: row.updated_at ?? undefined
   };
 }
 
@@ -74,7 +76,8 @@ function toDb(event: Event): DbEvent {
     budget: event.budget ?? 0,
     sub_events: event.subEvents ?? [],
     guests: event.guests ?? [],
-    is_guest_chat_enabled: event.isGuestChatEnabled ?? true
+    is_guest_chat_enabled: event.isGuestChatEnabled ?? true,
+    updated_at: event.updatedAt ?? new Date().toISOString()
   };
 }
 
@@ -125,13 +128,25 @@ export const eventsApi = {
   },
 
   async updateAtomic(eventId: string, updateFn: (event: Event) => Event): Promise<Event> {
-    const { data: current, error } = await supabase.from(TABLE).select('*').eq('id', eventId).single();
-    if (error || !current) throw new Error('Événement introuvable');
-    const updatedEvent = updateFn(fromDb(current as DbEvent));
-    const payload = toDb(updatedEvent);
-    const { data, error: updateError } = await supabase.from(TABLE).update(payload).eq('id', eventId).select('*').single();
-    if (updateError || !data) throw new Error(updateError?.message ?? 'Échec de mise à jour');
-    return fromDb(data as DbEvent);
+    const maxRetries = 6;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const { data: current, error } = await supabase.from(TABLE).select('*').eq('id', eventId).single();
+      if (error || !current) throw new Error('Événement introuvable');
+      const currentRow = current as DbEvent;
+      const currentEvent = fromDb(currentRow);
+      const updatedEvent = updateFn(currentEvent);
+      const payload = toDb(updatedEvent);
+      payload.updated_at = new Date().toISOString();
+      let query = supabase.from(TABLE).update(payload).eq('id', eventId);
+      if (currentRow.updated_at != null && currentRow.updated_at !== '') {
+        query = query.eq('updated_at', currentRow.updated_at);
+      }
+      const { data: updated, error: updateError } = await query.select('*').maybeSingle();
+      if (updateError) throw new Error(updateError.message ?? 'Échec de mise à jour');
+      if (updated) return fromDb(updated as DbEvent);
+      if (attempt === maxRetries - 1) throw new Error('Mise à jour en conflit après plusieurs tentatives. Réessaie.');
+    }
+    throw new Error('Échec de mise à jour');
   },
 
   async save(event: Event): Promise<void> {
