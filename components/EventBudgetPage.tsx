@@ -7,7 +7,6 @@ import { BudgetPieChart, type PieSegment } from './BudgetPieChart';
 import { CURRENCIES, getCurrencySymbol } from '@/core/constants/currencies';
 import { Input } from './Input';
 
-const SUB_EVENT_CHART_COLORS = ['#0d9488', '#14b8a6', '#2dd4bf', '#5eead4', '#99f6e4', '#64748b'];
 
 interface EventBudgetPageProps {
   event: Event;
@@ -43,15 +42,27 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
   const totalAllocated = Object.values(localDispatch).reduce((a, b) => a + b, 0);
   const unallocated = Math.max(0, budget - totalAllocated);
 
+  // Agrégation des postes (Fleurs, Traiteur, etc.) depuis toutes les séquences
+  const byLabel = new Map<string, number>();
+  subEvents.forEach((s) => {
+    (s.budgetAllocations ?? []).forEach((a) => {
+      const key = (a.label || 'Sans nom').trim();
+      byLabel.set(key, (byLabel.get(key) ?? 0) + a.amount);
+    });
+  });
+  const totalInPostes = Array.from(byLabel.values()).reduce((a, b) => a + b, 0);
+  const unallocatedPostes = Math.max(0, budget - totalInPostes);
+
+  const POSTE_CHART_COLORS = ['#0d9488', '#14b8a6', '#2dd4bf', '#5eead4', '#99f6e4', '#64748b', '#94a3b8', '#f59e0b', '#f97316'];
   const pieSegments: PieSegment[] = [
-    ...subEvents
-      .filter((s) => (localDispatch[s.id] ?? 0) > 0)
-      .map((s, i) => ({
-        label: s.title || 'Séquence',
-        value: localDispatch[s.id] ?? 0,
-        color: SUB_EVENT_CHART_COLORS[i % SUB_EVENT_CHART_COLORS.length]
+    ...Array.from(byLabel.entries())
+      .filter(([, value]) => value > 0)
+      .map(([label, value], i) => ({
+        label,
+        value,
+        color: POSTE_CHART_COLORS[i % POSTE_CHART_COLORS.length]
       })),
-    ...(unallocated > 0 ? [{ label: 'Non alloué', value: unallocated, color: '#e2e8f0' }] : [])
+    ...(unallocatedPostes > 0 ? [{ label: 'Non alloué', value: unallocatedPostes, color: '#e2e8f0' }] : [])
   ];
 
   const handleSaveAdjust = async () => {
