@@ -29,12 +29,12 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
   const symbol = getCurrencySymbol(currency);
   const subEventBudgets = event.subEventBudgets ?? {};
   const subEvents = event.subEvents ?? [];
-  const globalAllocations = event.globalBudgetAllocations ?? [];
 
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [adjustAmount, setAdjustAmount] = useState(String(budget));
   const [adjustCurrency, setAdjustCurrency] = useState(currency);
   const [localDispatch, setLocalDispatch] = useState<Record<string, number>>(subEventBudgets);
+  const [localGlobalAllocations, setLocalGlobalAllocations] = useState<BudgetAllocation[]>(event.globalBudgetAllocations ?? []);
   const [saving, setSaving] = useState(false);
   const [globalEditId, setGlobalEditId] = useState<string | null>(null);
   const [newGlobalLabel, setNewGlobalLabel] = useState('');
@@ -44,14 +44,18 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
     setLocalDispatch(event.subEventBudgets ?? {});
   }, [event.subEventBudgets]);
 
-  const totalGlobal = globalAllocations.reduce((a, b) => a + b.amount, 0);
-  const totalSequences = Object.values(localDispatch).reduce((a, b) => a + b, 0);
+  useEffect(() => {
+    setLocalGlobalAllocations(event.globalBudgetAllocations ?? []);
+  }, [event.globalBudgetAllocations]);
+
+  const totalGlobal = localGlobalAllocations.reduce((sum: number, b: BudgetAllocation) => sum + b.amount, 0 as number);
+  const totalSequences = Object.values(localDispatch).reduce((sum: number, v: number) => sum + v, 0 as number);
   const totalAllocated = totalGlobal + totalSequences;
   const unallocated = Math.max(0, budget - totalAllocated);
 
   // Agrégation des postes : frais globaux + postes de toutes les séquences
   const byLabel = new Map<string, number>();
-  globalAllocations.forEach((a) => {
+  localGlobalAllocations.forEach((a) => {
     const key = (a.label || 'Sans nom').trim();
     byLabel.set(key, (byLabel.get(key) ?? 0) + a.amount);
   });
@@ -99,6 +103,7 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
 
   const handleSaveGlobalAllocations = async (allocations: BudgetAllocation[]) => {
     if (!onSaveGlobalAllocations) return;
+    setLocalGlobalAllocations(allocations);
     setSaving(true);
     try {
       await onSaveGlobalAllocations(allocations);
@@ -112,20 +117,27 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
     const label = newGlobalLabel.trim();
     const amount = parseFloat(newGlobalAmount) || 0;
     if (!label || !onSaveGlobalAllocations) return;
-    const next = [...globalAllocations, { id: crypto.randomUUID(), label, amount }];
+    const next = [...localGlobalAllocations, { id: crypto.randomUUID(), label, amount }];
     setNewGlobalLabel('');
     setNewGlobalAmount('');
-    await handleSaveGlobalAllocations(next);
+    setLocalGlobalAllocations(next);
+    setSaving(true);
+    try {
+      await onSaveGlobalAllocations(next);
+      onUpdate({ ...event, globalBudgetAllocations: next });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleUpdateGlobal = async (id: string, label: string, amount: number) => {
-    const next = globalAllocations.map((a) => (a.id === id ? { ...a, label, amount } : a));
+    const next = localGlobalAllocations.map((a) => (a.id === id ? { ...a, label, amount } : a));
     setGlobalEditId(null);
     await handleSaveGlobalAllocations(next);
   };
 
   const handleDeleteGlobal = async (id: string) => {
-    await handleSaveGlobalAllocations(globalAllocations.filter((a) => a.id !== id));
+    await handleSaveGlobalAllocations(localGlobalAllocations.filter((a) => a.id !== id));
   };
 
   return (
@@ -179,7 +191,7 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
         <div className="mb-6">
           <h4 className="text-sm font-medium text-slate-700 mb-2">Frais globaux</h4>
           <ul className="space-y-3">
-            {globalAllocations.map((a) => (
+            {localGlobalAllocations.map((a) => (
               <li key={a.id} className="flex flex-wrap items-center gap-3 py-2 border-b border-slate-100 last:border-0">
                 {globalEditId === a.id ? (
                   <>
@@ -264,8 +276,8 @@ export const EventBudgetPage: React.FC<EventBudgetPageProps> = ({
 
         <p className="text-xs text-slate-500 mt-4 pt-4 border-t border-slate-100">
           Budget total : {budget.toLocaleString('fr-FR')} {symbol}
-          {totalGlobal > 0 && ` · Frais globaux : ${totalGlobal.toLocaleString('fr-FR')} ${symbol}`}
-          {totalSequences > 0 && ` · Séquences : ${totalSequences.toLocaleString('fr-FR')} ${symbol}`}
+          {Number(totalGlobal) > 0 && ` · Frais globaux : ${Number(totalGlobal).toLocaleString('fr-FR')} ${symbol}`}
+          {Number(totalSequences) > 0 && ` · Séquences : ${Number(totalSequences).toLocaleString('fr-FR')} ${symbol}`}
           {unallocated > 0 && ` · Non alloué : ${unallocated.toLocaleString('fr-FR')} ${symbol}`}
         </p>
       </div>
