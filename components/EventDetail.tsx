@@ -527,7 +527,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       lastName: (guestForm.lastName || '').trim(),
       email: (guestForm.email || '').trim(),
       phone: guestForm.phone?.trim() || undefined,
-      status: 'confirmed',
+      status: 'pending',
       companions: [],
       linkedSubEventIds: [targetSubId],
       addedByUserId: user.id,
@@ -831,35 +831,73 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     <h3 className="text-base font-semibold text-slate-900 mb-2">Description du projet</h3>
                     <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">{event.description || "Aucune description."}</p>
                   </div>
-                  <button type="button" onClick={() => { setActiveTab('guests'); setGuestsViewSubId(null); }} className="p-5 rounded-xl border border-slate-200 bg-white hover:border-teal-200 hover:shadow-sm text-left transition-all w-full">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-base font-semibold text-slate-900">Invités</h3>
-                      <span className="text-xs font-medium text-teal-600">Voir le tableau →</span>
-                    </div>
-                    {(() => {
-                      const guests = event.guests || [];
-                      const confirmed = guests.filter(g => g.status === 'confirmed').length;
-                      const declined = guests.filter(g => g.status === 'declined').length;
-                      const pending = guests.filter(g => g.status === 'pending').length;
-                      const responded = confirmed + declined;
-                      return (
-                        <div className="space-y-4">
-                          <div className="flex items-baseline justify-between gap-2">
-                            <span className="text-sm text-slate-500">Viennent</span>
-                            <span className="text-xl font-semibold text-emerald-600">{confirmed}</span>
+                  {canViewBudget && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('budget')}
+                      className="p-5 rounded-xl border border-slate-200 bg-white hover:border-teal-200 hover:shadow-sm text-left transition-all w-full flex flex-col gap-3 items-start"
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <h3 className="text-base font-semibold text-slate-900">Budget</h3>
+                        <span className="text-xs font-medium text-teal-600">Voir le détail →</span>
+                      </div>
+                      {event.budget > 0 ? (
+                        (() => {
+                          const budget = event.budget ?? 0;
+                          const globalAllocations = event.globalBudgetAllocations ?? [];
+                          const subEvents = event.subEvents ?? [];
+                          const totalGlobal = globalAllocations.reduce((s, a) => s + a.amount, 0);
+                          const subTotals = subEvents.map((sub) => ({
+                            sub,
+                            total: (sub.budgetAllocations ?? []).reduce((s, a) => s + a.amount, 0)
+                          }));
+                          const totalInPostes = totalGlobal + subTotals.reduce((s, t) => s + t.total, 0);
+                          const unallocated = Math.max(0, budget - totalInPostes);
+                          let colorIndex = 0;
+                          const overviewSegments: PieSegment[] = [
+                            ...(totalGlobal > 0
+                              ? [
+                                  {
+                                    label: 'Frais globaux',
+                                    value: totalGlobal,
+                                    color: globalAllocations[0]?.color || CHART_PALETTE[colorIndex++ % CHART_PALETTE.length]
+                                  }
+                                ]
+                              : []),
+                            ...subTotals
+                              .filter((t) => t.total > 0)
+                              .map(({ sub, total }) => ({
+                                label: sub.title || 'Séquence',
+                                value: total,
+                                color: sub.color || CHART_PALETTE[colorIndex++ % CHART_PALETTE.length]
+                              })),
+                            ...(unallocated > 0 ? [{ label: 'Non alloué', value: unallocated, color: UNALLOCATED_COLOR }] : [])
+                          ];
+                          return (
+                            <div className="flex items-center gap-3 w-full">
+                              <BudgetPieChart segments={overviewSegments} total={budget} size={80} strokeWidth={18} interactive={false} />
+                              <div className="flex flex-col">
+                                <span className="text-xs text-slate-500">Budget total</span>
+                                <span className="text-lg font-semibold text-slate-900">
+                                  {budget.toLocaleString('fr-FR')} {getCurrencySymbol(event.currency ?? 'EUR')}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center" aria-hidden>
+                            <span className="text-xl text-slate-300">{getCurrencySymbol(event.currency ?? 'EUR')}</span>
                           </div>
-                          <div className="flex items-baseline justify-between gap-2">
-                            <span className="text-sm text-slate-500">Invitations répondues</span>
-                            <span className="text-lg font-semibold text-slate-900">{responded}</span>
-                          </div>
-                          <div className="flex items-baseline justify-between gap-2">
-                            <span className="text-sm text-slate-500">Non répondu</span>
-                            <span className="text-lg font-semibold text-slate-400">{pending}</span>
+                          <div className="flex flex-col">
+                            <span className="text-sm text-slate-500">Aucun budget renseigné</span>
+                            <span className="text-xs text-slate-400">Cliquer pour définir le budget</span>
                           </div>
                         </div>
-                      );
-                    })()}
-                  </button>
+                      )}
+                    </button>
+                  )}
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                   <div className="lg:col-span-3 rounded-xl border border-slate-200 bg-white overflow-hidden">
@@ -874,20 +912,46 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                         return (
                           <ul className="relative space-y-0 pl-1">
                             <div className="absolute left-5 top-3 bottom-3 w-px bg-slate-200" aria-hidden />
-                            {sorted.map((sub) => (
-                              <li key={sub.id}>
-                                <button type="button" onClick={() => { setSelectedSubId(sub.id); setActiveTab('program'); setSubTab('sequence'); }} className="w-full text-left flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors relative">
-                                  <span className="flex flex-col items-center shrink-0 w-12 pt-0.5 relative z-10">
-                                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{sub.date ? new Date(sub.date).toLocaleDateString('fr-FR', { weekday: 'short' }) : '—'}</span>
-                                    <span className="text-lg font-bold text-slate-800 leading-tight">{sub.date ? new Date(sub.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : 'TBD'}</span>
-                                  </span>
-                                  <div className="min-w-0 flex-1 border-l border-slate-200 pl-3">
-                                    <p className="font-medium text-slate-900 truncate">{sub.title || 'Sans titre'}</p>
-                                    <p className="text-xs text-slate-500 truncate mt-0.5">{sub.date && new Date(sub.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}{sub.location && ` · ${sub.location}`}</p>
-                                  </div>
-                                </button>
-                              </li>
-                            ))}
+                            {sorted.map((sub) => {
+                              const guestsForSub = (event.guests || []).filter((g) => g.linkedSubEventIds.includes(sub.id));
+                              const confirmedSub = guestsForSub.filter((g) => g.status === 'confirmed').length;
+                              const pendingSub = guestsForSub.filter((g) => g.status === 'pending').length;
+                              return (
+                                <li key={sub.id}>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setSelectedSubId(sub.id); setActiveTab('program'); setSubTab('sequence'); }}
+                                    className="w-full text-left flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors relative"
+                                  >
+                                    <span className="flex flex-col items-center shrink-0 w-12 pt-0.5 relative z-10">
+                                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                                        {sub.date ? new Date(sub.date).toLocaleDateString('fr-FR', { weekday: 'short' }) : '—'}
+                                      </span>
+                                      <span className="text-lg font-bold text-slate-800 leading-tight">
+                                        {sub.date ? new Date(sub.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : 'TBD'}
+                                      </span>
+                                    </span>
+                                    <div className="min-w-0 flex-1 border-l border-slate-200 pl-3">
+                                      <p className="font-medium text-slate-900 truncate">{sub.title || 'Sans titre'}</p>
+                                      <p className="text-xs text-slate-500 truncate mt-0.5">
+                                        {sub.date && new Date(sub.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                                        {sub.location && ` · ${sub.location}`}
+                                      </p>
+                                      <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-slate-500">
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                          {confirmedSub} confirmé(s)
+                                        </span>
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                          {pendingSub} en attente
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </button>
+                                </li>
+                              );
+                            })}
                           </ul>
                         );
                       })()}
