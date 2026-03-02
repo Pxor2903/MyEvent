@@ -16,9 +16,15 @@ export function useEvents(userId: string) {
   userIdRef.current = userId;
 
   const fetchEvents = async () => {
-    const list = await dbService.getEventsByUserId(userIdRef.current);
-    setEvents(list);
-    setLoading(false);
+    try {
+      const list = await dbService.getEventsByUserId(userIdRef.current);
+      setEvents(list ?? []);
+    } catch (e) {
+      console.error('[useEvents] getEventsByUserId failed:', e);
+      setEvents([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fetchEventsRef = useRef(fetchEvents);

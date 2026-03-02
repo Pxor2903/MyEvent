@@ -53,7 +53,12 @@ const App: React.FC = () => {
             }
           }
           if (sessionUser && isMounted) {
-            await syncUserFromDb();
+            try {
+              await syncUserFromDb();
+            } catch (e) {
+              console.error('[Auth] syncUserFromDb après OAuth:', e);
+              showToast("Connexion OK mais chargement du profil en erreur. Réessaie.", "error");
+            }
           }
           if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('auth_redirect_origin');
           window.history.replaceState({}, document.title, window.location.pathname);
@@ -64,18 +69,27 @@ const App: React.FC = () => {
         const { data: sessionData } = await supabase.auth.getSession();
         if (isMounted) {
           if (sessionData.session?.user) {
-            await syncUserFromDb();
+            try {
+              await syncUserFromDb();
+            } catch (e) {
+              console.error('[Auth] syncUserFromDb au chargement:', e);
+              setCurrentUser(null);
+            }
           } else {
             setCurrentUser(null);
           }
           setIsInitializing(false);
         }
-      } catch {
+      } catch (e) {
+        console.error('[Auth] init:', e);
         if (isMounted) setIsInitializing(false);
       }
     };
 
-    init();
+    const timeout = setTimeout(() => {
+      if (isMounted) setIsInitializing(false);
+    }, 12000);
+    init().finally(() => clearTimeout(timeout));
 
     return () => {
       isMounted = false;

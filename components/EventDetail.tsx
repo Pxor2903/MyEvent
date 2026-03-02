@@ -1119,8 +1119,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                         <button
                           type="button"
                           onClick={() => {
-                            const target = guestsViewSubId ?? event.subEvents?.[0]?.id;
-                            setAddGuestTargetSubId(target ?? null);
+                            setAddGuestTargetSubId(guestsViewSubId ?? null);
                             setShowGuestModal(true);
                             setGuestCustomQualifierInput('');
                           }}
