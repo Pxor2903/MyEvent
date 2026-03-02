@@ -902,27 +902,32 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                             const budget = event.budget ?? 0;
                             const globalAllocations = event.globalBudgetAllocations ?? [];
                             const subEvents = event.subEvents ?? [];
+                            const totalGlobal = globalAllocations.reduce((s, a) => s + a.amount, 0);
+                            const subTotals = subEvents.map((sub) => ({
+                              sub,
+                              total: (sub.budgetAllocations ?? []).reduce((s, a) => s + a.amount, 0)
+                            }));
+                            const totalInPostes = totalGlobal + subTotals.reduce((s, t) => s + t.total, 0);
+                            const unallocated = Math.max(0, budget - totalInPostes);
                             let colorIndex = 0;
                             const overviewSegments: PieSegment[] = [
-                              ...globalAllocations.filter((a) => a.amount > 0).map((a) => ({
-                                label: (a.label || 'Sans nom').trim(),
-                                value: a.amount,
-                                color: a.color || CHART_PALETTE[colorIndex++ % CHART_PALETTE.length]
-                              })),
-                              ...subEvents.flatMap((sub) =>
-                                (sub.budgetAllocations ?? [])
-                                  .filter((a) => a.amount > 0)
-                                  .map((a) => ({
-                                    label: (a.label || 'Sans nom').trim(),
-                                    value: a.amount,
-                                    color: a.color || sub.color || CHART_PALETTE[colorIndex++ % CHART_PALETTE.length]
-                                  }))
-                              ),
-                              ...((() => {
-                                const totalInPostes = globalAllocations.reduce((s, a) => s + a.amount, 0) + subEvents.reduce((s, sub) => s + (sub.budgetAllocations ?? []).reduce((t, a) => t + a.amount, 0), 0);
-                                const unallocated = Math.max(0, budget - totalInPostes);
-                                return unallocated > 0 ? [{ label: 'Non alloué', value: unallocated, color: UNALLOCATED_COLOR }] : [];
-                              })())
+                              ...(totalGlobal > 0
+                                ? [
+                                    {
+                                      label: 'Frais globaux',
+                                      value: totalGlobal,
+                                      color: globalAllocations[0]?.color || CHART_PALETTE[colorIndex++ % CHART_PALETTE.length]
+                                    }
+                                  ]
+                                : []),
+                              ...subTotals
+                                .filter((t) => t.total > 0)
+                                .map(({ sub, total }) => ({
+                                  label: sub.title || 'Séquence',
+                                  value: total,
+                                  color: sub.color || CHART_PALETTE[colorIndex++ % CHART_PALETTE.length]
+                                })),
+                              ...(unallocated > 0 ? [{ label: 'Non alloué', value: unallocated, color: UNALLOCATED_COLOR }] : [])
                             ];
                             return (
                               <>
