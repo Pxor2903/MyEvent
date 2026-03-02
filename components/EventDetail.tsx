@@ -518,8 +518,8 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
   }, [flushGuestsTableUpdate]);
 
   const handleAddGuest = async () => {
-    const targetSubId = addGuestTargetSubId ?? selectedSubId;
-    if (!canManageGuests || !targetSubId) return;
+    if (!canManageGuests) return;
+    const targetSubId = addGuestTargetSubId ?? (activeTab === 'program' ? selectedSubId : null);
     if (!guestForm.firstName.trim()) return;
     const newGuest: Guest = {
       id: crypto.randomUUID(),
@@ -529,7 +529,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       phone: guestForm.phone?.trim() || undefined,
       status: 'pending',
       companions: [],
-      linkedSubEventIds: [targetSubId],
+      linkedSubEventIds: targetSubId ? [targetSubId] : [],
       addedByUserId: user.id,
       guestCount: (guestForm.adultsCount ?? 1) + (guestForm.childrenCount ?? 0) || 1,
       adultsCount: guestForm.adultsCount ?? 1,

@@ -135,7 +135,13 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
   const handleDeleteGuest = useCallback(
     (g: Guest) => {
       if (!canManage || !canEditGuest(g, currentUserId, event)) return;
-      if (!window.confirm(`Supprimer ${g.firstName} ${g.lastName} de la liste des invités ?`)) return;
+      const linkedSubs = subEvents.filter((s) => g.linkedSubEventIds.includes(s.id));
+      const subsText = linkedSubs.length
+        ? '\n\nIl/elle sera aussi retiré(e) des séquences :\n- ' +
+          linkedSubs.map((s) => s.title || 'Séquence sans titre').join('\n- ')
+        : '';
+      const message = `Supprimer ${g.firstName} ${g.lastName} de l'événement ?${subsText}`;
+      if (!window.confirm(message)) return;
       setDeletingId(g.id);
       const nextGuests = (event.guests ?? []).filter((x) => x.id !== g.id);
       const nextOverrides = { ...localOverrides };
@@ -144,7 +150,7 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
       onUpdate({ ...event, guests: nextGuests });
       setDeletingId(null);
     },
-    [canManage, currentUserId, event, localOverrides, onUpdate]
+    [canManage, currentUserId, event, localOverrides, onUpdate, subEvents]
   );
 
   const handleExportExcel = useCallback(async () => {
@@ -327,7 +333,7 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
                         );
                       })
                     ))}
-                    {canManage && !isGlobalView && (
+                    {canManage && (
                       <td className="px-2 py-2.5 text-center">
                         <button
                           type="button"
