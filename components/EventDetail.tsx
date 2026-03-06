@@ -957,9 +957,16 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                       })()}
                     </div>
                   </div>
-                  <div className="lg:col-span-2 p-5 rounded-xl border border-slate-200 bg-white flex flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('settings')}
+                    className="lg:col-span-2 p-5 rounded-xl border border-slate-200 bg-white flex flex-col gap-3 text-left hover:border-teal-200 hover:shadow-sm transition-all"
+                  >
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-semibold text-slate-900 w-full">Équipe</h3>
+                      {isOwner && (
+                        <span className="text-xs font-medium text-teal-600">Gérer les droits →</span>
+                      )}
                     </div>
                     {(() => {
                       const organizers = event.organizers || [];
@@ -1023,7 +1030,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                         </ul>
                       );
                     })()}
-                  </div>
+                  </button>
                 </div>
                 <div className="p-5 rounded-xl border border-teal-100 bg-teal-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div>
