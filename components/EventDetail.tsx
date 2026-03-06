@@ -957,62 +957,73 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                       })()}
                     </div>
                   </div>
-                  {canViewBudget && (
-                    <div className="lg:col-span-2">
-                      <button type="button" onClick={() => setActiveTab('budget')} className="w-full h-full min-h-[240px] rounded-xl border border-slate-200 bg-white p-4 flex flex-col items-center justify-center gap-3 hover:border-teal-200 hover:shadow-md transition-all">
-                        <h3 className="text-sm font-semibold text-slate-900 w-full">Budget</h3>
-                        {event.budget > 0 ? (
-                          (() => {
-                            const budget = event.budget ?? 0;
-                            const globalAllocations = event.globalBudgetAllocations ?? [];
-                            const subEvents = event.subEvents ?? [];
-                            const totalGlobal = globalAllocations.reduce((s, a) => s + a.amount, 0);
-                            const subTotals = subEvents.map((sub) => ({
-                              sub,
-                              total: (sub.budgetAllocations ?? []).reduce((s, a) => s + a.amount, 0)
-                            }));
-                            const totalInPostes = totalGlobal + subTotals.reduce((s, t) => s + t.total, 0);
-                            const unallocated = Math.max(0, budget - totalInPostes);
-                            let colorIndex = 0;
-                            const overviewSegments: PieSegment[] = [
-                              ...(totalGlobal > 0
-                                ? [
-                                    {
-                                      label: 'Frais globaux',
-                                      value: totalGlobal,
-                                      color: globalAllocations[0]?.color || CHART_PALETTE[colorIndex++ % CHART_PALETTE.length]
-                                    }
-                                  ]
-                                : []),
-                              ...subTotals
-                                .filter((t) => t.total > 0)
-                                .map(({ sub, total }) => ({
-                                  label: sub.title || 'Séquence',
-                                  value: total,
-                                  color: sub.color || CHART_PALETTE[colorIndex++ % CHART_PALETTE.length]
-                                })),
-                              ...(unallocated > 0 ? [{ label: 'Non alloué', value: unallocated, color: UNALLOCATED_COLOR }] : [])
-                            ];
-                            return (
-                              <>
-                                <div className="shrink-0">
-                                  <BudgetPieChart segments={overviewSegments} total={budget} size={128} strokeWidth={20} interactive={false} />
-                                </div>
-                                <p className="text-xl font-semibold text-slate-900">{event.budget.toLocaleString('fr-FR')} {getCurrencySymbol(event.currency ?? 'EUR')}</p>
-                                <p className="text-xs text-slate-500">Cliquer pour le détail</p>
-                              </>
-                            );
-                          })()
-                        ) : (
-                          <>
-                            <div className="w-32 h-32 rounded-full bg-slate-100 flex items-center justify-center" aria-hidden><span className="text-3xl text-slate-300">{getCurrencySymbol(event.currency ?? 'EUR')}</span></div>
-                            <p className="text-sm text-slate-500">Aucun budget renseigné</p>
-                            <p className="text-xs text-slate-400">Cliquer pour gérer</p>
-                          </>
-                        )}
-                      </button>
+                  <div className="lg:col-span-2 p-5 rounded-xl border border-slate-200 bg-white flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-slate-900 w-full">Équipe</h3>
                     </div>
-                  )}
+                    {(() => {
+                      const organizers = event.organizers || [];
+                      const subs = event.subEvents || [];
+                      const team = [
+                        ...(event.creatorId === user.id
+                          ? [{
+                              userId: user.id,
+                              firstName: user.firstName,
+                              lastName: user.lastName,
+                              status: 'confirmed' as const,
+                              permissions: ['all' as Permission],
+                              allowedSubEventIds: undefined
+                            }]
+                          : []),
+                        ...organizers
+                      ];
+                      if (team.length === 0) {
+                        return <p className="text-sm text-slate-500">Aucun co-organisateur pour l'instant.</p>;
+                      }
+                      return (
+                        <ul className="space-y-3">
+                          {team.slice(0, 6).map((m, idx) => {
+                            const isOwner = m.userId === event.creatorId;
+                            const label = `${m.firstName} ${m.lastName}`.trim() || 'Organisateur';
+                            const allowedSubs = (m.allowedSubEventIds && m.allowedSubEventIds.length
+                              ? m.allowedSubEventIds
+                              : subs.map(s => s.id))
+                              .map(id => subs.find(s => s.id === id)?.title || null)
+                              .filter(Boolean)
+                              .slice(0, 4) as string[];
+                            return (
+                              <li key={m.userId + idx} className="flex flex-col gap-0.5">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-7 h-7 rounded-full bg-teal-50 text-teal-700 flex items-center justify-center text-xs font-semibold">
+                                    {label.charAt(0).toUpperCase()}
+                                  </span>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium text-slate-900 truncate">
+                                      {label}{isOwner ? ' (Propriétaire)' : ''}
+                                    </p>
+                                    <p className="text-[11px] text-slate-500 truncate">
+                                      {m.permissions.includes('all') ? 'Tous les droits' : 'Co-organisateur'}
+                                    </p>
+                                  </div>
+                                </div>
+                                {allowedSubs.length > 0 && (
+                                  <p className="pl-9 text-[11px] text-slate-500 truncate">
+                                    Séquences : {allowedSubs.join(', ')}
+                                    {m.allowedSubEventIds && m.allowedSubEventIds.length > allowedSubs.length && '…'}
+                                  </p>
+                                )}
+                              </li>
+                            );
+                          })}
+                          {team.length > 6 && (
+                            <li className="pl-9 text-[11px] text-slate-400">
+                              + {team.length - 6} autre(s)
+                            </li>
+                          )}
+                        </ul>
+                      );
+                    })()}
+                  </div>
                 </div>
                 <div className="p-5 rounded-xl border border-teal-100 bg-teal-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div>
