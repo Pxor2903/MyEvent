@@ -153,6 +153,29 @@ Les variables sont prises en compte au **déploiement**. Il faut donc déclenche
 
 ---
 
+## Dépannage
+
+### « Erreur d’API » ou message d’erreur à l’envoi
+
+1. **Ouvre la console** du navigateur (F12 → onglet Console). Après avoir cliqué sur « Envoyer par WhatsApp à tous », un message `[WhatsApp API]` s’affiche avec le détail de l’erreur.
+2. **Si tu vois** « L’URL WhatsApp renvoie une page web au lieu de l’API » : l’app reçoit du HTML (souvent la page d’accueil) au lieu de JSON. Vérifie que :
+   - `VITE_WHATSAPP_API_URL` = `https://TON-DOMAINE.vercel.app/api/send-whatsapp` (sans faute, avec `/api/send-whatsapp`).
+   - Le fichier `vercel.json` contient bien le rewrite qui exclut `/api/` du fallback SPA (voir ci‑dessous).
+   - Tu as **redéployé** après avoir modifié les variables ou `vercel.json`.
+3. **Si tu vois** « Twilio non configuré » : ajoute sur Vercel les variables `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM` et redéploie.
+4. **Si tu vois** une erreur réseau (CORS, timeout, etc.) : vérifie que tu ouvres l’app depuis le **même domaine** que celui configuré (ou que `ALLOW_ORIGIN` inclut ton domaine).
+
+### L’app sur téléphone ne montre pas les changements
+
+L’app mobile (Capacitor) charge le **build** copié dans le projet iOS. Pour voir les derniers changements (dont le bouton WhatsApp) :
+
+1. Sur ton ordi : `npm run build` puis `npx cap sync ios`.
+2. Ouvre le projet iOS dans Xcode : `npx cap open ios` (ou ouvre `ios/App/App.xcworkspace`).
+3. Lance l’app sur ton téléphone (Run).
+4. Si rien ne change : **supprime l’app** du téléphone, puis relance depuis Xcode pour une réinstallation propre.
+
+---
+
 ## Récapitulatif
 
 | Étape | Où | Quoi |

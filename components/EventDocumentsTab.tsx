@@ -232,7 +232,9 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
                                   if (result.ok) {
                                     setWhatsAppResult({ sent: result.sent ?? phoneNumbers.length, failed: result.failed });
                                   } else {
-                                    alert(result.error ?? 'Erreur d’envoi');
+                                    const errMsg = result.error ?? 'Erreur d’envoi';
+                                    console.error('[WhatsApp]', errMsg);
+                                    alert(errMsg);
                                   }
                                 } finally {
                                   setWhatsAppSending(false);

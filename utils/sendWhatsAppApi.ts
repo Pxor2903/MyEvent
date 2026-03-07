@@ -34,9 +34,18 @@ export async function sendWhatsAppToMany(phoneNumbers: string[], message: string
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phoneNumbers: numbers, message })
     });
-    const data = await res.json().catch(() => ({}));
+    const text = await res.text();
+    const trimmed = text?.trim() ?? '';
+    if (trimmed.startsWith('<!') || trimmed.startsWith('<html')) {
+      const msg = 'L’URL WhatsApp renvoie une page web au lieu de l’API. Vérifiez VITE_WHATSAPP_API_URL (ex. https://votre-app.vercel.app/api/send-whatsapp) et redéployez.';
+      console.error('[WhatsApp API] Réponse HTML reçue:', trimmed.slice(0, 200));
+      return { ok: false, error: msg };
+    }
+    const data = trimmed ? (() => { try { return JSON.parse(trimmed); } catch { return {}; } })() : {};
     if (!res.ok) {
-      return { ok: false, error: (data.error as string) || res.statusText || 'Erreur API' };
+      const msg = (data.error as string) || res.statusText || trimmed?.slice(0, 150) || `Erreur ${res.status}`;
+      console.error('[WhatsApp API]', res.status, msg, trimmed?.slice(0, 200));
+      return { ok: false, error: msg };
     }
     return {
       ok: true,
@@ -44,6 +53,8 @@ export async function sendWhatsAppToMany(phoneNumbers: string[], message: string
       failed: data.failed ?? 0
     };
   } catch (e) {
-    return { ok: false, error: (e as Error).message || 'Erreur réseau' };
+    const errMsg = (e as Error).message || 'Erreur réseau';
+    console.error('[WhatsApp API]', errMsg, e);
+    return { ok: false, error: errMsg };
   }
 }
