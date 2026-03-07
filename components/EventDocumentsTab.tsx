@@ -7,7 +7,6 @@ import { dbService } from '@/api';
 import { ATTACHMENT_TYPE_LABELS } from '@/api/attachments';
 import {
   getShareToAllData,
-  getShareOptionsForGuest,
   type ShareChannel,
   type ShareToAllGuestEntry,
   type PendingContactUpdate
@@ -105,7 +104,7 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
 
   const isGlobal = !subEventId;
   const onlyChannel = event.shareChannelPreference && event.shareChannelPreference !== 'all' ? event.shareChannelPreference : undefined;
-  const shareData = shareDoc && !isGlobal
+  const shareData = shareDoc
     ? getShareToAllData(guestsForSub, shareMessage, {
         subject: `${event.title} – Document`,
         documentUrl: shareDoc.url,
@@ -154,13 +153,13 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
                 <a href={att.url} target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
                   Télécharger
                 </a>
-                {!isGlobal && canManage && (
+                {canManage && guestsForSub.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => { setShareDoc(att); }}
+                    onClick={() => { setShareDoc(att); setShareMessage(`Bonjour,\n\nVoici un document pour ${subEvent?.title ?? event.title}.\n`); }}
                     className="px-3 py-2 rounded-lg border border-teal-200 bg-teal-50 text-teal-700 text-sm font-medium hover:bg-teal-100"
                   >
-                    Partager à tous
+                    Partager aux invités
                   </button>
                 )}
                 {canManage && (
@@ -179,44 +178,67 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
         </ul>
       )}
 
-      {/* Modal Partager à tous */}
-      {shareDoc && !isGlobal && (
+      {/* Modal Partager aux invités */}
+      {shareDoc && (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShareDoc(null)}>
           <div className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-              <h4 className="font-semibold text-slate-900">Partager « {shareDoc.name} » aux invités</h4>
+              <h4 className="font-semibold text-slate-900">Envoyer « {shareDoc.name} » aux invités</h4>
               <button type="button" onClick={() => setShareDoc(null)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100">×</button>
             </div>
             <div className="p-4 flex-1 overflow-y-auto space-y-4">
               <textarea
                 className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm"
                 rows={3}
-                placeholder="Message accompagnant le lien…"
+                placeholder="Message accompagnant le lien du document…"
                 value={shareMessage}
                 onChange={e => setShareMessage(e.target.value)}
               />
-              <div>
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Par canal (priorité WhatsApp → SMS → email)</p>
-                <ul className="space-y-2">
-                  {shareData.entries.filter(e => e.canShare).map((entry) => (
-                    <li key={entry.guest.id} className="flex items-center justify-between gap-2 py-2 border-b border-slate-100 last:border-0">
-                      <span className="text-sm text-slate-800 truncate">
-                        {entry.guest.firstName} {entry.guest.lastName}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => openShare(entry)}
-                        className="shrink-0 px-3 py-1.5 rounded-lg bg-teal-100 text-teal-700 text-xs font-medium hover:bg-teal-200"
-                      >
-                        {CHANNEL_LABELS[entry.preferred]}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-                {shareData.entries.filter(e => e.canShare).length === 0 && (
-                  <p className="text-sm text-slate-500">Aucun invité avec contact renseigné.</p>
-                )}
-              </div>
+              {shareData.entries.filter(e => e.canShare).length > 0 && (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    {(() => {
+                      const withEmail = shareData.entries.filter(e => e.canShare && e.emailUrl);
+                      if (withEmail.length === 0) return null;
+                      const subject = `${event.title} – Document`;
+                      const body = shareMessage + (shareDoc ? `\n\n${shareDoc.url}` : '');
+                      const mailtoUrl = `mailto:${withEmail.map(e => encodeURIComponent((e.guest.email ?? '').trim())).filter(Boolean).join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => window.open(mailtoUrl, '_blank', 'noopener,noreferrer')}
+                          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-medium hover:bg-teal-700"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                          Envoyer par email à tous ({withEmail.length} invité{withEmail.length > 1 ? 's' : ''})
+                        </button>
+                      );
+                    })()}
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Ou envoyer individuellement (WhatsApp, SMS, email)</p>
+                    <ul className="space-y-2">
+                      {shareData.entries.filter(e => e.canShare).map((entry) => (
+                        <li key={entry.guest.id} className="flex items-center justify-between gap-2 py-2 border-b border-slate-100 last:border-0">
+                          <span className="text-sm text-slate-800 truncate">
+                            {entry.guest.firstName} {entry.guest.lastName}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => openShare(entry)}
+                            className="shrink-0 px-3 py-1.5 rounded-lg bg-teal-100 text-teal-700 text-xs font-medium hover:bg-teal-200"
+                          >
+                            {CHANNEL_LABELS[entry.preferred]}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
+              )}
+              {shareData.entries.filter(e => e.canShare).length === 0 && (
+                <p className="text-sm text-slate-500">Aucun invité avec email ou téléphone renseigné. Complétez les contacts dans l’onglet Invités.</p>
+              )}
               {shareData.pending.length > 0 && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                   <h5 className="text-sm font-semibold text-amber-800 mb-2">Contacts à compléter</h5>

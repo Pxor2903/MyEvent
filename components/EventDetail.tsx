@@ -1099,6 +1099,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 currentUserId={user.id}
                 subEventId={null}
                 canManage={isOwner || (currentOrganizer?.status === 'confirmed')}
+                guestsForSub={event.guests ?? []}
                 onGuestClick={(g) => setSelectedGuestForDetail(g)}
               />
             )}
