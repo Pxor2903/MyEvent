@@ -10,8 +10,8 @@
 
 import type { Guest } from '@/core/types';
 
-/** Numéro au format E.164 pour wa.me (chiffres uniquement avec +). */
-function toE164(phone: string): string {
+/** Numéro au format E.164 pour wa.me / API (chiffres uniquement avec +). Exporté pour l’envoi groupé via API. */
+export function toE164(phone: string): string {
   const digits = phone.replace(/\D/g, '');
   if (digits.startsWith('0') && digits.length === 10) return '+33' + digits.slice(1);
   if (digits.length >= 10 && !digits.startsWith('+')) return '+' + digits;
