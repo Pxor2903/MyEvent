@@ -164,6 +164,9 @@ Les variables sont prises en compte au **déploiement**. Il faut donc déclenche
    - Tu as **redéployé** après avoir modifié les variables ou `vercel.json`.
 3. **Si tu vois** « Twilio non configuré » : ajoute sur Vercel les variables `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM` et redéploie.
 4. **Si tu vois** une erreur réseau (CORS, timeout, etc.) : vérifie que tu ouvres l’app depuis le **même domaine** que celui configuré (ou que `ALLOW_ORIGIN` inclut ton domaine).
+5. **Erreur 405 (Method not allowed)** : le serveur reçoit une requête en GET au lieu de POST. Souvent à cause d’une **redirection** (l’URL avec un slash final ou en `http://` est redirigée, et le navigateur transforme le POST en GET). **À faire** :
+   - Sur Vercel, définis `VITE_WHATSAPP_API_URL` **exactement** ainsi : `https://ton-domaine.vercel.app/api/send-whatsapp` (en **HTTPS**, **sans slash** à la fin).
+   - Redéploie, puis refais un build de l’app (y compris mobile : `npm run build` puis `npx cap sync ios` et relance depuis Xcode).
 
 ### L’app sur téléphone ne montre pas les changements
 

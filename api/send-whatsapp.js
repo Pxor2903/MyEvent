@@ -21,7 +21,9 @@ export default async function handler(req, res) {
     return;
   }
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
+    res.status(405).json({
+      error: 'Method not allowed. Use POST. If the app sends POST but you see 405, the request may have been redirected (use HTTPS and no trailing slash in VITE_WHATSAPP_API_URL).'
+    });
     return;
   }
   if (!twilioAccountSid || !twilioAuthToken || !twilioFrom) {

@@ -4,10 +4,21 @@
  * Configure VITE_WHATSAPP_API_URL (ex. https://ton-app.vercel.app/api/send-whatsapp) pour activer.
  */
 
-const API_URL = import.meta.env.VITE_WHATSAPP_API_URL as string | undefined;
+const RAW_API_URL = import.meta.env.VITE_WHATSAPP_API_URL as string | undefined;
+
+/** URL normalisée : sans slash final, en HTTPS pour éviter les redirections (POST → GET → 405). */
+function getApiUrl(): string | undefined {
+  const u = RAW_API_URL?.trim();
+  if (!u) return undefined;
+  let url = u.replace(/\/+$/, '');
+  if (url.startsWith('http://')) url = 'https://' + url.slice(7);
+  return url || undefined;
+}
+
+const API_URL = getApiUrl();
 
 export function isWhatsAppApiConfigured(): boolean {
-  return !!API_URL?.trim();
+  return !!API_URL;
 }
 
 export interface SendWhatsAppResult {
@@ -21,7 +32,7 @@ export interface SendWhatsAppResult {
  * Envoie le même message WhatsApp à tous les numéros (E.164) via l’API configurée.
  */
 export async function sendWhatsAppToMany(phoneNumbers: string[], message: string): Promise<SendWhatsAppResult> {
-  if (!API_URL?.trim()) {
+  if (!API_URL) {
     return { ok: false, error: 'API WhatsApp non configurée (VITE_WHATSAPP_API_URL)' };
   }
   const numbers = phoneNumbers.filter((n) => n && n.startsWith('+'));
@@ -29,11 +40,17 @@ export async function sendWhatsAppToMany(phoneNumbers: string[], message: string
     return { ok: false, error: 'Aucun numéro valide' };
   }
   try {
-    const res = await fetch(API_URL.trim(), {
+    const res = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phoneNumbers: numbers, message })
+      body: JSON.stringify({ phoneNumbers: numbers, message }),
+      redirect: 'manual'
     });
+    if (res.type === 'opaqueredirect' || res.status === 301 || res.status === 302) {
+      const msg = 'L’URL de l’API provoque une redirection (POST devient GET → erreur 405). Utilisez HTTPS et pas de slash final : https://votre-app.vercel.app/api/send-whatsapp';
+      console.error('[WhatsApp API] Redirection détectée:', res.status, API_URL);
+      return { ok: false, error: msg };
+    }
     const text = await res.text();
     const trimmed = text?.trim() ?? '';
     if (trimmed.startsWith('<!') || trimmed.startsWith('<html')) {
@@ -43,7 +60,10 @@ export async function sendWhatsAppToMany(phoneNumbers: string[], message: string
     }
     const data = trimmed ? (() => { try { return JSON.parse(trimmed); } catch { return {}; } })() : {};
     if (!res.ok) {
-      const msg = (data.error as string) || res.statusText || trimmed?.slice(0, 150) || `Erreur ${res.status}`;
+      let msg = (data.error as string) || res.statusText || trimmed?.slice(0, 150) || `Erreur ${res.status}`;
+      if (res.status === 405) {
+        msg = 'Erreur 405 (méthode non autorisée). Vérifiez VITE_WHATSAPP_API_URL : utilisez exactement https://votre-domaine.vercel.app/api/send-whatsapp (HTTPS, pas de slash à la fin). Puis redéployez.';
+      }
       console.error('[WhatsApp API]', res.status, msg, trimmed?.slice(0, 200));
       return { ok: false, error: msg };
     }
