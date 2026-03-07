@@ -24,6 +24,7 @@ import { BudgetPieChart, type PieSegment } from './BudgetPieChart';
 import { getCurrencySymbol } from '@/core/constants/currencies';
 import { CHART_PALETTE, UNALLOCATED_COLOR } from '@/core/constants/chartColors';
 import type { BudgetAllocation } from '@/core/types';
+import { EventDocumentsTab } from './EventDocumentsTab';
 
 interface EventDetailProps {
   event: Event;
@@ -77,9 +78,9 @@ function GuestsTableSegmentBar({
 }
 
 export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, onUpdate }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'program' | 'chat' | 'settings' | 'budget' | 'guests'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'program' | 'chat' | 'settings' | 'budget' | 'guests' | 'documents'>('overview');
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
-  const [subTab, setSubTab] = useState<'sequence' | 'chat' | 'guests' | 'budget'>('sequence');
+  const [subTab, setSubTab] = useState<'sequence' | 'chat' | 'guests' | 'budget' | 'documents'>('sequence');
   /** Filtre optionnel pour l’onglet Invités (niveau événement principal). */
   const [guestsViewSubId, setGuestsViewSubId] = useState<string | null>(null);
   const [guestsViewFilterAddedBy, setGuestsViewFilterAddedBy] = useState<string | null>(null);
@@ -139,7 +140,8 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
     startDate: '',
     location: '',
     budget: '',
-    image: ''
+    image: '',
+    shareChannelPreference: 'all' as Event['shareChannelPreference']
   });
   const [approveModalOrganizer, setApproveModalOrganizer] = useState<Organizer | null>(null);
   const [approvePermissions, setApprovePermissions] = useState<Permission[]>(['access_organizer_chat']);
@@ -152,6 +154,8 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
   const [newPasswordValue, setNewPasswordValue] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
   const chatScrollContainerRef = useRef<HTMLDivElement>(null);
+  /** Après mise à jour d’un invité (contact complété), proposer d’envoyer les documents. */
+  const [suggestShareGuestName, setSuggestShareGuestName] = useState<string | null>(null);
 
   const handleCopy = useCallback((value: string, field: 'code' | 'password') => {
     navigator.clipboard.writeText(String(value).trim()).then(() => {
@@ -723,7 +727,8 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       startDate: event.startDate ? event.startDate.slice(0, 16) : '',
       location: event.location || '',
       budget: String(event.budget || 0),
-      image: event.image || ''
+      image: event.image || '',
+      shareChannelPreference: event.shareChannelPreference ?? 'all'
     });
     setEventSettingsTab('general');
     setShowEventSettingsModal(true);
@@ -776,7 +781,8 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       location: eventEditForm.location.trim() || evt.location,
       budget: parseFloat(eventEditForm.budget) || 0,
       image: eventEditForm.image.trim() || undefined,
-      date: startDate ?? evt.date
+      date: startDate ?? evt.date,
+      shareChannelPreference: eventEditForm.shareChannelPreference === 'all' ? undefined : eventEditForm.shareChannelPreference
     }));
     onUpdate(updated);
     setShowEventSettingsModal(false);
@@ -810,6 +816,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
               { id: 'program', label: 'Programme' },
               { id: 'guests', label: 'Invités' },
               { id: 'chat', label: 'Chat' },
+              { id: 'documents', label: 'Documents' },
               { id: 'settings', label: 'Équipe' },
               ...(canViewBudget ? [{ id: 'budget', label: 'Budget' }] : [])
             ].map(tab => (
@@ -1084,6 +1091,16 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                   ))}
                 </div>
               </div>
+            )}
+
+            {activeTab === 'documents' && (
+              <EventDocumentsTab
+                event={event}
+                currentUserId={user.id}
+                subEventId={null}
+                canManage={isOwner || (currentOrganizer?.status === 'confirmed')}
+                onGuestClick={(g) => setSelectedGuestForDetail(g)}
+              />
             )}
 
             {activeTab === 'guests' && (
@@ -1374,6 +1391,10 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                   {subTab === 'budget' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-teal-600 rounded-t-full" />}
                 </button>
               )}
+              <button key="documents" type="button" onClick={() => setSubTab('documents')} className={`py-4 sm:py-5 px-4 sm:px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'documents' ? 'text-teal-600' : 'text-gray-400'}`}>
+                Documents
+                {subTab === 'documents' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-teal-600 rounded-t-full" />}
+              </button>
               {canChatForCurrentSubEvent && (
                 <button key="chat" type="button" onClick={() => setSubTab('chat')} className={`py-4 sm:py-5 px-4 sm:px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'chat' ? 'text-teal-600' : 'text-gray-400'}`}>
                   Chat
@@ -1522,6 +1543,18 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 />
               )}
 
+              {subTab === 'documents' && selectedSubId && currentSub && (
+                <EventDocumentsTab
+                  event={event}
+                  currentUserId={user.id}
+                  subEventId={selectedSubId}
+                  subEvent={currentSub}
+                  canManage={canManageProgramHere}
+                  guestsForSub={event.guests?.filter((g) => g.linkedSubEventIds.includes(selectedSubId)) ?? []}
+                  onGuestClick={(g) => { setSelectedGuestForDetail(g); setSubTab('guests'); }}
+                />
+              )}
+
               {subTab === 'chat' && canChatForCurrentSubEvent && (
                 <div className="flex flex-col bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm min-h-[280px] h-[min(400px,60dvh)]">
                   <p className="px-4 py-2 text-xs text-slate-500 border-b border-slate-100">Chat réservé aux admins de cette séquence.</p>
@@ -1624,6 +1657,20 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     value={eventEditForm.budget}
                     onChange={e => setEventEditForm(prev => ({ ...prev, budget: e.target.value }))}
                   />
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Partage des documents aux invités</label>
+                    <p className="text-xs text-gray-500 mb-2">Choisir le canal utilisé pour envoyer documents et invitations. Les invités sans ce moyen de contact apparaîtront en « Contacts à compléter ».</p>
+                    <select
+                      value={eventEditForm.shareChannelPreference ?? 'all'}
+                      onChange={e => setEventEditForm(prev => ({ ...prev, shareChannelPreference: e.target.value as Event['shareChannelPreference'] }))}
+                      className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-900"
+                    >
+                      <option value="all">Tous (priorité WhatsApp → SMS → email)</option>
+                      <option value="whatsapp">WhatsApp uniquement</option>
+                      <option value="sms">SMS uniquement</option>
+                      <option value="email">Email uniquement</option>
+                    </select>
+                  </div>
                 </>
               )}
               {eventSettingsTab === 'appearance' && (
@@ -2060,12 +2107,30 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
         </div>
       )}
 
+      {suggestShareGuestName && (
+        <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-sm z-[300] flex items-center gap-3 p-4 rounded-xl bg-teal-600 text-white shadow-lg">
+          <span className="text-sm flex-1">Vous pouvez maintenant partager les documents à {suggestShareGuestName} depuis l’onglet Documents.</span>
+          <button type="button" onClick={() => { setSubTab('documents'); setSuggestShareGuestName(null); }} className="shrink-0 px-3 py-1.5 rounded-lg bg-white/20 text-sm font-medium hover:bg-white/30">Ouvrir</button>
+        </div>
+      )}
+
       {selectedGuestForDetail && (
         <GuestDetailModal
           guest={selectedGuestForDetail}
           event={event}
           currentUserId={user.id}
-          onSave={(updated) => { handleGuestsTableUpdate(updated); onUpdate(updated); setSelectedGuestForDetail(null); }}
+          onSave={(updated) => {
+            const savedGuest = updated.guests?.find((g) => g.id === selectedGuestForDetail?.id);
+            const hadNoContact = !(selectedGuestForDetail?.email?.trim()) && !(selectedGuestForDetail?.phone?.trim());
+            const hasContact = !!(savedGuest?.email?.trim()) || !!(savedGuest?.phone?.trim());
+            handleGuestsTableUpdate(updated);
+            onUpdate(updated);
+            setSelectedGuestForDetail(null);
+            if (hadNoContact && hasContact && savedGuest && selectedSubId) {
+              setSuggestShareGuestName(`${savedGuest.firstName} ${savedGuest.lastName}`);
+              setTimeout(() => setSuggestShareGuestName(null), 6000);
+            }
+          }}
           onClose={() => setSelectedGuestForDetail(null)}
         />
       )}

@@ -35,7 +35,8 @@ create table if not exists events (
   guests jsonb not null default '[]'::jsonb,
   is_guest_chat_enabled boolean not null default true,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  share_channel_preference text check (share_channel_preference is null or share_channel_preference in ('whatsapp', 'sms', 'email', 'all'))
 );
 
 create index if not exists events_creator_id_idx on events(creator_id);
@@ -55,6 +56,19 @@ create table if not exists chat_messages (
 
 create index if not exists chat_messages_event_id_idx on chat_messages(event_id);
 create index if not exists chat_messages_channel_id_idx on chat_messages(channel_id);
+
+create table if not exists event_attachments (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references events(id) on delete cascade,
+  sub_event_id text,
+  name text not null,
+  type text not null default 'other',
+  url text not null,
+  uploaded_by uuid not null references profiles(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index if not exists event_attachments_event_id_idx on event_attachments(event_id);
+create index if not exists event_attachments_sub_event_id_idx on event_attachments(sub_event_id);
 
 alter table profiles enable row level security;
 alter table events enable row level security;
@@ -129,3 +143,13 @@ for insert with check (
       )
   )
 );
+
+alter table event_attachments enable row level security;
+create policy "event_attachments_read" on event_attachments for select using (
+  exists (select 1 from events e where e.id = event_attachments.event_id and (e.creator_id = auth.uid() or exists (select 1 from jsonb_array_elements(e.organizers) as org where org->>'userId' = auth.uid()::text and org->>'status' = 'confirmed' and (event_attachments.sub_event_id is null or (org->'allowedSubEventIds') is null or (org->'allowedSubEventIds') @> to_jsonb(ARRAY[event_attachments.sub_event_id])))));
+create policy "event_attachments_insert" on event_attachments for insert with check (
+  exists (select 1 from events e where e.id = event_attachments.event_id and (e.creator_id = auth.uid() or exists (select 1 from jsonb_array_elements(e.organizers) as org where org->>'userId' = auth.uid()::text and org->>'status' = 'confirmed' and (event_attachments.sub_event_id is null or (org->'allowedSubEventIds') is null or (org->'allowedSubEventIds') @> to_jsonb(ARRAY[event_attachments.sub_event_id])))));
+create policy "event_attachments_update" on event_attachments for update using (
+  exists (select 1 from events e where e.id = event_attachments.event_id and (e.creator_id = auth.uid() or exists (select 1 from jsonb_array_elements(e.organizers) as org where org->>'userId' = auth.uid()::text and org->>'status' = 'confirmed')));
+create policy "event_attachments_delete" on event_attachments for delete using (
+  exists (select 1 from events e where e.id = event_attachments.event_id and (e.creator_id = auth.uid() or exists (select 1 from jsonb_array_elements(e.organizers) as org where org->>'userId' = auth.uid()::text and org->>'status' = 'confirmed')));

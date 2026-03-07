@@ -53,6 +53,19 @@ export interface BudgetAllocation {
   color?: string;
 }
 
+/** Pièce jointe : document lié à l’événement ou à un sous-événement. */
+export interface EventAttachment {
+  id: string;
+  eventId: string;
+  subEventId?: string;
+  name: string;
+  /** Type / catégorie (invitation, plan, menu, autre). */
+  type: string;
+  url: string;
+  uploadedBy: string;
+  createdAt: string;
+}
+
 export interface SubEvent {
   id: string;
   title: string;
@@ -112,4 +125,8 @@ export interface Event {
   date?: string;
   /** Timestamp de dernière mise à jour (pour verrouillage optimiste, concurrence). */
   updatedAt?: string;
+  /** Pièces jointes (chargées séparément via API, optionnel côté type). */
+  attachments?: EventAttachment[];
+  /** Moyen de communication unique pour le partage (documents, invitations). Si défini, seuls les invités avec ce canal ne sont pas « à compléter ». */
+  shareChannelPreference?: 'whatsapp' | 'sms' | 'email' | 'all';
 }

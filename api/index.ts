@@ -7,10 +7,12 @@ export { profilesApi } from './profiles';
 export { eventsApi } from './events';
 export { messagesApi } from './messages';
 export { authApi } from './auth';
+export { attachmentsApi, ATTACHMENT_TYPE_LABELS } from './attachments';
 
 import type { User } from '@/core/types';
 import type { ChatMessage, Event } from '@/core/types';
 import { authApi } from './auth';
+import { attachmentsApi } from './attachments';
 import { eventsApi } from './events';
 import { messagesApi } from './messages';
 import { profilesApi } from './profiles';
@@ -33,7 +35,11 @@ export const dbService = {
   requestJoinByCodeAndPassword: (code: string, password: string, user: User) =>
     eventsApi.requestJoinByCodeAndPassword(code, password, user),
   getMessages: (eventId: string, channelId: string) => messagesApi.get(eventId, channelId),
-  saveMessage: (msg: ChatMessage) => messagesApi.save(msg)
+  saveMessage: (msg: ChatMessage) => messagesApi.save(msg),
+  listAttachments: (eventId: string, subEventId?: string | null) => attachmentsApi.listByEvent(eventId, subEventId),
+  listAllAttachments: (eventId: string) => attachmentsApi.listAllByEvent(eventId),
+  uploadAttachment: attachmentsApi.upload.bind(attachmentsApi),
+  deleteAttachment: (id: string) => attachmentsApi.delete(id)
 };
 
 /** Service d’authentification (compatibilité avec l’existant). */

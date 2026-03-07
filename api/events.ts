@@ -31,6 +31,7 @@ type DbEvent = {
   guests: Guest[];
   is_guest_chat_enabled: boolean;
   updated_at: string | null;
+  share_channel_preference: string | null;
 };
 
 function fromDb(row: DbEvent): Event {
@@ -58,7 +59,10 @@ function fromDb(row: DbEvent): Event {
     guests: row.guests ?? [],
     isGuestChatEnabled: row.is_guest_chat_enabled,
     date: row.start_date ?? undefined,
-    updatedAt: row.updated_at ?? undefined
+    updatedAt: row.updated_at ?? undefined,
+    shareChannelPreference: (row.share_channel_preference === 'whatsapp' || row.share_channel_preference === 'sms' || row.share_channel_preference === 'email' || row.share_channel_preference === 'all')
+      ? row.share_channel_preference
+      : undefined
   };
 }
 
@@ -86,7 +90,8 @@ function toDb(event: Event): DbEvent {
     sub_events: event.subEvents ?? [],
     guests: event.guests ?? [],
     is_guest_chat_enabled: event.isGuestChatEnabled ?? true,
-    updated_at: event.updatedAt ?? new Date().toISOString()
+    updated_at: event.updatedAt ?? new Date().toISOString(),
+    share_channel_preference: event.shareChannelPreference ?? null
   };
 }
 
