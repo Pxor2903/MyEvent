@@ -40,6 +40,7 @@ export async function sendWhatsAppToMany(phoneNumbers: string[], message: string
     return { ok: false, error: 'Aucun numéro valide' };
   }
   try {
+    console.log('[WhatsApp API] Envoi POST vers:', API_URL);
     const res = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
