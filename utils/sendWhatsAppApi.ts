@@ -71,7 +71,8 @@ export async function sendWhatsAppToMany(phoneNumbers: string[], message: string
     return {
       ok: true,
       sent: data.sent ?? numbers.length,
-      failed: data.failed ?? 0
+      failed: data.failed ?? 0,
+      error: data.error as string | undefined
     };
   } catch (e) {
     const errMsg = (e as Error).message || 'Erreur réseau';

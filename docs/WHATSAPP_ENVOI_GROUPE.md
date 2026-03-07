@@ -1,6 +1,20 @@
-# Envoi WhatsApp groupé en un clic – Guide détaillé
+# Envoi WhatsApp groupé – Guide détaillé
 
-Ce guide explique **étape par étape** comment configurer Twilio et Vercel pour que le bouton **« Envoyer par WhatsApp à tous »** envoie le message à **tous** les invités ayant un numéro de téléphone, en un seul clic, sans ressélection.
+## Deux façons d’envoyer par WhatsApp
+
+1. **Depuis votre numéro WhatsApp** (recommandé, sans configuration)  
+   Dans l’app, option **« Depuis votre numéro WhatsApp »** : le message part de **votre** téléphone. Une conversation s’ouvre à la fois ; vous envoyez, puis vous revenez dans l’app pour ouvrir la suivante. **Aucune configuration** n’est nécessaire. Tous les utilisateurs de MyEvent (organisateurs, admin, etc.) peuvent utiliser cette option sans rien configurer — pas besoin de Twilio.
+
+2. **En un clic via l’API (optionnel)**  
+   Si l’administrateur du déploiement a configuré Twilio (ce guide), un bouton **« Envoyer à tous en un clic »** apparaît. Un seul clic envoie le message à tous les invités via l’API. En **mode sandbox** Twilio, les destinataires doivent avoir rejoint le sandbox ; pour envoyer à n’importe quel numéro sans ça, il faut un compte WhatsApp Business approuvé par Twilio.
+
+**En résumé** : chaque personne qui utilise l’app peut envoyer depuis son propre WhatsApp sans configuration. Seul l’admin du déploiement peut, s’il le souhaite, configurer Twilio pour activer l’envoi « à tous en un clic ».
+
+---
+
+## Configurer l’envoi « à tous en un clic » (Twilio)
+
+Ce qui suit explique **étape par étape** comment configurer Twilio et Vercel pour que le bouton **« Envoyer à tous en un clic »** soit disponible (envoi groupé sans ouvrir chaque conversation).
 
 ---
 
@@ -143,13 +157,15 @@ Les variables sont prises en compte au **déploiement**. Il faut donc déclenche
 1. Ouvre ton app (l’URL Vercel après redéploiement).
 2. Va sur un **événement** → onglet **Documents** (ou une séquence → Documents).
 3. Clique sur **Partager aux invités** pour un document.
-4. Tu dois voir le **bouton vert** : **« Envoyer par WhatsApp à tous (X invités) »** (X = nombre d’invités avec un numéro).
-5. Clique dessus : l’app envoie une requête à `https://TON-DOMAINE.vercel.app/api/send-whatsapp` avec la liste des numéros et le message.
+4. En haut, l’option **« Depuis votre numéro WhatsApp »** permet d’envoyer depuis votre téléphone (sans config). Si Twilio est configuré, tu vois aussi le **bouton vert** : **« Envoyer à tous en un clic (X invités) »**.
+5. En cliquant sur ce bouton vert : l’app envoie une requête à `https://TON-DOMAINE.vercel.app/api/send-whatsapp` avec la liste des numéros et le message.
 6. Si tout est bien configuré : message **« Envoyé à X contacts »**. Les invités reçoivent le WhatsApp (sandbox : seuls les numéros « join » au sandbox peuvent recevoir).
 
-**Si le bouton vert n’apparaît pas** : la variable `VITE_WHATSAPP_API_URL` n’est pas prise en compte au build. Vérifie qu’elle est bien définie dans Vercel (Settings → Environment Variables) et **redéploie** encore une fois.
+**Si le bouton vert « Envoyer à tous en un clic » n’apparaît pas** : la variable `VITE_WHATSAPP_API_URL` n’est pas prise en compte au build. Vérifie qu’elle est bien définie dans Vercel (Settings → Environment Variables) et **redéploie** encore une fois. Tu peux en attendant utiliser **« Depuis votre numéro WhatsApp »** pour envoyer à chaque invité depuis ton téléphone.
 
 **Si tu as une erreur (alert ou message)** : ouvre la **console** du navigateur (F12 → Console) et regarde la réponse de l’API (erreur 500, 400, ou message renvoyé par la fonction). Vérifie alors les variables Twilio (SID, Token, `TWILIO_WHATSAPP_FROM`) et que le sandbox WhatsApp est bien activé.
+
+**L’app affiche « Envoyé à X contacts » mais personne ne reçoit** : en **mode sandbox** Twilio, **seuls les numéros qui ont rejoint le sandbox** peuvent recevoir des messages. Chaque invité doit, **une seule fois**, ouvrir WhatsApp et envoyer au numéro Twilio (ex. +1 415 523 8886) le message exact affiché dans la console Twilio, par ex. `join super-code`. Une fois « connecté » au sandbox, il recevra les messages envoyés depuis l’app. Pour envoyer à n’importe quel numéro sans cette étape, il faut passer sur un compte WhatsApp Business approuvé par Twilio (hors sandbox).
 
 ---
 
