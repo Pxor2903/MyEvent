@@ -93,8 +93,11 @@ export function openPreferredShare(guest: Guest, message: string, options?: { su
   const opts = getShareOptionsForGuest(guest, message, options);
   if (!opts.canShare) return false;
   const url = opts.whatsappUrl ?? opts.smsUrl ?? opts.emailUrl;
-  if (url) window.open(url, '_blank', 'noopener,noreferrer');
-  return !!url;
+  if (url) {
+    import('@/utils/openExternalUrl').then(({ openExternalUrl }) => openExternalUrl(url));
+    return true;
+  }
+  return false;
 }
 
 export interface ShareToAllGuestEntry {
