@@ -18,10 +18,19 @@ L’onglet **Documents** de MyEvent envoie les fichiers (PDF, images) dans un bu
    - **File size limit** (optionnel) : ex. `5MB` ou `10MB` pour limiter la taille des fichiers.
    - Valide avec **Create bucket**.
 
-4. **Policies (RLS)**  
-   Si ton projet utilise déjà des policies Storage strictes, vérifie qu’elles autorisent au moins :
-   - **Upload** : utilisateurs authentifiés (ou selon tes règles métier).
-   - **Lecture** : si le bucket est public, la lecture est déjà possible sans policy supplémentaire pour les objets publics.
+4. **Policies Storage (RLS)**  
+   Sans policy, l’upload renvoie *« new row violates row-level security policy »*. Il faut autoriser les opérations sur le bucket. Deux options :
+
+   **Option 1 – Exécuter la migration (recommandé)**  
+   Dans le **SQL Editor** du dashboard, exécute la requête du fichier :
+   `supabase/migrations/20250128_storage_event_files_policies.sql`  
+   (elle crée les policies : upload et suppression pour les utilisateurs connectés, lecture publique).
+
+   **Option 2 – Créer les policies à la main**  
+   Dashboard → **Storage** → bucket **event-files** → onglet **Policies** → **New policy** :
+   - **Insert** : pour les rôles **authenticated**, condition `bucket_id = 'event-files'`.
+   - **Select** : pour **public** (ou **anon** + **authenticated**), condition `bucket_id = 'event-files'`.
+   - **Delete** : pour **authenticated**, condition `bucket_id = 'event-files'`.
 
 5. **Vérification**  
    Dans l’app, ouvre un événement → onglet **Documents** → **Ajouter un document** et envoie un petit PDF ou une image. Si le bucket est bien créé et public, le fichier doit s’uploader et le lien doit s’ouvrir.
