@@ -825,9 +825,9 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
           <nav className="flex gap-0 sm:gap-1 px-2 sm:px-4 pt-2 pb-1 border-b border-slate-200 overflow-x-auto no-scrollbar overflow-y-hidden" style={{ WebkitOverflowScrolling: 'touch' }} aria-label="Onglets">
             {[
               { id: 'overview', label: "Vue d'ensemble" },
+              { id: 'missions', label: 'Missions' },
               { id: 'program', label: 'Programme' },
               { id: 'guests', label: 'Invités' },
-              { id: 'missions', label: 'Missions' },
               { id: 'chat', label: 'Chat' },
               { id: 'documents', label: 'Documents' },
               { id: 'settings', label: 'Équipe' },
@@ -1431,6 +1431,9 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
               <button key="sequence" type="button" onClick={() => setSubTab('sequence')} className={`py-4 sm:py-5 px-4 sm:px-6 text-xs font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'sequence' ? 'text-teal-600' : 'text-gray-400'}`}>
                 Séquence
                 {subTab === 'sequence' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-teal-600 rounded-t-full" />}
+              </button>
+              <button key="missions" type="button" onClick={() => { setSelectedSubId(null); setActiveTab('missions'); }} className="py-4 sm:py-5 px-4 sm:px-6 text-xs font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center text-gray-400 hover:text-teal-600">
+                Missions
               </button>
               <button key="guests" type="button" onClick={() => setSubTab('guests')} className={`py-4 sm:py-5 px-4 sm:px-6 text-xs font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'guests' ? 'text-teal-600' : 'text-gray-400'}`}>
                 Invités
