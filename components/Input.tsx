@@ -20,7 +20,7 @@ export const Input: React.FC<InputProps> = ({ label, error, icon, ...props }) =>
           {...props}
           className={`
             w-full min-h-[44px] py-2.5 px-3 ${icon ? 'pl-10' : ''}
-            bg-white border rounded-xl text-sm
+            bg-white border rounded-xl text-base
             placeholder:text-slate-400
             ${error ? 'border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-500/20' : 'border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20'}
             ${props.disabled ? 'opacity-60 cursor-not-allowed' : ''}

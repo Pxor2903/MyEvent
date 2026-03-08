@@ -1881,7 +1881,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                    </div>
                    <p className="text-xs text-slate-500 mb-1">Autre : saisir un libellé puis ajouter.</p>
                    <div className="flex gap-2 flex-wrap items-center">
-                     <input type="text" value={guestCustomQualifierInput} onChange={e => setGuestCustomQualifierInput(e.target.value)} placeholder="Ex : Parrain, Témoin…" className="flex-1 min-w-[120px] rounded-lg border border-slate-200 px-3 py-1.5 text-sm" />
+                     <input type="text" value={guestCustomQualifierInput} onChange={e => setGuestCustomQualifierInput(e.target.value)} placeholder="Ex : Parrain, Témoin…" className="flex-1 min-w-0 rounded-lg border border-slate-200 px-3 py-1.5 text-sm" />
                      <button type="button" onClick={() => { const v = guestCustomQualifierInput.trim(); if (v && !(guestForm.qualifiers ?? []).includes(v)) setGuestForm(f => ({ ...f, qualifiers: [...(f.qualifiers ?? []), v] })); setGuestCustomQualifierInput(''); }} disabled={!guestCustomQualifierInput.trim()} className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 text-sm hover:bg-slate-50 disabled:opacity-50">Ajouter</button>
                    </div>
                    {(guestForm.qualifiers ?? []).filter(q => !QUALIFIER_OPTIONS.includes(q)).length > 0 && (
@@ -2056,7 +2056,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                               </div>
                               <p className="text-xs text-slate-500 mb-1">Autre :</p>
                               <div className="flex gap-2 flex-wrap items-center">
-                                <input type="text" value={importedCustomQualifierInputs[i] ?? ''} onChange={e => setImportedCustomQualifierInputs(prev => ({ ...prev, [i]: e.target.value }))} placeholder="Ex : Parrain…" className="flex-1 min-w-[100px] rounded-lg border border-slate-200 px-2 py-1 text-sm" />
+                                <input type="text" value={importedCustomQualifierInputs[i] ?? ''} onChange={e => setImportedCustomQualifierInputs(prev => ({ ...prev, [i]: e.target.value }))} placeholder="Ex : Parrain…" className="flex-1 min-w-0 rounded-lg border border-slate-200 px-2 py-1 text-sm" />
                                 <button type="button" onClick={() => { const v = (importedCustomQualifierInputs[i] ?? '').trim(); if (v && !(c.qualifiers ?? []).includes(v)) { setImportedContacts(prev => prev.map((co, j) => j === i ? { ...co, qualifiers: [...(co.qualifiers ?? []), v] } : co)); setImportedCustomQualifierInputs(prev => ({ ...prev, [i]: '' })); } }} disabled={!(importedCustomQualifierInputs[i] ?? '').trim()} className="px-2 py-1 rounded border border-slate-200 text-slate-600 text-xs hover:bg-slate-50 disabled:opacity-50">Ajouter</button>
                               </div>
                               {(c.qualifiers ?? []).filter(q => !QUALIFIER_OPTIONS.includes(q)).length > 0 && (

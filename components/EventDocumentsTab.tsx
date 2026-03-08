@@ -220,7 +220,7 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
             </div>
             <div className="p-4 flex-1 overflow-y-auto space-y-4">
               <textarea
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm"
+                className="w-full min-w-0 rounded-xl border border-slate-200 px-4 py-3 text-base"
                 rows={3}
                 placeholder="Message accompagnant le lien du document…"
                 value={shareMessage}
@@ -560,13 +560,13 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
             />
             <input
               type="text"
-              className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm"
+              className="w-full min-w-0 rounded-xl border border-slate-200 px-4 py-2 text-base"
               placeholder="Nom du document"
               value={uploadName}
               onChange={e => setUploadName(e.target.value)}
             />
             <select
-              className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm"
+              className="w-full min-w-0 rounded-xl border border-slate-200 px-4 py-2 text-base"
               value={uploadType}
               onChange={e => setUploadType(e.target.value)}
             >

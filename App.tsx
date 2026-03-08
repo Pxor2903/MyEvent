@@ -164,7 +164,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <>
+    <div className="w-full max-w-full min-w-0 overflow-x-hidden">
       {currentUser ? (
         <Home user={currentUser} onLogout={handleLogout} />
       ) : (
@@ -196,7 +196,7 @@ const App: React.FC = () => {
         </AuthLayout>
       )}
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
-    </>
+    </div>
   );
 };
 

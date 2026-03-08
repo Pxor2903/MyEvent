@@ -76,7 +76,7 @@ export const EventForm: React.FC<EventFormProps> = ({ user, onSubmit, onCancel }
         <div>
           <label className="text-sm font-medium text-slate-700 block mb-1">Description</label>
           <textarea
-            className="w-full h-28 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 resize-none"
+            className="w-full min-w-0 h-28 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-base placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 resize-none"
             placeholder="Ambiance, objectifs..."
             value={formData.description}
             onChange={e => setFormData({ ...formData, description: e.target.value })}
