@@ -215,6 +215,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
                 if (updated) setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
                 fetchEvents();
               }}
+              onRefresh={fetchEvents}
             />
             </div>
           ) : (

@@ -174,10 +174,176 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
   const isGlobalView = filterSubEventId == null;
   const columnsForSubEvents = filterSubEventId ? [] : subEvents;
 
+  // Scinder : en attente de réponse vs réponses reçues (confirmé ou décliné)
+  const guestsPending = guests.filter((g) => g.status === 'pending');
+  const guestsResponded = guests.filter((g) => g.status !== 'pending');
+
   const effectiveAttendanceForRow = (g: Guest, subEventId: string) => {
     const max = effectiveGuestCount(g);
     const raw = effectiveAttendance(g, subEventId);
     return Math.min(raw, max);
+  };
+
+  const renderGuestCard = (g: Guest) => {
+    const canEditThis = canEditGuest(g, currentUserId, event);
+    return (
+      <li key={g.id} className="py-3 px-2">
+        <div
+          role={onGuestClick ? 'button' : undefined}
+          tabIndex={onGuestClick ? 0 : undefined}
+          onClick={onGuestClick ? () => onGuestClick(g) : undefined}
+          onKeyDown={onGuestClick ? (e) => e.key === 'Enter' && onGuestClick(g) : undefined}
+          className={`w-full text-left rounded-xl p-3 border border-slate-100 bg-slate-50/50 flex flex-col gap-1 ${onGuestClick ? 'hover:bg-slate-50 hover:border-slate-200 active:bg-slate-100 min-h-[44px] cursor-pointer' : ''}`}
+        >
+          <span className="font-medium text-slate-900">
+            {g.firstName} {g.lastName}
+          </span>
+          {g.email && <span className="text-xs text-slate-500 truncate">{g.email}</span>}
+          {!g.email && g.phone && <span className="text-xs text-slate-500">{g.phone}</span>}
+          <span className={`inline-flex self-start mt-1 px-2 py-0.5 rounded-md text-xs font-medium ${
+            g.status === 'confirmed' ? 'bg-emerald-100 text-emerald-800' :
+            g.status === 'declined' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-600'
+          }`}>
+            {STATUS_LABELS[g.status]}
+          </span>
+          {isGlobalView && (
+            <span className="text-xs text-slate-500 mt-0.5">Nb personnes : {effectiveGuestCount(g)}</span>
+          )}
+          {!isGlobalView && filterSubEventId && (
+            <span className="text-xs text-slate-500 mt-0.5">
+              Présents : {effectiveAttendanceForRow(g, filterSubEventId)} / {effectiveGuestCount(g)}
+            </span>
+          )}
+        </div>
+        {canManage && (
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); handleDeleteGuest(g); }}
+              disabled={deletingId === g.id}
+              className="touch-target p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 text-xs font-medium"
+              aria-label="Supprimer"
+            >
+              Supprimer
+            </button>
+          </div>
+        )}
+      </li>
+    );
+  };
+
+  const renderTableRow = (g: Guest) => {
+    const count = effectiveGuestCount(g);
+    const canEditThis = canEditGuest(g, currentUserId, event);
+    return (
+      <tr key={g.id} className="hover:bg-slate-50/50">
+        <td className="px-2 py-2.5 text-slate-600 text-xs max-w-[140px]">
+          {(g.qualifiers && g.qualifiers.length > 0)
+            ? g.qualifiers.map((q) => formatQualifierLabel(q)).join(', ')
+            : '—'}
+        </td>
+        <td className="px-3 py-2.5 font-medium text-slate-900">
+          {onGuestClick ? (
+            <button type="button" onClick={() => onGuestClick(g)} className="text-left hover:text-teal-600 underline decoration-teal-200 hover:decoration-teal-500">
+              {g.lastName}
+            </button>
+          ) : (
+            g.lastName
+          )}
+        </td>
+        <td className="px-3 py-2.5 text-slate-800">
+          {onGuestClick ? (
+            <button type="button" onClick={() => onGuestClick(g)} className="text-left hover:text-teal-600 underline decoration-teal-200 hover:decoration-teal-500">
+              {g.firstName}
+            </button>
+          ) : (
+            g.firstName
+          )}
+        </td>
+        <td className="px-3 py-2.5 text-slate-600 hidden sm:table-cell truncate max-w-[180px]">{g.email || '—'}</td>
+        <td className="px-3 py-2.5 text-slate-600 hidden md:table-cell">{g.phone || '—'}</td>
+        <td className="px-3 py-2.5">
+          <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-medium ${
+            g.status === 'confirmed' ? 'bg-emerald-100 text-emerald-800' :
+            g.status === 'declined' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-600'
+          }`}>
+            {STATUS_LABELS[g.status]}
+          </span>
+        </td>
+        {isGlobalView && (
+          <td className="px-3 py-2.5 text-center text-slate-700">
+            {canEditThis ? (
+              <input
+                type="number"
+                min={1}
+                max={99}
+                value={count}
+                onChange={(e) => setGuestCount(g, e.target.value === '' ? 1 : parseInt(e.target.value, 10))}
+                className="w-12 text-center rounded-lg border border-slate-200 px-1 py-1 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                title="Nombre de personnes"
+              />
+            ) : (
+              <span>{count}</span>
+            )}
+          </td>
+        )}
+        {!isGlobalView && (filterSubEventId ? (
+          <td className="px-2 py-2.5 text-center">
+            {canEditThis ? (
+              <input
+                type="number"
+                min={0}
+                max={count}
+                value={effectiveAttendanceForRow(g, filterSubEventId)}
+                onChange={(e) => setAttendance(g, filterSubEventId, e.target.value === '' ? 0 : parseInt(e.target.value, 10))}
+                className="w-12 text-center rounded-lg border border-slate-200 px-1 py-1 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                title="Nombre de personnes présentes"
+              />
+            ) : (
+              <span className="text-slate-700">{effectiveAttendanceForRow(g, filterSubEventId)}</span>
+            )}
+          </td>
+        ) : (
+          columnsForSubEvents.map((s) => {
+            const present = effectiveAttendanceForRow(g, s.id);
+            const isLinked = g.linkedSubEventIds.includes(s.id);
+            return (
+              <td key={s.id} className="px-2 py-2.5 text-center">
+                {!isLinked ? (
+                  <span className="text-slate-300">—</span>
+                ) : canEditThis ? (
+                  <input
+                    type="number"
+                    min={0}
+                    max={count}
+                    value={present}
+                    onChange={(e) => setAttendance(g, s.id, e.target.value === '' ? 0 : parseInt(e.target.value, 10))}
+                    className="w-10 text-center rounded-lg border border-slate-200 px-1 py-1 text-xs focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                    title={`Présents · ${s.title}`}
+                  />
+                ) : (
+                  <span className="text-slate-700">{present}</span>
+                )}
+              </td>
+            );
+          })
+        ))}
+        {canManage && (
+          <td className="px-2 py-2.5 text-center">
+            <button
+              type="button"
+              onClick={() => handleDeleteGuest(g)}
+              disabled={deletingId === g.id || !canEditThis}
+              className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Supprimer l’invité"
+              aria-label="Supprimer"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </button>
+          </td>
+        )}
+      </tr>
+    );
   };
 
   return (
@@ -229,55 +395,29 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
           </div>
         ) : (
           <>
-            {/* Vue cartes — mobile uniquement */}
-            <ul className="md:hidden divide-y divide-slate-100 p-3 space-y-0">
-              {guests.map((g) => {
-                const canEditThis = canEditGuest(g, currentUserId, event);
-                return (
-                  <li key={g.id} className="py-3 px-2">
-                    <div
-                      role={onGuestClick ? 'button' : undefined}
-                      tabIndex={onGuestClick ? 0 : undefined}
-                      onClick={onGuestClick ? () => onGuestClick(g) : undefined}
-                      onKeyDown={onGuestClick ? (e) => e.key === 'Enter' && onGuestClick(g) : undefined}
-                      className={`w-full text-left rounded-xl p-3 border border-slate-100 bg-slate-50/50 flex flex-col gap-1 ${onGuestClick ? 'hover:bg-slate-50 hover:border-slate-200 active:bg-slate-100 min-h-[44px] cursor-pointer' : ''}`}
-                    >
-                      <span className="font-medium text-slate-900">
-                        {g.firstName} {g.lastName}
-                      </span>
-                      {g.email && <span className="text-xs text-slate-500 truncate">{g.email}</span>}
-                      {!g.email && g.phone && <span className="text-xs text-slate-500">{g.phone}</span>}
-                      {!isGlobalView && (
-                        <span className={`inline-flex self-start mt-1 px-2 py-0.5 rounded-md text-xs font-medium ${
-                          g.status === 'confirmed' ? 'bg-emerald-100 text-emerald-800' :
-                          g.status === 'declined' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-600'
-                        }`}>
-                          {STATUS_LABELS[g.status]}
-                        </span>
-                      )}
-                      {!isGlobalView && filterSubEventId && (
-                        <span className="text-xs text-slate-500 mt-0.5">
-                          Présents : {effectiveAttendanceForRow(g, filterSubEventId)} / {effectiveGuestCount(g)}
-                        </span>
-                      )}
-                    </div>
-                    {canManage && (
-                      <div className="mt-2 flex justify-end">
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleDeleteGuest(g); }}
-                          disabled={deletingId === g.id}
-                          className="touch-target p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 text-xs font-medium"
-                          aria-label="Supprimer"
-                        >
-                          Supprimer
-                        </button>
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+            {/* Vue cartes — mobile uniquement (scindée en deux blocs) */}
+            <div className="md:hidden p-3 space-y-6">
+              {guestsPending.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 px-2 pb-2">
+                    En attente de réponse ({guestsPending.length})
+                  </h3>
+                  <ul className="divide-y divide-slate-100 space-y-0">
+                    {guestsPending.map((g) => renderGuestCard(g))}
+                  </ul>
+                </div>
+              )}
+              {guestsResponded.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 px-2 pb-2">
+                    Réponses reçues ({guestsResponded.length})
+                  </h3>
+                  <ul className="divide-y divide-slate-100 space-y-0">
+                    {guestsResponded.map((g) => renderGuestCard(g))}
+                  </ul>
+                </div>
+              )}
+            </div>
 
             {/* Tableau — desktop */}
             <table className="hidden md:table w-full text-left text-sm border-collapse">
@@ -288,7 +428,8 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
                 <th className="px-3 py-3 font-semibold text-slate-700 whitespace-nowrap">Prénom</th>
                 <th className="px-3 py-3 font-semibold text-slate-700 whitespace-nowrap hidden sm:table-cell">Email</th>
                 <th className="px-3 py-3 font-semibold text-slate-700 whitespace-nowrap hidden md:table-cell">Tél</th>
-                {!isGlobalView && <th className="px-3 py-3 font-semibold text-slate-700 whitespace-nowrap">Statut</th>}
+                <th className="px-3 py-3 font-semibold text-slate-700 whitespace-nowrap">Statut</th>
+                {isGlobalView && <th className="px-3 py-3 font-semibold text-slate-700 whitespace-nowrap text-center">Nb personnes</th>}
                 {!isGlobalView && (filterSubEventId ? (
                   <th className="px-3 py-3 font-semibold text-slate-700 whitespace-nowrap text-center">Présents</th>
                 ) : (
@@ -298,111 +439,31 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
                     </th>
                   ))
                 ))}
-                {canManage && !isGlobalView && <th className="px-2 py-3 font-semibold text-slate-600 text-center w-12" aria-label="Supprimer" />}
+                {canManage && <th className="px-2 py-3 font-semibold text-slate-600 text-center w-12" aria-label="Supprimer" />}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {guests.map((g) => {
-                const count = effectiveGuestCount(g);
-                const canEditThis = canEditGuest(g, currentUserId, event);
-                return (
-                  <tr key={g.id} className="hover:bg-slate-50/50">
-                    <td className="px-2 py-2.5 text-slate-600 text-xs max-w-[140px]">
-                      {(g.qualifiers && g.qualifiers.length > 0)
-                        ? g.qualifiers.map((q) => formatQualifierLabel(q)).join(', ')
-                        : '—'}
-                    </td>
-                    <td className="px-3 py-2.5 font-medium text-slate-900">
-                      {onGuestClick ? (
-                        <button type="button" onClick={() => onGuestClick(g)} className="text-left hover:text-teal-600 underline decoration-teal-200 hover:decoration-teal-500">
-                          {g.lastName}
-                        </button>
-                      ) : (
-                        g.lastName
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 text-slate-800">
-                      {onGuestClick ? (
-                        <button type="button" onClick={() => onGuestClick(g)} className="text-left hover:text-teal-600 underline decoration-teal-200 hover:decoration-teal-500">
-                          {g.firstName}
-                        </button>
-                      ) : (
-                        g.firstName
-                      )}
-                    </td>
-                    {!isGlobalView && (
-                      <>
-                        <td className="px-3 py-2.5 text-slate-600 hidden sm:table-cell truncate max-w-[180px]">{g.email || '—'}</td>
-                        <td className="px-3 py-2.5 text-slate-600 hidden md:table-cell">{g.phone || '—'}</td>
-                        <td className="px-3 py-2.5">
-                          <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-medium ${
-                            g.status === 'confirmed' ? 'bg-emerald-100 text-emerald-800' :
-                            g.status === 'declined' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-600'
-                          }`}>
-                            {STATUS_LABELS[g.status]}
-                          </span>
-                        </td>
-                      </>
-                    )}
-                    {!isGlobalView && (filterSubEventId ? (
-                      <td className="px-2 py-2.5 text-center">
-                        {canEditThis ? (
-                          <input
-                            type="number"
-                            min={0}
-                            max={count}
-                            value={effectiveAttendanceForRow(g, filterSubEventId)}
-                            onChange={(e) => setAttendance(g, filterSubEventId, e.target.value === '' ? 0 : parseInt(e.target.value, 10))}
-                            className="w-12 text-center rounded-lg border border-slate-200 px-1 py-1 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
-                            title="Nombre de personnes présentes"
-                          />
-                        ) : (
-                          <span className="text-slate-700">{effectiveAttendanceForRow(g, filterSubEventId)}</span>
-                        )}
-                      </td>
-                    ) : (
-                      columnsForSubEvents.map((s) => {
-                        const present = effectiveAttendanceForRow(g, s.id);
-                        const isLinked = g.linkedSubEventIds.includes(s.id);
-                        return (
-                          <td key={s.id} className="px-2 py-2.5 text-center">
-                            {!isLinked ? (
-                              <span className="text-slate-300">—</span>
-                            ) : canEditThis ? (
-                              <input
-                                type="number"
-                                min={0}
-                                max={count}
-                                value={present}
-                                onChange={(e) => setAttendance(g, s.id, e.target.value === '' ? 0 : parseInt(e.target.value, 10))}
-                                className="w-10 text-center rounded-lg border border-slate-200 px-1 py-1 text-xs focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
-                                title={`Présents · ${s.title}`}
-                              />
-                            ) : (
-                              <span className="text-slate-700">{present}</span>
-                            )}
-                          </td>
-                        );
-                      })
-                    ))}
-                    {canManage && (
-                      <td className="px-2 py-2.5 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteGuest(g)}
-                          disabled={deletingId === g.id || !canEditThis}
-                          className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Supprimer l’invité"
-                          aria-label="Supprimer"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
+            {/* En attente de réponse */}
+            {guestsPending.length > 0 && (
+              <tbody className="divide-y divide-slate-100">
+                <tr className="bg-slate-50/80">
+                  <td colSpan={100} className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    En attente de réponse ({guestsPending.length})
+                  </td>
+                </tr>
+                {guestsPending.map((g) => renderTableRow(g))}
+              </tbody>
+            )}
+            {/* Réponses reçues */}
+            {guestsResponded.length > 0 && (
+              <tbody className="divide-y divide-slate-100">
+                <tr className="bg-slate-50/80">
+                  <td colSpan={100} className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Réponses reçues ({guestsResponded.length})
+                  </td>
+                </tr>
+                {guestsResponded.map((g) => renderTableRow(g))}
+              </tbody>
+            )}
             </table>
           </>
         )}

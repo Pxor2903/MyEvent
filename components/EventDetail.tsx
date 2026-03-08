@@ -31,6 +31,8 @@ interface EventDetailProps {
   user: User;
   onBack: () => void;
   onUpdate: (updated: Event | null) => void;
+  /** Appelé pour rafraîchir les données de l’événement (ex. après une réponse d’invité). */
+  onRefresh?: () => void;
 }
 
 /** Barre de filtrage par responsable (qui a ajouté les invités) dans l'onglet Invités. */
@@ -77,7 +79,7 @@ function GuestsTableSegmentBar({
   );
 }
 
-export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, onUpdate }) => {
+export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, onUpdate, onRefresh }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'program' | 'chat' | 'settings' | 'budget' | 'guests' | 'documents'>('overview');
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
   const [subTab, setSubTab] = useState<'sequence' | 'chat' | 'guests' | 'budget' | 'documents'>('sequence');
@@ -100,6 +102,11 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
 
   const chatChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Rafraîchir l’événement à l’ouverture de l’onglet Invités pour afficher les réponses (statut, nb personnes) à jour
+  useEffect(() => {
+    if (activeTab === 'guests' && onRefresh) onRefresh();
+  }, [activeTab, onRefresh]);
 
   // Modals
   const [showMomentModal, setShowMomentModal] = useState(false);
