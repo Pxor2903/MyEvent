@@ -14,11 +14,18 @@ export async function getOrCreateInvitationLinks(
   const normalized = baseUrl.replace(/\/+$/, '');
   const result: Record<string, string> = {};
 
-  const { data: existing } = await supabase
+  const { data: existing, error: selectError } = await supabase
     .from('invitation_links')
     .select('guest_id, token')
     .eq('event_id', eventId)
     .in('guest_id', guestIds);
+
+  if (selectError) {
+    console.error('[invitationLinks] select error', selectError);
+    throw new Error(
+      'Impossible de charger les liens d’invitation. Vérifiez que la migration Supabase (invitation_links) est exécutée et que vous êtes connecté comme organisateur.'
+    );
+  }
 
   const byGuest = new Map((existing || []).map((r) => [r.guest_id, r.token]));
 
@@ -26,11 +33,17 @@ export async function getOrCreateInvitationLinks(
     let token = byGuest.get(gid);
     if (!token) {
       token = crypto.randomUUID();
-      await supabase.from('invitation_links').insert({
+      const { error: insertError } = await supabase.from('invitation_links').insert({
         event_id: eventId,
         guest_id: gid,
         token,
       });
+      if (insertError) {
+        console.error('[invitationLinks] insert error', insertError);
+        throw new Error(
+          'Impossible de créer les liens d’invitation. Vérifiez que la migration Supabase (invitation_links) est exécutée et que vous êtes organisateur de cet événement.'
+        );
+      }
     }
     result[gid] = `${normalized}/repondre?token=${token}`;
   }

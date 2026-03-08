@@ -108,6 +108,13 @@ Après le redéploiement, les liens d’invitation (`/api/invitation?token=...` 
 
 La clé **service_role** permet à l’API de lire et mettre à jour les événements et les tables invitation sans authentification utilisateur (nécessaire pour la page publique « Répondre à l’invitation »).
 
+## Dépannage : « Je ne reçois pas le lien de réponse »
+
+- **Le document doit être de type « Carte d’invitation »** : à l’ajout du document, choisir **Carte d’invitation** dans la liste (type `invitation` en base). Seuls ces documents déclenchent l’ajout du lien « Répondre à l’invitation » dans le SMS/WhatsApp.
+- **Migration exécutée** : les tables `invitation_links` et `invitation_responses` doivent exister (voir section « Exécuter la migration Supabase »). Sinon, un message d’erreur s’affiche au clic sur « Envoyer à tous ».
+- **Droits organisateur** : tu dois être connecté comme **créateur** ou **organisateur confirmé** de l’événement. Sinon la création des liens est refusée (RLS) et une alerte s’affiche.
+- Si une alerte apparaît au moment de l’envoi, lire le message : il indique soit un problème de migration, soit un problème de droits.
+
 ## Voir les réponses
 
 Les réponses sont visibles côté organisateur : le **statut** et le **nombre de personnes** de chaque invité sont mis à jour dans l’onglet Invités. Le tableau **invitation_responses** peut être interrogé (Supabase SQL ou une future vue « Réponses reçues ») pour l’historique et les messages libres.

@@ -24,6 +24,12 @@ const CHANNEL_LABELS: Record<ShareChannel, string> = {
   email: 'Email'
 };
 
+/** Document considéré comme « Carte d’invitation » pour inclure le lien de réponse. */
+function isInvitationDoc(doc: EventAttachment | null): boolean {
+  if (!doc) return false;
+  return doc.type === 'invitation' || ATTACHMENT_TYPE_LABELS[doc.type] === "Carte d'invitation";
+}
+
 interface EventDocumentsTabProps {
   event: Event;
   currentUserId: string;
@@ -358,12 +364,20 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
                                   try {
                                     let messageToSend = fullMessage;
                                     let messagesOpt: string[] | undefined;
-                                    if (shareDoc?.type === 'invitation') {
+                                    if (isInvitationDoc(shareDoc)) {
                                       const guestIds = withSms.map((e) => e.guest.id);
                                       const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-                                      const links = baseUrl ? await getOrCreateInvitationLinks(event.id, guestIds, baseUrl) : {};
-                                      if (Object.keys(links).length > 0) {
-                                        messagesOpt = withSms.map((e) => fullMessage + (shareDoc?.url ? `\n\n${shareDoc.url}` : '') + `\n\nRépondre à l'invitation : ${links[e.guest.id] ?? ''}`);
+                                      if (baseUrl) {
+                                        try {
+                                          const links = await getOrCreateInvitationLinks(event.id, guestIds, baseUrl);
+                                          if (Object.keys(links).length > 0) {
+                                            messagesOpt = withSms.map((e) => fullMessage + (shareDoc?.url ? `\n\n${shareDoc.url}` : '') + `\n\nRépondre à l'invitation : ${links[e.guest.id] ?? ''}`);
+                                          }
+                                        } catch (err) {
+                                          alert(err instanceof Error ? err.message : 'Liens d’invitation indisponibles.');
+                                          setSmsSending(false);
+                                          return;
+                                        }
                                       }
                                     }
                                     const result = await sendSmsToMany(phoneNumbersSms, messageToSend, messagesOpt);
@@ -418,13 +432,21 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
                                 setWhatsAppSending(true);
                                 try {
                                   let messagesOpt: string[] | undefined;
-                                  if (shareDoc?.type === 'invitation') {
+                                  if (isInvitationDoc(shareDoc)) {
                                     const withWhatsAppEntries = shareData.entries.filter(e => e.canShare && e.whatsappUrl);
                                     const guestIds = withWhatsAppEntries.map((e) => e.guest.id);
                                     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-                                    const links = baseUrl ? await getOrCreateInvitationLinks(event.id, guestIds, baseUrl) : {};
-                                    if (Object.keys(links).length > 0) {
-                                      messagesOpt = withWhatsAppEntries.map((e) => fullMessage + (shareDoc?.url ? `\n\n${shareDoc.url}` : '') + `\n\nRépondre à l'invitation : ${links[e.guest.id] ?? ''}`);
+                                    if (baseUrl) {
+                                      try {
+                                        const links = await getOrCreateInvitationLinks(event.id, guestIds, baseUrl);
+                                        if (Object.keys(links).length > 0) {
+                                          messagesOpt = withWhatsAppEntries.map((e) => fullMessage + (shareDoc?.url ? `\n\n${shareDoc.url}` : '') + `\n\nRépondre à l'invitation : ${links[e.guest.id] ?? ''}`);
+                                        }
+                                      } catch (err) {
+                                        alert(err instanceof Error ? err.message : 'Liens d’invitation indisponibles.');
+                                        setWhatsAppSending(false);
+                                        return;
+                                      }
                                     }
                                   }
                                   const result = await sendWhatsAppToMany(phoneNumbers, fullMessage, shareDoc?.url, messagesOpt);
