@@ -36,9 +36,14 @@ export default async function handler(req, res) {
     res.status(400).json({ error: 'JSON invalide' });
     return;
   }
-  const { phoneNumbers, message } = body;
-  if (!Array.isArray(phoneNumbers) || !phoneNumbers.length || typeof message !== 'string') {
-    res.status(400).json({ error: 'phoneNumbers (array) et message (string) requis' });
+  const { phoneNumbers, message, messages } = body;
+  const usePersonalized = Array.isArray(messages) && messages.length === phoneNumbers?.length;
+  if (!Array.isArray(phoneNumbers) || !phoneNumbers.length) {
+    res.status(400).json({ error: 'phoneNumbers (array) requis' });
+    return;
+  }
+  if (!usePersonalized && typeof message !== 'string') {
+    res.status(400).json({ error: 'message (string) requis, ou messages (array) de même longueur que phoneNumbers' });
     return;
   }
   const toNumbers = phoneNumbers
@@ -48,13 +53,19 @@ export default async function handler(req, res) {
     res.status(400).json({ error: 'Aucun numéro valide (E.164 avec +)' });
     return;
   }
+  if (usePersonalized && toNumbers.length !== messages.length) {
+    res.status(400).json({ error: 'messages doit avoir la même longueur que phoneNumbers' });
+    return;
+  }
 
   let sent = 0;
   let failed = 0;
   const errors = [];
   const auth = Buffer.from(`${twilioAccountSid}:${twilioAuthToken}`).toString('base64');
 
-  for (const to of toNumbers) {
+  for (let i = 0; i < toNumbers.length; i++) {
+    const to = toNumbers[i];
+    const bodyText = usePersonalized ? (typeof messages[i] === 'string' ? messages[i] : message) : message;
     try {
       const r = await fetch(
         `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`,
@@ -67,7 +78,7 @@ export default async function handler(req, res) {
           body: new URLSearchParams({
             To: to,
             From: twilioFrom.trim(),
-            Body: message
+            Body: bodyText
           }).toString()
         }
       );

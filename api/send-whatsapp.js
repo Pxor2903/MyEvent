@@ -39,9 +39,14 @@ export default async function handler(req, res) {
     res.status(400).json({ error: 'JSON invalide' });
     return;
   }
-  const { phoneNumbers, message, documentUrl } = body;
-  if (!Array.isArray(phoneNumbers) || !phoneNumbers.length || typeof message !== 'string') {
-    res.status(400).json({ error: 'phoneNumbers (array) et message (string) requis' });
+  const { phoneNumbers, message, messages, documentUrl } = body;
+  const usePersonalized = Array.isArray(messages) && messages.length === phoneNumbers?.length;
+  if (!Array.isArray(phoneNumbers) || !phoneNumbers.length) {
+    res.status(400).json({ error: 'phoneNumbers (array) requis' });
+    return;
+  }
+  if (!usePersonalized && typeof message !== 'string') {
+    res.status(400).json({ error: 'message (string) requis, ou messages (array) de même longueur que phoneNumbers' });
     return;
   }
   const hasDocumentUrl = typeof documentUrl === 'string' && documentUrl.trim().length > 0;
@@ -52,21 +57,27 @@ export default async function handler(req, res) {
     res.status(400).json({ error: 'Aucun numéro valide (E.164 avec +)' });
     return;
   }
+  if (usePersonalized && toNumbers.length !== messages.length) {
+    res.status(400).json({ error: 'messages doit avoir la même longueur que phoneNumbers' });
+    return;
+  }
   const useTemplate = !!contentSid?.trim();
 
   let sent = 0;
   let failed = 0;
   const errors = [];
-  for (const to of toNumbers) {
+  for (let i = 0; i < toNumbers.length; i++) {
+    const to = toNumbers[i];
+    const msgText = usePersonalized ? (typeof messages[i] === 'string' ? messages[i] : message) : message;
     const toWhatsApp = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
     const bodyParams = { To: toWhatsApp, From: twilioFrom };
     if (useTemplate) {
       bodyParams.ContentSid = contentSid.trim();
       bodyParams.ContentVariables = JSON.stringify(
-        hasDocumentUrl ? { 1: message, 2: documentUrl.trim() } : { 1: message }
+        hasDocumentUrl ? { 1: msgText, 2: documentUrl.trim() } : { 1: msgText }
       );
     } else {
-      bodyParams.Body = message;
+      bodyParams.Body = msgText;
     }
     try {
       const r = await fetch(

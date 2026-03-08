@@ -9,9 +9,20 @@ import { AuthLayout } from './components/AuthLayout';
 import { LoginForm } from './components/LoginForm';
 import { RegisterForm } from './components/RegisterForm';
 import { Home } from './components/Home';
+import { RespondToInvitation } from './components/RespondToInvitation';
 import { Toast } from './components/Toast';
 
+function getInvitationToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return new URLSearchParams(window.location.search).get('token');
+  } catch {
+    return null;
+  }
+}
+
 const App: React.FC = () => {
+  const [invitationToken] = useState<string | null>(getInvitationToken);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [isLoading, setIsLoading] = useState(false);
@@ -154,6 +165,10 @@ const App: React.FC = () => {
     setCurrentUser(null);
     showToast("Déconnexion réussie", "success");
   };
+
+  if (invitationToken) {
+    return <RespondToInvitation token={invitationToken} />;
+  }
 
   if (isInitializing) {
     return (

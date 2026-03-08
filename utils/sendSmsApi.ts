@@ -27,7 +27,15 @@ export interface SendSmsResult {
   error?: string;
 }
 
-export async function sendSmsToMany(phoneNumbers: string[], message: string): Promise<SendSmsResult> {
+/**
+ * Envoie un message (ou des messages personnalisés) à tous les numéros.
+ * Si messages est fourni et a la même longueur que phoneNumbers, chaque destinataire reçoit messages[i].
+ */
+export async function sendSmsToMany(
+  phoneNumbers: string[],
+  message: string,
+  messages?: string[]
+): Promise<SendSmsResult> {
   if (!API_URL) {
     return { ok: false, error: 'API SMS non configurée (VITE_SMS_API_URL)' };
   }
@@ -35,11 +43,15 @@ export async function sendSmsToMany(phoneNumbers: string[], message: string): Pr
   if (numbers.length === 0) {
     return { ok: false, error: 'Aucun numéro valide' };
   }
+  const body =
+    Array.isArray(messages) && messages.length === numbers.length
+      ? { phoneNumbers: numbers, messages }
+      : { phoneNumbers: numbers, message };
   try {
     const res = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phoneNumbers: numbers, message }),
+      body: JSON.stringify(body),
       redirect: 'manual'
     });
     if (res.type === 'opaqueredirect' || res.status === 301 || res.status === 302) {

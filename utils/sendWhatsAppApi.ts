@@ -35,7 +35,8 @@ export interface SendWhatsAppResult {
 export async function sendWhatsAppToMany(
   phoneNumbers: string[],
   message: string,
-  documentUrl?: string
+  documentUrl?: string,
+  messages?: string[]
 ): Promise<SendWhatsAppResult> {
   if (!API_URL) {
     return { ok: false, error: 'API WhatsApp non configurée (VITE_WHATSAPP_API_URL)' };
@@ -44,11 +45,12 @@ export async function sendWhatsAppToMany(
   if (numbers.length === 0) {
     return { ok: false, error: 'Aucun numéro valide' };
   }
-  const body: { phoneNumbers: string[]; message: string; documentUrl?: string } = {
+  const body: { phoneNumbers: string[]; message: string; documentUrl?: string; messages?: string[] } = {
     phoneNumbers: numbers,
     message
   };
   if (documentUrl?.trim()) body.documentUrl = documentUrl.trim();
+  if (Array.isArray(messages) && messages.length === numbers.length) body.messages = messages;
   try {
     console.log('[WhatsApp API] Envoi POST vers:', API_URL);
     const res = await fetch(API_URL, {
