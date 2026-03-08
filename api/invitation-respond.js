@@ -82,11 +82,17 @@ export default async function handler(req, res) {
   }
 
   const guest = guests[guestIndex];
+  const linkedIds = Array.isArray(guest.linkedSubEventIds) ? guest.linkedSubEventIds : [];
+  const presentCount = confirmed ? guestCount : 0;
+  const attendance = { ...(guest.attendance || {}) };
+  linkedIds.forEach((subId) => {
+    attendance[subId] = presentCount;
+  });
   guests[guestIndex] = {
     ...guest,
     status: confirmed ? 'confirmed' : 'declined',
     guestCount,
-    attendance: guest.attendance || {},
+    attendance,
   };
 
   const { error: updateError } = await supabase

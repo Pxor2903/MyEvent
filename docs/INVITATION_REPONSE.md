@@ -117,4 +117,4 @@ La clé **service_role** permet à l’API de lire et mettre à jour les événe
 
 ## Voir les réponses
 
-Les réponses sont visibles côté organisateur : le **statut** et le **nombre de personnes** de chaque invité sont mis à jour dans l’onglet Invités. Le tableau **invitation_responses** peut être interrogé (Supabase SQL ou une future vue « Réponses reçues ») pour l’historique et les messages libres.
+Les réponses sont visibles côté organisateur : le **statut** et le **nombre de personnes** de chaque invité sont mis à jour dans l’onglet Invités. La colonne **Présents** (par séquence) est directement liée à la réponse : **Décliné** → 0, **Confirmé** → nombre de personnes indiqué (ex. « vient à 2 » → 2), comme dans la fiche détail de l’invité. Le tableau **invitation_responses** peut être interrogé (Supabase SQL ou une future vue « Réponses reçues ») pour l’historique et les messages libres.

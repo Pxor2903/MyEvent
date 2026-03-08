@@ -215,7 +215,10 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
                 if (updated) setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
                 fetchEvents();
               }}
-              onRefresh={fetchEvents}
+              onRefreshEvent={async (eventId) => {
+                const fresh = await dbService.findEventById(eventId);
+                if (fresh) setEvents((prev) => prev.map((e) => (e.id === fresh.id ? fresh : e)));
+              }}
             />
             </div>
           ) : (

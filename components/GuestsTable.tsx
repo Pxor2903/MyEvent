@@ -18,10 +18,14 @@ function getGuestCount(g: Guest): number {
   return Math.max(1, Math.min(99, g.guestCount ?? 1));
 }
 
+/** Nombre de « présents » pour une séquence : lié à la réponse d’invitation (décliné = 0, confirmé = nombre de personnes). */
 function getAttendance(g: Guest, subEventId: string): number {
   const n = g.attendance?.[subEventId];
-  if (n === undefined || n === null) return 0;
-  return Math.max(0, Math.min(getGuestCount(g), Number(n)));
+  if (n !== undefined && n !== null) return Math.max(0, Math.min(getGuestCount(g), Number(n)));
+  // Anciennes réponses sans attendance : dérivé du statut (décliné → 0, confirmé → guestCount)
+  if (g.status === 'declined') return 0;
+  if (g.status === 'confirmed' && g.linkedSubEventIds?.includes(subEventId)) return getGuestCount(g);
+  return 0;
 }
 
 type LocalOverrides = Record<string, { guestCount?: number; attendance?: Record<string, number> }>;

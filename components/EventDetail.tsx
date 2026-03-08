@@ -31,8 +31,8 @@ interface EventDetailProps {
   user: User;
   onBack: () => void;
   onUpdate: (updated: Event | null) => void;
-  /** Appelé pour rafraîchir les données de l’événement (ex. après une réponse d’invité). */
-  onRefresh?: () => void;
+  /** Appelé pour rafraîchir l’événement affiché (ex. réponses d’invités). Reçoit l’id de l’événement, charge les données à jour et met à jour le parent. */
+  onRefreshEvent?: (eventId: string) => void | Promise<void>;
 }
 
 /** Barre de filtrage par responsable (qui a ajouté les invités) dans l'onglet Invités. */
@@ -79,7 +79,7 @@ function GuestsTableSegmentBar({
   );
 }
 
-export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, onUpdate, onRefresh }) => {
+export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, onUpdate, onRefreshEvent }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'program' | 'chat' | 'settings' | 'budget' | 'guests' | 'documents'>('overview');
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
   const [subTab, setSubTab] = useState<'sequence' | 'chat' | 'guests' | 'budget' | 'documents'>('sequence');
@@ -104,9 +104,13 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Rafraîchir l’événement à l’ouverture de l’onglet Invités pour afficher les réponses (statut, nb personnes) à jour
+  const onRefreshEventRef = useRef(onRefreshEvent);
+  onRefreshEventRef.current = onRefreshEvent;
   useEffect(() => {
-    if (activeTab === 'guests' && onRefresh) onRefresh();
-  }, [activeTab, onRefresh]);
+    if (activeTab === 'guests' && onRefreshEventRef.current && event.id) {
+      void onRefreshEventRef.current(event.id);
+    }
+  }, [activeTab, event.id]);
 
   // Modals
   const [showMomentModal, setShowMomentModal] = useState(false);
@@ -1134,6 +1138,17 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                       </button>
                     ))}
                   </div>
+                  {onRefreshEvent && event.id && (
+                    <button
+                      type="button"
+                      onClick={() => void onRefreshEvent(event.id)}
+                      className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                      title="Recharger les réponses des invités"
+                    >
+                      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                      Rafraîchir
+                    </button>
+                  )}
                 </div>
                 <GuestsTableSegmentBar
                   event={event}
