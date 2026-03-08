@@ -65,7 +65,7 @@ export default async function handler(req, res) {
 
   const { data: eventRow, error: eventError } = await supabase
     .from('events')
-    .select('id, guests, updated_at')
+    .select('id, guests, updated_at, sub_events')
     .eq('id', link.event_id)
     .single();
 
@@ -82,7 +82,13 @@ export default async function handler(req, res) {
   }
 
   const guest = guests[guestIndex];
-  const linkedIds = Array.isArray(guest.linkedSubEventIds) ? guest.linkedSubEventIds : [];
+  // Séquences liées à l'invité, ou toutes les séquences si aucune liaison (fallback)
+  const subEvents = Array.isArray(eventRow.sub_events) ? eventRow.sub_events : [];
+  const allSubIds = subEvents.map((s) => s.id).filter(Boolean);
+  const linkedIds =
+    Array.isArray(guest.linkedSubEventIds) && guest.linkedSubEventIds.length > 0
+      ? guest.linkedSubEventIds
+      : allSubIds;
   const presentCount = confirmed ? guestCount : 0;
   const attendance = { ...(guest.attendance || {}) };
   linkedIds.forEach((subId) => {
