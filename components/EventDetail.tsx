@@ -827,9 +827,9 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
               { id: 'overview', label: "Vue d'ensemble" },
               { id: 'program', label: 'Programme' },
               { id: 'guests', label: 'Invités' },
+              { id: 'missions', label: 'Missions' },
               { id: 'chat', label: 'Chat' },
               { id: 'documents', label: 'Documents' },
-              { id: 'missions', label: 'Missions' },
               { id: 'settings', label: 'Équipe' },
               ...(canViewBudget ? [{ id: 'budget', label: 'Budget' }] : [])
             ].map(tab => (
