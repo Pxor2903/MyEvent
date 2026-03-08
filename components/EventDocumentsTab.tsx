@@ -15,6 +15,7 @@ import {
 import { openExternalUrl } from '@/utils/openExternalUrl';
 import { shareDocumentViaSheet } from '@/utils/shareDocument';
 import { isWhatsAppApiConfigured, sendWhatsAppToMany } from '@/utils/sendWhatsAppApi';
+import { isSmsApiConfigured, sendSmsToMany } from '@/utils/sendSmsApi';
 
 const CHANNEL_LABELS: Record<ShareChannel, string> = {
   whatsapp: 'WhatsApp',
@@ -53,8 +54,12 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
   const [shareMessage, setShareMessage] = useState(`Bonjour,\n\nVoici un document pour ${subEvent?.title ?? event.title}.\n`);
   /** Pour WhatsApp : index de la prochaine conversation à ouvrir (0 = déjà ouverte la première). Permet "Ouvrir la suivante". */
   const [whatsAppNextIndex, setWhatsAppNextIndex] = useState<number | null>(null);
+  /** Même principe pour SMS natif (une conversation à la fois). */
+  const [smsNextIndex, setSmsNextIndex] = useState<number | null>(null);
   const [whatsAppSending, setWhatsAppSending] = useState(false);
   const [whatsAppResult, setWhatsAppResult] = useState<{ sent: number; failed?: number; error?: string } | null>(null);
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsResult, setSmsResult] = useState<{ sent: number; failed?: number; error?: string } | null>(null);
 
   const loadAttachments = useCallback(async () => {
     setLoading(true);
@@ -78,7 +83,9 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
   useEffect(() => {
     if (!shareDoc) {
       setWhatsAppNextIndex(null);
+      setSmsNextIndex(null);
       setWhatsAppResult(null);
+      setSmsResult(null);
     }
   }, [shareDoc]);
 
@@ -226,7 +233,7 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
                               Depuis votre numéro WhatsApp
                             </p>
                             <p className="text-xs text-slate-500">
-                              Le message part de votre téléphone. Une conversation s’ouvre à la fois : envoyez, puis revenez ici pour la suivante. Aucune configuration requise.
+                              Le message part de votre téléphone. Une conversation s’ouvre à la fois : envoyez, puis revenez ici pour la suivante. Aucune configuration requise. (Le navigateur et WhatsApp ne permettent pas d’ouvrir toutes les conversations en un clic.)
                             </p>
                             {whatsAppNextIndex === null ? (
                               <button
@@ -265,7 +272,110 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
                           </div>
                         )}
 
-                        {/* 2. En un clic via l’API (optionnel, config Twilio) */}
+                        {/* 2. Depuis votre messagerie SMS (natif, une conversation à la fois) */}
+                        {(() => {
+                          const withSms = shareData.entries.filter(e => e.canShare && e.smsUrl);
+                          if (withSms.length === 0) return null;
+                          return (
+                            <div className="flex flex-col gap-2">
+                              <p className="text-sm font-medium text-slate-700">
+                                Depuis votre messagerie SMS
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                Le message part de votre téléphone en SMS. Une conversation s’ouvre à la fois : envoyez, puis revenez ici pour la suivante. Aucune configuration, 100 % natif. (Le téléphone n’autorise qu’une ouverture par action.)
+                              </p>
+                              {smsNextIndex === null ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const first = withSms[0];
+                                    if (first?.smsUrl) {
+                                      openExternalUrl(first.smsUrl);
+                                      setSmsNextIndex(withSms.length > 1 ? 1 : null);
+                                    }
+                                  }}
+                                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:opacity-90"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                                  Ouvrir la 1re conversation SMS ({withSms.length} invité{withSms.length > 1 ? 's' : ''})
+                                </button>
+                              ) : smsNextIndex < withSms.length ? (
+                                <div className="rounded-xl border border-sky-300 bg-sky-50/50 p-4 space-y-2">
+                                  <p className="text-sm font-medium text-slate-700">
+                                    SMS {smsNextIndex + 1} sur {withSms.length} – {withSms[smsNextIndex]?.guest.firstName} {withSms[smsNextIndex]?.guest.lastName}
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const entry = withSms[smsNextIndex];
+                                      if (entry?.smsUrl) openExternalUrl(entry.smsUrl);
+                                      setSmsNextIndex(smsNextIndex >= withSms.length - 1 ? null : smsNextIndex + 1);
+                                    }}
+                                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:opacity-90"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                                    {smsNextIndex >= withSms.length - 1 ? 'Ouvrir le dernier SMS' : 'Ouvrir le SMS suivant'}
+                                  </button>
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })()}
+
+                        {/* 3. Envoyer à tous en un clic par SMS (API Twilio) — message groupé, sans confirmation manuelle */}
+                        {(() => {
+                          const withSms = shareData.entries.filter(e => e.canShare && e.smsUrl);
+                          const phoneNumbersSms = withSms.map((e) => toE164((e.guest.phone ?? '').trim())).filter((n) => n);
+                          const smsApiConfigured = isSmsApiConfigured();
+                          if (!smsApiConfigured || phoneNumbersSms.length === 0) return null;
+                          return (
+                            <div className="flex flex-col gap-2">
+                              <p className="text-sm font-medium text-slate-700">
+                                Envoyer à tous par SMS en un clic
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                Message groupé envoyé à tous les invités par SMS en une fois (API Twilio). Aucune confirmation manuelle.
+                              </p>
+                              <button
+                                type="button"
+                                disabled={smsSending}
+                                onClick={async () => {
+                                  setSmsResult(null);
+                                  setSmsSending(true);
+                                  try {
+                                    const result = await sendSmsToMany(phoneNumbersSms, fullMessage);
+                                    if (result.ok) {
+                                      setSmsResult({
+                                        sent: result.sent ?? phoneNumbersSms.length,
+                                        failed: result.failed,
+                                        error: result.error
+                                      });
+                                    } else {
+                                      alert(result.error ?? 'Erreur d’envoi SMS');
+                                    }
+                                  } finally {
+                                    setSmsSending(false);
+                                  }
+                                }}
+                                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:opacity-90 disabled:opacity-60"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                                {smsSending ? 'Envoi en cours…' : `Envoyer par SMS à tous (${phoneNumbersSms.length} invité${phoneNumbersSms.length > 1 ? 's' : ''})`}
+                              </button>
+                              {smsResult && (
+                                <p className="text-sm text-green-700 bg-green-50 px-3 py-2 rounded-lg">
+                                  Envoyé à {smsResult.sent} contact{smsResult.sent > 1 ? 's' : ''}
+                                  {smsResult.failed ? `, ${smsResult.failed} échec(s)` : ''}.
+                                  {smsResult.failed && smsResult.error && (
+                                    <span className="block text-xs text-amber-800 mt-1">Détails : {smsResult.error}</span>
+                                  )}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        {/* 4. En un clic via l’API WhatsApp (optionnel, config Twilio) */}
                         {apiConfigured && phoneNumbers.length > 0 && (
                           <div className="flex flex-col gap-2">
                             <p className="text-sm font-medium text-slate-700">
@@ -281,7 +391,7 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
                                 setWhatsAppResult(null);
                                 setWhatsAppSending(true);
                                 try {
-                                  const result = await sendWhatsAppToMany(phoneNumbers, fullMessage);
+                                  const result = await sendWhatsAppToMany(phoneNumbers, fullMessage, shareDoc?.url);
                                   if (result.ok) {
                                     setWhatsAppResult({
                                       sent: result.sent ?? phoneNumbers.length,
@@ -321,7 +431,7 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
                           </div>
                         )}
 
-                        {/* 3. Partager le document (natif) */}
+                        {/* 5. Partager le document (natif) */}
                         <div className="flex flex-col gap-2">
                           <p className="text-sm font-medium text-slate-700">
                             Ou partager via l’appareil

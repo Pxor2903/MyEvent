@@ -30,8 +30,13 @@ export interface SendWhatsAppResult {
 
 /**
  * Envoie le même message WhatsApp à tous les numéros (E.164) via l’API configurée.
- */
-export async function sendWhatsAppToMany(phoneNumbers: string[], message: string): Promise<SendWhatsAppResult> {
+ * Si documentUrl est fourni, l'API l'envoie comme variable {{2}} (template avec pièce jointe document).
+*/
+export async function sendWhatsAppToMany(
+  phoneNumbers: string[],
+  message: string,
+  documentUrl?: string
+): Promise<SendWhatsAppResult> {
   if (!API_URL) {
     return { ok: false, error: 'API WhatsApp non configurée (VITE_WHATSAPP_API_URL)' };
   }
@@ -39,12 +44,17 @@ export async function sendWhatsAppToMany(phoneNumbers: string[], message: string
   if (numbers.length === 0) {
     return { ok: false, error: 'Aucun numéro valide' };
   }
+  const body: { phoneNumbers: string[]; message: string; documentUrl?: string } = {
+    phoneNumbers: numbers,
+    message
+  };
+  if (documentUrl?.trim()) body.documentUrl = documentUrl.trim();
   try {
     console.log('[WhatsApp API] Envoi POST vers:', API_URL);
     const res = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phoneNumbers: numbers, message }),
+      body: JSON.stringify(body),
       redirect: 'manual'
     });
     if (res.type === 'opaqueredirect' || res.status === 301 || res.status === 302) {

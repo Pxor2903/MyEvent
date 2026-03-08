@@ -6,15 +6,168 @@
    Dans l’app, option **« Depuis votre numéro WhatsApp »** : le message part de **votre** téléphone. Une conversation s’ouvre à la fois ; vous envoyez, puis vous revenez dans l’app pour ouvrir la suivante. **Aucune configuration** n’est nécessaire. Tous les utilisateurs de MyEvent (organisateurs, admin, etc.) peuvent utiliser cette option sans rien configurer — pas besoin de Twilio.
 
 2. **En un clic via l’API (optionnel)**  
-   Si l’administrateur du déploiement a configuré Twilio (ce guide), un bouton **« Envoyer à tous en un clic »** apparaît. Un seul clic envoie le message à tous les invités via l’API. En **mode sandbox** Twilio, les destinataires doivent avoir rejoint le sandbox ; pour envoyer à n’importe quel numéro sans ça, il faut un compte WhatsApp Business approuvé par Twilio.
+   Si l’administrateur du déploiement a configuré Twilio (ce guide), un bouton **« Envoyer à tous en un clic »** apparaît. Les messages partent d’**un numéro global** (un seul numéro pour toute l’app, configuré une fois). Un seul clic envoie le message à tous les invités via l’API. En **mode sandbox** Twilio, les destinataires doivent avoir rejoint le sandbox ; pour envoyer à n’importe quel numéro sans ça, il faut un compte WhatsApp Business approuvé par Twilio.
 
 **En résumé** : chaque personne qui utilise l’app peut envoyer depuis son propre WhatsApp sans configuration. Seul l’admin du déploiement peut, s’il le souhaite, configurer Twilio pour activer l’envoi « à tous en un clic ».
 
 ---
 
+## Pourquoi on ne peut pas envoyer à tout le monde d’un coup depuis son propre numéro ?
+
+**Limitation technique (WhatsApp + OS)** : il n’existe pas de moyen, pour une app ou un site, d’envoyer en **un seul clic** des messages **depuis ton numéro WhatsApp** à une liste de contacts.
+
+- **WhatsApp** ne fournit pas d’API pour envoyer des messages à partir du compte personnel d’un utilisateur. Les APIs (Twilio, etc.) envoient depuis un **numéro professionnel / Business**, pas depuis le téléphone de l’utilisateur.
+- **Navigateur et téléphone** : pour des raisons de sécurité et de vie privée, une action utilisateur (un clic) ne peut ouvrir qu’**une seule** fenêtre ou app externe. On ne peut donc pas ouvrir 10 conversations WhatsApp d’un coup depuis une page web ou une app.
+
+**Ce qu’on peut faire** : envoyer **depuis ton numéro**, mais **une conversation à la fois** — tu ouvres la 1re, tu envoies, tu reviens dans l’app, tu ouvres la 2e, etc. C’est l’option **« Depuis votre numéro WhatsApp »** dans MyEvent. Il n’y a pas de contournement technique pour faire « tout le monde en un clic depuis mon numéro ».
+
+**Pour envoyer à tous en un clic** : il faut passer par une API (Twilio) qui envoie depuis un **numéro WhatsApp Business** (pas ton numéro perso). Les destinataires n’ont rien à configurer si tu es en **production** (voir ci‑dessous).
+
+---
+
+## Peut-on lier automatiquement le numéro de chaque utilisateur à Twilio à la connexion ?
+
+**Non : on ne peut pas avoir « chaque utilisateur a son numéro lié à Twilio automatiquement, sans rien faire, juste en se connectant ».**
+
+### Pourquoi ce n’est pas possible
+
+1. **WhatsApp / Twilio = numéros Business uniquement**  
+   L’API WhatsApp (via Twilio) ne permet pas d’envoyer des messages **depuis le compte WhatsApp personnel** d’un utilisateur. Elle ne travaille qu’avec des **numéros WhatsApp Business** enregistrés et vérifiés auprès de Meta. Il n’existe pas d’équivalent « OAuth » où l’utilisateur clique sur « Se connecter avec WhatsApp » et l’app envoie ensuite à sa place depuis son numéro perso.
+
+2. **Vérification obligatoire pour chaque numéro d’envoi**  
+   Meta exige une **vérification de propriété** pour chaque numéro utilisé comme expéditeur : réception d’un **code OTP** par SMS ou appel vocal, puis validation. Donc même si on voulait « un numéro par utilisateur », chaque utilisateur devrait **au minimum** recevoir un code et le saisir dans l’app. Ce n’est pas « rien à faire », et ce n’est pas déclenché « juste » par la connexion à MyEvent.
+
+3. **Un seul compte Twilio = un (ou quelques) numéros partagés**  
+   Aujourd’hui, la config Twilio (Account SID, Auth Token, numéro d’envoi) est définie **une fois** au niveau du déploiement (variables d’environnement Vercel). Tous les utilisateurs de cette instance partagent donc **le même numéro d’envoi**. C’est le modèle prévu pour une app comme MyEvent : un numéro « organisateur / événement » pour les envois groupés.
+
+4. **Multi-tenant « un numéro par utilisateur »**  
+   Twilio propose une [Senders API](https://www.twilio.com/docs/whatsapp/register-senders-using-api) pour enregistrer **plusieurs numéros** (plusieurs expéditeurs) sur un même compte. On pourrait en théorie faire : chaque utilisateur **ajoute son numéro** → reçoit un OTP → le saisit → son numéro est enregistré comme expéditeur pour son compte. Mais :
+   - Ce numéro doit être un **numéro WhatsApp Business** (vérification Meta), pas un simple WhatsApp perso ;
+   - L’utilisateur doit quand même faire **au moins** l’étape OTP (et souvent plus pour un vrai Business) ;
+   - Ce n’est donc pas « automatiquement lié à la connexion sans rien faire ».
+
+### En résumé
+
+| Souhait | Réalité |
+|--------|---------|
+| Chaque utilisateur a son numéro lié à Twilio **automatiquement à la connexion, sans rien faire** | **Impossible** : pas d’API « envoi depuis le compte perso », et chaque numéro d’envoi doit être vérifié (OTP au minimum). |
+| Un seul numéro pour toute l’app (config actuelle) | **Possible** : un compte Twilio, un numéro (sandbox ou production), tous les envois « en un clic » partent de ce numéro. |
+| Un numéro par utilisateur, avec une étape de vérification (ex. OTP) | **Possible en théorie** (Senders API, flux « ajouter mon numéro » + OTP), mais ce n’est pas « juste par connexion » et le numéro doit être éligible WhatsApp Business. |
+
+Donc aujourd’hui, le modèle réaliste reste : **un numéro partagé** configuré par l’admin (sandbox ou production), **ou** l’option **« Depuis votre numéro WhatsApp »** (une conversation à la fois, sans Twilio).
+
+---
+
 ## Configurer l’envoi « à tous en un clic » (Twilio)
 
-Ce qui suit explique **étape par étape** comment configurer Twilio et Vercel pour que le bouton **« Envoyer à tous en un clic »** soit disponible (envoi groupé sans ouvrir chaque conversation).
+**Modèle retenu : un numéro global.** Un seul numéro WhatsApp (Twilio sandbox ou production) est configuré pour toute l’application. Tous les utilisateurs de l’app utilisent ce même numéro pour les envois « à tous en un clic ». Aucune configuration par utilisateur : seul l’admin du déploiement configure Twilio une fois.
+
+Ce qui suit explique **étape par étape** comment configurer ce numéro global sur Twilio et Vercel pour que le bouton **« Envoyer à tous en un clic »** soit disponible (envoi groupé sans ouvrir chaque conversation).
+
+---
+
+## Par où commencer (tu as déjà ton compte Meta)
+
+Tu as ton **compte Meta professionnel** : tu peux choisir l’une de ces deux voies.
+
+**Option A – Démarrer en sandbox (le plus rapide pour tester)**  
+1. Crée un **compte Twilio** (Partie 1.1).  
+2. Active le **sandbox WhatsApp** dans Twilio (Partie 1.4) et note le numéro d’envoi.  
+3. Configure les **variables sur Vercel** (Partie 2) et redéploie.  
+4. Teste dans MyEvent : le bouton « Envoyer à tous en un clic » apparaît. Les destinataires devront envoyer « join &lt;code&gt; » au numéro Twilio pour recevoir (limitation du sandbox).  
+→ Tu n’utilises pas encore ton compte Meta ; c’est pour valider que tout fonctionne.
+
+**Option B – Passer directement en production (avec ton compte Meta)**  
+→ Suis le guide **« Passer en production directement »** ci‑dessous. Les invités reçoivent sans rien faire.
+
+**Conseil** : si tu hésites, commence par l’**option A** (sandbox) pour vérifier Twilio + Vercel en quelques minutes, puis passe au guide production.
+
+---
+
+## Passer en production directement (guide pas à pas)
+
+Tu as déjà ton **compte Meta professionnel**. Voici les étapes dans l’ordre.
+
+### Étape 1 : Compte Twilio et upgrade
+
+1. Va sur **[twilio.com](https://www.twilio.com)** et crée un compte (ou connecte-toi).
+2. **Upgrade** le compte (compte payant) : dans la console Twilio, clique sur **Upgrade** en haut, ou **Admin** → **Account** → **Upgrade account**. Un compte payant est requis pour enregistrer un expéditeur WhatsApp en production.
+3. Note ton **Account SID** et ton **Auth Token** (dashboard, zone Account).
+
+### Étape 2 : Enregistrer ton numéro WhatsApp (lier Meta + Twilio)
+
+1. Dans Twilio : **Messaging** (menu gauche) → **Senders** → **WhatsApp Senders** (ou [console.twilio.com → WhatsApp Senders](https://console.twilio.com/us1/develop/sms/senders/whatsapp-senders)).
+2. Clique sur **Create new sender**.
+3. Choisis un **numéro** : Twilio ou ton propre numéro (non-Twilio). Ce numéro ne doit pas être déjà utilisé sur WhatsApp perso ; il doit pouvoir recevoir un **SMS ou un appel** pour le code de vérification.
+4. Clique sur **Continue with Facebook**. Une fenêtre pop-up s’ouvre.
+5. **Connecte-toi avec Facebook** (ton compte lié à ton Meta Business).
+6. **Crée un nouveau Meta Business Portfolio** ou sélectionne celui que tu viens de créer.
+7. **Crée un nouveau WhatsApp Business Account (WABA)** ou sélectionne-en un existant.
+8. Renseigne le **profil WhatsApp Business** (nom affiché, catégorie, etc.).
+9. **Ajoute et vérifie ton numéro** : entre le numéro, choisis **SMS** ou **appel** pour recevoir le code OTP, saisis le code. Une fois validé, le numéro est enregistré comme expéditeur.
+10. Valide les accords et ferme la pop-up. Twilio affiche ton expéditeur WhatsApp (statut **Online** quand tout est ok).
+11. Note le **numéro d’envoi** au format **`whatsapp:+33...`** (avec l’indicatif pays, sans espace). C’est la valeur pour `TWILIO_WHATSAPP_FROM`.
+
+Si Meta demande la **vérification d’entreprise** (Business Verification), suis les instructions ; elle peut être nécessaire pour passer en production ou augmenter les limites.
+
+### Étape 3 : Créer un template de message (Content Template Builder)
+
+En production, WhatsApp n’accepte que des **messages basés sur un template approuvé**.
+
+**Tu veux envoyer du texte + un document en pièce jointe ?**  
+→ Il faut choisir **Media** (pas Text), puis configurer le document et le texte avec deux variables.
+
+1. Dans Twilio : **Messaging** → **Content** → **Content Template Builder** (ou [Content](https://console.twilio.com/us1/develop/content)).
+2. **Create new** (nouveau template).
+3. **Template Name** : ex. `document_invitation` (minuscules, chiffres et `_` uniquement).
+4. **Template Language** : ex. French.
+5. **Content Type** :  
+   - Si tu veux **texte + document en pièce jointe** : choisis **Media** (pas Text).  
+   - Si tu veux **seulement du texte** (avec le lien du document dans le message) : choisis **Text**.
+6. Clique sur **Create**.
+
+**Si tu as choisi Media (texte + document) :**
+
+7. Dans l’écran suivant, Twilio te demande de configurer le média :
+   - **Type de média** : Document (ou équivalent pour fichier PDF, etc.).
+   - **URL du document** : mets la variable **`{{2}}`** (l’app enverra l’URL du document dans cette variable).
+   - **Corps du message / caption** : mets le texte avec **`{{1}}`**, par ex. `Bonjour, {{1}}` ou `Bonjour, voici un document pour votre événement. {{1}}` (l’app envoie le message personnalisé dans `{{1}}`).
+8. Twilio peut demander une **URL d’exemple** pour la variable média (pour la validation Meta) : mets une URL publique vers un PDF de test, ex. `https://example.com/doc.pdf`.
+9. Enregistre et **soumis à approbation**. Une fois approuvé, récupère le **Content SID** (commence par `HX...`) pour `TWILIO_WHATSAPP_CONTENT_SID`.
+
+**Si tu as choisi Text (message avec lien uniquement) :**
+
+7. Dans le corps du message : `Bonjour, voici un document pour votre événement : {{1}}`. L’app envoie le message complet (texte + lien) dans `{{1}}`.
+8. Enregistre, soumis à approbation, puis copie le **Content SID** (`HX...`).
+
+Dans les deux cas, une fois le template approuvé, utilise son **Content SID** dans la variable Vercel `TWILIO_WHATSAPP_CONTENT_SID`.
+
+### Étape 4 : Variables d’environnement sur Vercel
+
+Dans ton projet Vercel → **Settings** → **Environment Variables**, ajoute (ou modifie) :
+
+| Name | Value |
+|------|--------|
+| `TWILIO_ACCOUNT_SID` | Ton Account SID Twilio |
+| `TWILIO_AUTH_TOKEN` | Ton Auth Token Twilio |
+| `TWILIO_WHATSAPP_FROM` | `whatsapp:+33xxxxxxxxx` (ton numéro production, sans espace) |
+| `TWILIO_WHATSAPP_CONTENT_SID` | `HXxxxxxxxx...` (Content SID du template, ex. HX...) |
+| `VITE_WHATSAPP_API_URL` | `https://ton-domaine.vercel.app/api/send-whatsapp` (sans slash final) |
+
+Coche **Production** (et Preview si tu veux) puis **Save**.
+
+### Étape 5 : Redéployer
+
+1. **Deployments** → sur le dernier déploiement → **⋮** → **Redeploy**.
+2. Attends la fin du build.
+
+### Étape 6 : Tester dans MyEvent
+
+1. Ouvre ton app (URL Vercel).
+2. Va sur un événement → **Documents** → **Partager aux invités** pour un document.
+3. Clique sur **« Envoyer à tous en un clic »**. Les invités reçoivent le message (texte + lien) sur leur WhatsApp **sans avoir rien à faire** (pas de « join »).
+
+**Résumé production** : Twilio (payant) + numéro enregistré via « Continue with Facebook » (Meta + WABA) + template avec variable `{{1}}` + `TWILIO_WHATSAPP_CONTENT_SID` sur Vercel + redéploiement.
 
 ---
 
@@ -40,7 +193,20 @@ Ce qui suit explique **étape par étape** comment configurer Twilio et Vercel p
 
 ---
 
-### 1.3 Activer WhatsApp (sandbox pour tester)
+### 1.3 Meta Business ou juste WhatsApp Business ?
+
+- **Mode sandbox (test)**  
+  Tu n’as **pas besoin** de compte Meta Business ni de compte WhatsApp Business. Un **compte Twilio** suffit : tu actives le sandbox WhatsApp dans Twilio et tu utilises le numéro fourni par Twilio. C’est ce que décrit la section 1.4 ci‑dessous.
+
+- **Mode production** (envoyer à n’importe quel numéro sans « join »)  
+  Là, il faut enregistrer un **numéro** comme expéditeur WhatsApp. Ce numéro est géré via le **WhatsApp Business Platform** (l’API), pas via l’app mobile « WhatsApp Business ». Et ce plateau est géré par **Meta** : le **WhatsApp Business Account (WABA)** se crée et se lie **via Meta Business** (Business Manager / Meta Business Portfolio).  
+  Donc en production, **il faut un compte Meta Business** (ou en créer un pendant le processus Twilio « Continue with Facebook »). On ne peut pas faire « seulement » un compte WhatsApp Business sans passer par Meta : le WABA pour l’API est toujours créé ou lié **via** Meta Business.
+
+**En bref** : sandbox = **Twilio seul**. Production = **Twilio + Meta Business** (et WABA créé via Meta).
+
+---
+
+### 1.4 Activer WhatsApp (sandbox pour tester)
 
 1. Dans le menu de gauche Twilio, va dans **Messaging** (ou **Explore Products** → **Messaging**).
 2. Clique sur **Try it out** → **Send a WhatsApp message** (ou cherche **WhatsApp** dans le menu).
@@ -57,6 +223,35 @@ Ce qui suit explique **étape par étape** comment configurer Twilio et Vercel p
 - **Account SID** : `AC...`
 - **Auth Token** : (celui affiché après « Show »)
 - **Numéro WhatsApp (FROM)** : `whatsapp:+14155238886` (remplace par ton numéro sandbox si différent)
+
+---
+
+### 1.5 Envoyer à tout le monde avec Twilio sans que les invités fassent quoi que ce soit
+
+En **mode sandbox** (test), les destinataires doivent envoyer « join &lt;code&gt; » au numéro Twilio pour recevoir les messages — c’est une règle WhatsApp/Twilio pour les tests.
+
+Pour **envoyer à n’importe quel numéro sans que les invités aient quoi que ce soit à faire** (pas de « join », pas de config de leur part), il faut passer en **production** avec le **WhatsApp Business API** :
+
+1. **Compte Meta Business**  
+   Crée ou utilise un compte sur [business.facebook.com](https://business.facebook.com). Vérifie ton entreprise si demandé.
+
+2. **WhatsApp Business Account (WABA)**  
+   Dans Meta Business Manager, ajoute le produit **WhatsApp** et crée un compte WhatsApp Business. Associe un **numéro de téléphone** dédié (qui ne doit pas être déjà utilisé sur WhatsApp perso).
+
+3. **Vérification du numéro**  
+   WhatsApp envoie un code par SMS ou appel sur ce numéro. Une fois vérifié, ce numéro devient ton **numéro d’envoi** professionnel.
+
+4. **Lier Twilio à ton compte WhatsApp Business**  
+   Dans la [console Twilio](https://console.twilio.com), section **Messaging** → **WhatsApp** : tu peux connecter ton compte WhatsApp Business (WABA) à Twilio. Suis les étapes Twilio pour l’approbation et la liaison du numéro.
+
+5. **Modèles de message (templates)**  
+   En production, WhatsApp n’accepte que des **messages basés sur des modèles approuvés**. Tu dois créer un template dans Meta Business Manager (ex. « Bonjour, voici un document pour votre événement : {{1}}. »), le faire approuver, puis l’utiliser dans l’API Twilio en remplaçant {{1}} par le lien du document.  
+   Notre API actuelle envoie du texte libre ; pour la production, il faudrait adapter `api/send-whatsapp.js` pour utiliser un **template approuvé** au lieu de `Body: message`. Voir la [doc Twilio WhatsApp](https://www.twilio.com/docs/whatsapp/api#send-whatsapp-message-with-template).
+
+6. **Variables Vercel**  
+   Une fois le numéro production connecté à Twilio, utilise ce numéro dans `TWILIO_WHATSAPP_FROM` (format `whatsapp:+33...`) au lieu du numéro sandbox. Redéploie.
+
+**Résumé** : en **sandbox**, seuls les numéros qui ont rejoint le sandbox reçoivent les messages. En **production** (WhatsApp Business + numéro vérifié + templates approuvés), tu peux envoyer à **tout le monde** sans que les invités aient quoi que ce soit à faire — ils reçoivent directement sur leur WhatsApp, sans configuration de leur part.
 
 ---
 
@@ -91,7 +286,8 @@ Pour **chaque** variable ci-dessous :
 |------------|----------------|-------------------|
 | `TWILIO_ACCOUNT_SID` | `ACxxxxxxxx...` | Twilio Dashboard, zone Account (Account SID). |
 | `TWILIO_AUTH_TOKEN` | Le token affiché après « Show » | Twilio Dashboard, même zone (Auth Token). |
-| `TWILIO_WHATSAPP_FROM` | `whatsapp:+14155238886` | Numéro du sandbox WhatsApp (avec le préfixe `whatsapp:`). Remplace par ton numéro si différent. |
+| `TWILIO_WHATSAPP_FROM` | `whatsapp:+14155238886` ou `whatsapp:+33...` | Sandbox : numéro Twilio (ex. +14155238886). Production : ton numéro enregistré (ex. +33...). Toujours avec le préfixe `whatsapp:`. |
+| `TWILIO_WHATSAPP_CONTENT_SID` | `HXxxxxxxxx...` | **Production uniquement.** Content SID du template (Content Template Builder Twilio), avec une variable `{{1}}` pour le message. Si non défini, l’API envoie en mode sandbox (Body libre). |
 
 Optionnel (sécurité) :
 
