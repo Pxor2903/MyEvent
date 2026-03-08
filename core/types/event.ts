@@ -44,6 +44,17 @@ export interface Guest {
   attendance?: GuestAttendance;
 }
 
+/** Mission / tâche assignable à un organisateur. */
+export interface Mission {
+  id: string;
+  title: string;
+  description?: string;
+  /** Organisateur assigné (userId). */
+  assignedToUserId?: string;
+  status: 'todo' | 'in_progress' | 'done';
+  createdAt: string;
+}
+
 /** Poste d'allocation de budget (ex. Fleurs 2000 €). */
 export interface BudgetAllocation {
   id: string;
@@ -129,4 +140,6 @@ export interface Event {
   attachments?: EventAttachment[];
   /** Moyen de communication unique pour le partage (documents, invitations). Si défini, seuls les invités avec ce canal ne sont pas « à compléter ». */
   shareChannelPreference?: 'whatsapp' | 'sms' | 'email' | 'all';
+  /** Missions / tâches à dispatcher entre les organisateurs. */
+  missions?: Mission[];
 }

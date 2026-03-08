@@ -2,7 +2,7 @@
  * CRUD événements (Supabase table events), partage (code + mot de passe),
  * demande de rejoindre en tant qu’organisateur. Gère aussi les invités et sous-événements.
  */
-import type { Event, Guest, Organizer, SubEvent, User } from '@/core/types';
+import type { Event, Guest, Organizer, SubEvent, User, Mission } from '@/core/types';
 import { supabase } from './client';
 
 const TABLE = 'events';
@@ -32,6 +32,7 @@ type DbEvent = {
   is_guest_chat_enabled: boolean;
   updated_at: string | null;
   share_channel_preference: string | null;
+  missions?: { id: string; title: string; description?: string; assignedToUserId?: string; status: string; createdAt: string }[] | null;
 };
 
 function fromDb(row: DbEvent): Event {
@@ -62,7 +63,15 @@ function fromDb(row: DbEvent): Event {
     updatedAt: row.updated_at ?? undefined,
     shareChannelPreference: (row.share_channel_preference === 'whatsapp' || row.share_channel_preference === 'sms' || row.share_channel_preference === 'email' || row.share_channel_preference === 'all')
       ? row.share_channel_preference
-      : undefined
+      : undefined,
+    missions: (row.missions ?? []).map((m: { id: string; title: string; description?: string; assignedToUserId?: string; status: string; createdAt: string }) => ({
+      id: m.id,
+      title: m.title,
+      description: m.description,
+      assignedToUserId: m.assignedToUserId,
+      status: m.status === 'in_progress' || m.status === 'done' ? m.status : 'todo',
+      createdAt: m.createdAt
+    }))
   };
 }
 
@@ -91,7 +100,8 @@ function toDb(event: Event): DbEvent {
     guests: event.guests ?? [],
     is_guest_chat_enabled: event.isGuestChatEnabled ?? true,
     updated_at: event.updatedAt ?? new Date().toISOString(),
-    share_channel_preference: event.shareChannelPreference ?? null
+    share_channel_preference: event.shareChannelPreference ?? null,
+    missions: event.missions ?? []
   };
 }
 

@@ -25,6 +25,7 @@ import { getCurrencySymbol } from '@/core/constants/currencies';
 import { CHART_PALETTE, UNALLOCATED_COLOR } from '@/core/constants/chartColors';
 import type { BudgetAllocation } from '@/core/types';
 import { EventDocumentsTab } from './EventDocumentsTab';
+import { EventMissionsTab } from './EventMissionsTab';
 
 interface EventDetailProps {
   event: Event;
@@ -80,7 +81,7 @@ function GuestsTableSegmentBar({
 }
 
 export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, onUpdate, onRefreshEvent }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'program' | 'chat' | 'settings' | 'budget' | 'guests' | 'documents'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'program' | 'chat' | 'settings' | 'budget' | 'guests' | 'documents' | 'missions'>('overview');
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
   const [subTab, setSubTab] = useState<'sequence' | 'chat' | 'guests' | 'budget' | 'documents'>('sequence');
   /** Filtre optionnel pour l’onglet Invités (niveau événement principal). */
@@ -828,6 +829,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
               { id: 'guests', label: 'Invités' },
               { id: 'chat', label: 'Chat' },
               { id: 'documents', label: 'Documents' },
+              { id: 'missions', label: 'Missions' },
               { id: 'settings', label: 'Équipe' },
               ...(canViewBudget ? [{ id: 'budget', label: 'Budget' }] : [])
             ].map(tab => (
@@ -1058,6 +1060,32 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                   <button type="button" onClick={handleShare} className="px-4 py-2.5 bg-teal-600 text-white text-sm font-medium rounded-xl hover:bg-teal-700 shrink-0">Partager l'invitation</button>
                 </div>
               </div>
+            )}
+
+            {activeTab === 'missions' && (
+              <EventMissionsTab
+                event={event}
+                currentUserId={user.id}
+                canManage={isOwner || (currentOrganizer?.status === 'confirmed')}
+                onUpdate={async (updated) => {
+                  try {
+                    const saved = await dbService.updateEventAtomic(event.id, () => updated);
+                    onUpdate(saved);
+                  } catch (e) {
+                    console.error(e);
+                    alert('Impossible de sauvegarder les missions.');
+                  }
+                }}
+                teamMembers={[
+                  { userId: event.creatorId, label: event.creatorId === user.id ? 'Propriétaire (vous)' : 'Propriétaire' },
+                  ...(event.organizers ?? [])
+                    .filter((o) => o.status === 'confirmed' && o.userId !== event.creatorId)
+                    .map((o) => ({
+                      userId: o.userId,
+                      label: `${o.firstName} ${o.lastName}`.trim() || 'Co-organisateur'
+                    }))
+                ]}
+              />
             )}
 
             {activeTab === 'budget' && canViewBudget && (

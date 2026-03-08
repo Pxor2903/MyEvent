@@ -37,7 +37,8 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
         shareCode,
         sharePassword,
         isGuestChatEnabled: true,
-        organizers: []
+        organizers: [],
+        missions: []
       };
       await dbService.saveEvent(newEvent);
       setView('dashboard');
