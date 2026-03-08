@@ -85,7 +85,9 @@ export default async function handler(req, res) {
         sent++;
       } else {
         failed++;
-        errors.push(data.message || r.statusText);
+        const twilioMsg = data.message || data.error_message || r.statusText;
+        const twilioCode = data.code ? ` [${data.code}]` : '';
+        errors.push(twilioMsg + twilioCode);
       }
     } catch (e) {
       failed++;
