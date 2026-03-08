@@ -213,7 +213,7 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
       {/* Modal Partager aux invités */}
       {shareDoc && (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShareDoc(null)}>
-          <div className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[min(88dvh,88vh)] overflow-hidden flex flex-col pb-[env(safe-area-inset-bottom)]" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
               <h4 className="font-semibold text-slate-900">Envoyer « {shareDoc.name} » aux invités</h4>
               <button type="button" onClick={() => setShareDoc(null)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100">×</button>

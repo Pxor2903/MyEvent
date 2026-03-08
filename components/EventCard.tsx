@@ -26,7 +26,7 @@ export const EventCard: React.FC<EventCardProps> = ({ event, compact }) => {
           alt=""
         />
         <span
-          className={`absolute top-2 right-2 text-[10px] font-semibold px-2 py-1 rounded-lg ${
+          className={`absolute top-2 right-2 text-xs font-semibold px-2 py-1 rounded-lg ${
             isPast ? 'bg-slate-200/90 text-slate-600' : 'bg-teal-600 text-white'
           }`}
         >

@@ -6,8 +6,8 @@ interface FooterProps {
 }
 
 export const Footer: React.FC<FooterProps> = ({ onNavigate }) => (
-  <footer className="bg-white border-t border-slate-200 mt-auto pb-[env(safe-area-inset-bottom)]">
-    <div className="max-w-4xl mx-auto px-4 py-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+  <footer className="bg-white border-t border-slate-200 mt-auto shrink-0 pb-[env(safe-area-inset-bottom)]">
+    <div className="page-container content-padding py-4 sm:py-5 flex flex-col sm:flex-row items-center justify-between gap-4 max-w-4xl mx-auto">
       <button
         type="button"
         onClick={() => onNavigate('dashboard')}

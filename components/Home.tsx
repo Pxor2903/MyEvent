@@ -168,23 +168,23 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
   );
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-slate-50 flex flex-col">
-      <nav className="bg-white border-b border-slate-200 sticky top-0 z-50 pt-[env(safe-area-inset-top)]" aria-label="Navigation">
-        <div className="max-w-4xl mx-auto px-3 sm:px-4 h-14 min-h-[56px] flex justify-between items-center">
-          <button type="button" onClick={() => setView('dashboard')} className="min-w-[44px] min-h-[44px] flex items-center justify-center -m-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded-lg" aria-label="Accueil">
+    <div className="min-h-screen min-h-[100dvh] bg-slate-50 flex flex-col overflow-hidden">
+      <nav className="bg-white border-b border-slate-200 sticky top-0 z-50 shrink-0" style={{ paddingTop: 'env(safe-area-inset-top)' }} aria-label="Navigation">
+        <div className="page-container content-padding h-14 min-h-[56px] flex justify-between items-center gap-2">
+          <button type="button" onClick={() => setView('dashboard')} className="touch-target flex items-center justify-center -ml-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded-lg" aria-label="Accueil">
             <Logo />
           </button>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <span className="text-sm text-slate-600 hidden sm:inline truncate max-w-[120px]">Bonjour, {user.firstName}</span>
-            <img src={`https://ui-avatars.com/api/?name=${user.firstName}+${user.lastName}&background=6366f1&color=fff`} className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg shrink-0" alt="" />
-            <button type="button" onClick={onLogout} className="min-w-[44px] min-h-[44px] p-2 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50" aria-label="Déconnexion">
+          <div className="flex items-center gap-1 sm:gap-3 min-w-0">
+            <span className="text-sm text-slate-600 hidden sm:inline truncate max-w-[100px]">Bonjour, {user.firstName}</span>
+            <img src={`https://ui-avatars.com/api/?name=${user.firstName}+${user.lastName}&background=14b8a6&color=fff`} className="w-9 h-9 rounded-full shrink-0" alt="" />
+            <button type="button" onClick={onLogout} className="touch-target p-2 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50" aria-label="Déconnexion">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7" /></svg>
             </button>
           </div>
         </div>
       </nav>
 
-      <main className="flex-1 max-w-4xl w-full mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 min-h-0">
+      <main className="flex-1 min-h-0 w-full min-w-0 flex flex-col page-container content-padding py-4 sm:py-6 md:py-8 overflow-y-auto overflow-x-hidden max-w-4xl mx-auto">
         {view === 'dashboard' && (
           <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-6 sm:mb-8">
             <h1 className="text-xl sm:text-2xl font-semibold text-slate-900">Vos événements</h1>
@@ -201,11 +201,12 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
         )}
 
         {view === 'create-event' ? (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 md:p-8 max-w-2xl mx-auto">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 max-w-2xl mx-auto w-full min-w-0">
             <EventForm user={user} onCancel={() => setView('dashboard')} onSubmit={handleCreate} />
           </div>
         ) : view === 'event-detail' ? (
           selectedEvent ? (
+            <div className="flex-1 min-h-0 min-w-0 w-full flex flex-col">
             <EventDetail
               event={selectedEvent}
               user={user}
@@ -215,6 +216,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
                 fetchEvents();
               }}
             />
+            </div>
           ) : (
             <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-500 text-sm">
               Événement introuvable.

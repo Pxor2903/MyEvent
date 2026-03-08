@@ -95,7 +95,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSocialSubmit, 
         {typeof window !== 'undefined' && !/^https?:\/\/localhost(:\d+)?\/?$/.test(window.location.origin) && (
           <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
             Connexion depuis l’IP : ajoute dans Supabase → Authentication → URL Configuration → Redirect URLs cette URL :<br />
-            <code className="block mt-1 break-all font-mono text-[10px]">{window.location.origin}/**</code>
+            <code className="block mt-1 break-all font-mono text-xs">{window.location.origin}/**</code>
           </p>
         )}
       </div>

@@ -78,7 +78,7 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ onAddr
       
       {showDropdown && suggestions.length > 0 && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50 border-b border-gray-100">
+          <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-widest bg-gray-50 border-b border-gray-100">
             Adresses suggérées par l'API BAN
           </div>
           {suggestions.map((s, i) => (

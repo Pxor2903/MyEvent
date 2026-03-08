@@ -15,7 +15,7 @@ export const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
 
   return (
     <div className={`
-      fixed bottom-6 left-1/2 -translate-x-1/2 z-[100]
+      fixed left-1/2 -translate-x-1/2 z-[100] bottom-[max(1.5rem,env(safe-area-inset-bottom))] max-w-[calc(100vw-2rem)]
       flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border
       animate-in slide-in-from-bottom-4 duration-300
       ${type === 'success' 

@@ -931,7 +931,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                                     className="w-full text-left flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors relative"
                                   >
                                     <span className="flex flex-col items-center shrink-0 w-12 pt-0.5 relative z-10">
-                                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
                                         {sub.date ? new Date(sub.date).toLocaleDateString('fr-FR', { weekday: 'short' }) : '—'}
                                       </span>
                                       <span className="text-lg font-bold text-slate-800 leading-tight">
@@ -944,7 +944,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                                         {sub.date && new Date(sub.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                                         {sub.location && ` · ${sub.location}`}
                                       </p>
-                                      <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-slate-500">
+                                      <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500">
                                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
                                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                                           {confirmedSub} confirmé(s)
@@ -1015,13 +1015,13 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                                     <p className="text-sm font-medium text-slate-900 truncate">
                                       {label}{isOwner ? ' (Propriétaire)' : ''}
                                     </p>
-                                    <p className="text-[11px] text-slate-500 truncate">
+                                    <p className="text-xs text-slate-500 truncate">
                                       {m.permissions.includes('all') ? 'Tous les droits' : 'Co-organisateur'}
                                     </p>
                                   </div>
                                 </div>
                                 {allowedSubs.length > 0 && (
-                                  <p className="pl-9 text-[11px] text-slate-500 truncate">
+                                  <p className="pl-9 text-xs text-slate-500 truncate">
                                     Séquences : {allowedSubs.join(', ')}
                                     {m.allowedSubEventIds && m.allowedSubEventIds.length > allowedSubs.length && '…'}
                                   </p>
@@ -1030,7 +1030,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                             );
                           })}
                           {team.length > 6 && (
-                            <li className="pl-9 text-[11px] text-slate-400">
+                            <li className="pl-9 text-xs text-slate-400">
                               + {team.length - 6} autre(s)
                             </li>
                           )}
@@ -1188,7 +1188,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                        <div className="p-4 bg-gray-50 rounded-2xl flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                             <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Clé de partage</p>
+                             <p className="text-xs font-black text-gray-400 uppercase mb-1">Clé de partage</p>
                              <p className="font-black text-teal-600 text-lg break-all">{event.shareCode}</p>
                           </div>
                           <button type="button" onClick={() => handleCopy(event.shareCode, 'code')} className="p-2 rounded-xl text-gray-400 hover:bg-gray-200 hover:text-teal-600 flex-shrink-0" title="Copier">
@@ -1201,7 +1201,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                        </div>
                        <div className="p-4 bg-gray-50 rounded-2xl flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
-                             <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Mot de passe</p>
+                             <p className="text-xs font-black text-gray-400 uppercase mb-1">Mot de passe</p>
                              {editingPassword ? (
                                <div className="space-y-2 mt-2" onClick={e => e.stopPropagation()}>
                                  <div className="flex gap-2 items-end">
@@ -1220,7 +1220,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                              ) : (
                                <>
                                  <p className="font-black text-teal-600 text-lg break-all">{event.sharePassword ?? ''}</p>
-                                 <button type="button" onClick={startEditPassword} className="mt-2 text-teal-600 text-[10px] font-black uppercase hover:underline">Modifier le mot de passe</button>
+                                 <button type="button" onClick={startEditPassword} className="mt-2 text-teal-600 text-xs font-black uppercase hover:underline">Modifier le mot de passe</button>
                                </>
                              )}
                           </div>
@@ -1235,14 +1235,14 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                           )}
                        </div>
                     </div>
-                    <button onClick={handleShare} className="bg-teal-600 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-teal-100 active:scale-95">
+                    <button onClick={handleShare} className="bg-teal-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase shadow-lg shadow-teal-100 active:scale-95">
                       Partager l’invitation
                     </button>
                  </div>
 
                  {pendingOrganizers.length > 0 && (
                    <div className="space-y-4">
-                      <h4 className="text-[10px] font-black text-red-500 uppercase px-2">Demandes en attente ({pendingOrganizers.length})</h4>
+                      <h4 className="text-xs font-black text-red-500 uppercase px-2">Demandes en attente ({pendingOrganizers.length})</h4>
                       <div className="max-h-64 overflow-y-auto space-y-3 pr-1">
                          {pendingOrganizers.map(o => (
                            <div key={o.userId} className="bg-white p-5 rounded-3xl border-2 border-amber-100 flex items-center justify-between gap-4 flex-shrink-0">
@@ -1253,8 +1253,8 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                                  <p className="font-bold text-gray-900 truncate">{o.firstName} {o.lastName}</p>
                               </div>
                               <div className="flex gap-2 flex-shrink-0">
-                                 <button onClick={() => handleApprove(o.userId, false)} className="px-4 py-2 text-gray-400 font-bold text-[10px] uppercase rounded-xl hover:bg-gray-100">Refuser</button>
-                                 <button onClick={() => openApproveModal(o)} className="px-5 py-2 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase">Approuver</button>
+                                 <button onClick={() => handleApprove(o.userId, false)} className="px-4 py-2 text-gray-400 font-bold text-xs uppercase rounded-xl hover:bg-gray-100">Refuser</button>
+                                 <button onClick={() => openApproveModal(o)} className="px-5 py-2 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase">Approuver</button>
                               </div>
                            </div>
                          ))}
@@ -1263,26 +1263,26 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                  )}
 
                  <div className="space-y-4">
-                    <h4 className="text-[10px] font-black text-gray-400 uppercase px-2">Équipe confirmée</h4>
+                    <h4 className="text-xs font-black text-gray-400 uppercase px-2">Équipe confirmée</h4>
                     <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden">
                        <table className="w-full text-left">
                           <thead className="bg-gray-50 border-b border-gray-100">
                              <tr>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase">Membre</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase">Rôle</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase text-right">Droits</th>
+                                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase">Membre</th>
+                                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase">Rôle</th>
+                                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase text-right">Droits</th>
                              </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-50">
                              <tr>
                                 <td className="px-6 py-4 font-black text-teal-600">{user.firstName} (Vous)</td>
-                                <td className="px-6 py-4 text-[10px] font-black text-gray-300 uppercase">Propriétaire</td>
-                                <td className="px-6 py-4 text-[10px] text-gray-300">—</td>
+                                <td className="px-6 py-4 text-xs font-black text-gray-300 uppercase">Propriétaire</td>
+                                <td className="px-6 py-4 text-xs text-gray-300">—</td>
                              </tr>
                              {activeOrganizers.map(o => (
                                <tr key={o.userId}>
                                   <td className="px-6 py-4 font-bold text-gray-800">{o.firstName} {o.lastName}</td>
-                                  <td className="px-6 py-4 text-[10px] font-black text-emerald-600 uppercase">Co-organisateur</td>
+                                  <td className="px-6 py-4 text-xs font-black text-emerald-600 uppercase">Co-organisateur</td>
                                   <td className="px-6 py-4 text-right">
                                     <button
                                       onClick={() => {
@@ -1290,7 +1290,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                                         setEditRightsPermissions(o.permissions || []);
                                         setEditRightsSubEventIds(o.allowedSubEventIds || []);
                                       }}
-                                      className="text-teal-600 font-bold text-[10px] uppercase hover:underline"
+                                      className="text-teal-600 font-bold text-xs uppercase hover:underline"
                                     >
                                       Modifier
                                     </button>
@@ -1325,7 +1325,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                  <div ref={chatScrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 space-y-4 sm:space-y-6 min-h-0 overscroll-behavior-contain">
                     {messages.map(m => (
                       <div key={m.id} className={`flex flex-col ${m.senderId === user.id ? 'items-end' : 'items-start'}`}>
-                         <span className="text-[9px] font-black text-gray-300 mb-1 uppercase">{m.senderName}</span>
+                         <span className="text-xs font-black text-gray-300 mb-1 uppercase">{m.senderName}</span>
                          <div className={`px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl max-w-[85%] text-sm shadow-sm break-words ${m.senderId === user.id ? 'bg-teal-600 text-white' : 'bg-gray-50 text-gray-700'}`}>
                             {m.text}
                          </div>
@@ -1367,7 +1367,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                  </button>
                  <div className="min-w-0">
                     <h2 className="text-lg sm:text-xl font-black truncate">{currentSub?.title}</h2>
-                    <p className="text-white/40 text-[9px] font-black uppercase tracking-widest">Séquence du programme</p>
+                    <p className="text-white/40 text-xs font-black uppercase tracking-widest">Séquence du programme</p>
                  </div>
               </div>
               {canManageProgramHere && (
@@ -1378,26 +1378,26 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
            </header>
 
            <nav className="flex px-2 sm:px-4 border-b border-gray-100 bg-gray-50/30 overflow-x-auto no-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
-              <button key="sequence" type="button" onClick={() => setSubTab('sequence')} className={`py-4 sm:py-5 px-4 sm:px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'sequence' ? 'text-teal-600' : 'text-gray-400'}`}>
+              <button key="sequence" type="button" onClick={() => setSubTab('sequence')} className={`py-4 sm:py-5 px-4 sm:px-6 text-xs font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'sequence' ? 'text-teal-600' : 'text-gray-400'}`}>
                 Séquence
                 {subTab === 'sequence' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-teal-600 rounded-t-full" />}
               </button>
-              <button key="guests" type="button" onClick={() => setSubTab('guests')} className={`py-4 sm:py-5 px-4 sm:px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'guests' ? 'text-teal-600' : 'text-gray-400'}`}>
+              <button key="guests" type="button" onClick={() => setSubTab('guests')} className={`py-4 sm:py-5 px-4 sm:px-6 text-xs font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'guests' ? 'text-teal-600' : 'text-gray-400'}`}>
                 Invités
                 {subTab === 'guests' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-teal-600 rounded-t-full" />}
               </button>
               {canViewBudget && (
-                <button key="budget" type="button" onClick={() => setSubTab('budget')} className={`py-4 sm:py-5 px-4 sm:px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'budget' ? 'text-teal-600' : 'text-gray-400'}`}>
+                <button key="budget" type="button" onClick={() => setSubTab('budget')} className={`py-4 sm:py-5 px-4 sm:px-6 text-xs font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'budget' ? 'text-teal-600' : 'text-gray-400'}`}>
                   Budget
                   {subTab === 'budget' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-teal-600 rounded-t-full" />}
                 </button>
               )}
-              <button key="documents" type="button" onClick={() => setSubTab('documents')} className={`py-4 sm:py-5 px-4 sm:px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'documents' ? 'text-teal-600' : 'text-gray-400'}`}>
+              <button key="documents" type="button" onClick={() => setSubTab('documents')} className={`py-4 sm:py-5 px-4 sm:px-6 text-xs font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'documents' ? 'text-teal-600' : 'text-gray-400'}`}>
                 Documents
                 {subTab === 'documents' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-teal-600 rounded-t-full" />}
               </button>
               {canChatForCurrentSubEvent && (
-                <button key="chat" type="button" onClick={() => setSubTab('chat')} className={`py-4 sm:py-5 px-4 sm:px-6 text-[10px] font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'chat' ? 'text-teal-600' : 'text-gray-400'}`}>
+                <button key="chat" type="button" onClick={() => setSubTab('chat')} className={`py-4 sm:py-5 px-4 sm:px-6 text-xs font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'chat' ? 'text-teal-600' : 'text-gray-400'}`}>
                   Chat
                   {subTab === 'chat' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-teal-600 rounded-t-full" />}
                 </button>
@@ -1572,7 +1572,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                   <div ref={chatScrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-4 min-h-0">
                     {messages.map(m => (
                       <div key={m.id} className={`flex flex-col ${m.senderId === user.id ? 'items-end' : 'items-start'}`}>
-                        <span className="text-[9px] font-medium text-slate-400 mb-1">{m.senderName}</span>
+                        <span className="text-xs font-medium text-slate-400 mb-1">{m.senderName}</span>
                         <div className={`px-4 py-2.5 rounded-xl max-w-[85%] text-sm break-words ${m.senderId === user.id ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-800'}`}>{m.text}</div>
                       </div>
                     ))}
@@ -1599,7 +1599,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
       {/* MODALS */}
       {showEventSettingsModal && (
         <div className="fixed inset-0 z-[250] flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 bg-gray-900/80 backdrop-blur-xl">
-          <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-[3rem] shadow-2xl max-h-[90vh] sm:max-h-[85vh] overflow-hidden flex flex-col pb-[env(safe-area-inset-bottom)]">
+          <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[min(90dvh,90vh)] overflow-hidden flex flex-col pb-[env(safe-area-inset-bottom)]">
             <h3 className="text-xl sm:text-2xl font-black text-gray-900 px-5 sm:px-10 pt-6 sm:pt-10 pb-3 sm:pb-4">Réglages du projet</h3>
             <nav className="flex px-4 sm:px-6 border-b border-gray-100">
               {(['general', 'appearance'] as const).map((tab) => (
@@ -1607,7 +1607,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                   key={tab}
                   type="button"
                   onClick={() => setEventSettingsTab(tab)}
-                  className={`py-4 px-6 text-[11px] font-black uppercase tracking-widest border-b-2 transition-colors ${
+                  className={`py-4 px-6 text-xs font-black uppercase tracking-widest border-b-2 transition-colors ${
                     eventSettingsTab === tab
                       ? 'border-teal-600 text-teal-600'
                       : 'border-transparent text-gray-400 hover:text-gray-600'
@@ -1617,7 +1617,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 </button>
               ))}
             </nav>
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-10 space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
               {eventSettingsTab === 'general' && (
                 <>
                   <Input
@@ -1711,11 +1711,11 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 </>
               )}
             </div>
-            <div className="flex gap-4 p-10 pt-4 border-t border-gray-100">
-              <button type="button" onClick={() => setShowEventSettingsModal(false)} className="flex-1 py-4 font-bold text-gray-400 text-[10px] uppercase rounded-2xl border border-gray-200">
+            <div className="flex gap-4 p-4 sm:p-6 pt-4 border-t border-gray-100">
+              <button type="button" onClick={() => setShowEventSettingsModal(false)} className="flex-1 py-4 font-bold text-gray-400 text-xs uppercase rounded-2xl border border-gray-200">
                 Annuler
               </button>
-              <button type="button" onClick={handleSaveEventSettings} className="flex-[2] py-4 bg-teal-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-teal-100">
+              <button type="button" onClick={handleSaveEventSettings} className="flex-[2] py-4 bg-teal-600 text-white rounded-2xl font-black text-xs uppercase shadow-xl shadow-teal-100">
                 Enregistrer
               </button>
             </div>
@@ -1725,7 +1725,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
 
       {approveModalOrganizer && (
         <div className="fixed inset-0 z-[260] flex items-center justify-center p-6 bg-gray-900/80 backdrop-blur-xl">
-          <div className="bg-white w-full max-w-md rounded-[3rem] p-10 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white w-full max-w-md rounded-2xl p-4 sm:p-6 space-y-6 shadow-2xl max-h-[min(90dvh,90vh)] overflow-y-auto pb-[env(safe-area-inset-bottom)]">
             <h3 className="text-xl font-black">Droits du co-organisateur</h3>
             <p className="text-sm text-gray-500">Choisis les droits pour {approveModalOrganizer.firstName} {approveModalOrganizer.lastName}.</p>
             <div className="space-y-3">
@@ -1760,11 +1760,11 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
               </div>
             )}
             <div className="flex gap-4 pt-2">
-              <button type="button" onClick={() => setApproveModalOrganizer(null)} className="flex-1 py-3 font-bold text-gray-400 text-[10px] uppercase rounded-2xl border border-gray-200">Annuler</button>
+              <button type="button" onClick={() => setApproveModalOrganizer(null)} className="flex-1 py-3 font-bold text-gray-400 text-xs uppercase rounded-2xl border border-gray-200">Annuler</button>
               <button
                 type="button"
                 onClick={() => handleApprove(approveModalOrganizer.userId, true, approvePermissions.length ? approvePermissions : ['access_organizer_chat'], approveSubEventIds.length > 0 ? approveSubEventIds : undefined)}
-                className="flex-[2] py-3 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase"
+                className="flex-[2] py-3 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase"
               >
                 Approuver
               </button>
@@ -1775,7 +1775,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
 
       {editRightsOrganizer && (
         <div className="fixed inset-0 z-[260] flex items-center justify-center p-6 bg-gray-900/80 backdrop-blur-xl">
-          <div className="bg-white w-full max-w-md rounded-[3rem] p-10 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white w-full max-w-md rounded-2xl p-4 sm:p-6 space-y-6 shadow-2xl max-h-[min(90dvh,90vh)] overflow-y-auto pb-[env(safe-area-inset-bottom)]">
             <h3 className="text-xl font-black">Modifier les droits</h3>
             <p className="text-sm text-gray-500">{editRightsOrganizer.firstName} {editRightsOrganizer.lastName}</p>
             <div className="space-y-3">
@@ -1810,8 +1810,8 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
               </div>
             )}
             <div className="flex gap-4 pt-2">
-              <button type="button" onClick={() => setEditRightsOrganizer(null)} className="flex-1 py-3 font-bold text-gray-400 text-[10px] uppercase rounded-2xl border border-gray-200">Annuler</button>
-              <button type="button" onClick={handleSaveEditRights} className="flex-[2] py-3 bg-teal-600 text-white rounded-2xl font-black text-[10px] uppercase">Enregistrer</button>
+              <button type="button" onClick={() => setEditRightsOrganizer(null)} className="flex-1 py-3 font-bold text-gray-400 text-xs uppercase rounded-2xl border border-gray-200">Annuler</button>
+              <button type="button" onClick={handleSaveEditRights} className="flex-[2] py-3 bg-teal-600 text-white rounded-2xl font-black text-xs uppercase">Enregistrer</button>
             </div>
           </div>
         </div>
@@ -1841,7 +1841,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
 
       {showSequenceModal && (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 bg-gray-900/80 backdrop-blur-xl">
-           <div className="bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-[3rem] p-6 sm:p-10 space-y-5 sm:space-y-6 shadow-2xl pb-[env(safe-area-inset-bottom)]">
+           <div className="bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-4 sm:p-6 space-y-5 shadow-2xl max-h-[min(90dvh,90vh)] overflow-y-auto pb-[env(safe-area-inset-bottom)]">
               <h3 className="text-2xl font-black">Nouvelle Séquence</h3>
               <div className="space-y-4">
                  <Input label="Titre de la séquence" placeholder="Ex: Cocktail de bienvenue" value={seqForm.title} onChange={e => setSeqForm({...seqForm, title: e.target.value})} />
@@ -1849,8 +1849,8 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                  <Input label="Lieu spécifique" placeholder="Ex: Salon panoramique" value={seqForm.location} onChange={e => setSeqForm({...seqForm, location: e.target.value})} />
               </div>
               <div className="flex gap-4">
-                 <button onClick={() => setShowSequenceModal(false)} className="flex-1 py-4 font-bold text-gray-400 text-[10px] uppercase">Annuler</button>
-                 <button onClick={handleAddSequence} className="flex-[2] py-4 bg-teal-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-teal-100">Ajouter</button>
+                 <button onClick={() => setShowSequenceModal(false)} className="flex-1 py-4 font-bold text-gray-400 text-xs uppercase">Annuler</button>
+                 <button onClick={handleAddSequence} className="flex-[2] py-4 bg-teal-600 text-white rounded-2xl font-black text-xs uppercase shadow-xl shadow-teal-100">Ajouter</button>
               </div>
            </div>
         </div>
@@ -1858,7 +1858,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
 
       {showGuestModal && (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 bg-gray-900/80 backdrop-blur-xl">
-           <div className="bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 space-y-5 sm:space-y-6 shadow-xl max-h-[90vh] overflow-y-auto pb-[env(safe-area-inset-bottom)]">
+           <div className="bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-4 sm:p-6 space-y-5 shadow-xl max-h-[min(90dvh,90vh)] overflow-y-auto pb-[env(safe-area-inset-bottom)]">
               <h3 className="text-lg font-semibold text-slate-900">Ajouter un participant</h3>
               <div className="space-y-4">
                  <Input label="Prénom" value={guestForm.firstName} onChange={e => setGuestForm({...guestForm, firstName: e.target.value})} />
@@ -1906,7 +1906,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
 
       {showImportGuestsModal && (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 bg-gray-900/80 backdrop-blur-xl">
-          <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-xl h-[90vh] sm:h-auto sm:max-h-[90vh] overflow-hidden flex flex-col pb-[env(safe-area-inset-bottom)]">
+          <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-xl max-h-[min(90dvh,90vh)] overflow-hidden flex flex-col pb-[env(safe-area-inset-bottom)]">
             {/* Étape : liste native avec cases à cocher */}
             {deviceContactList !== null ? (
               <>
@@ -2094,15 +2094,15 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
 
       {showMomentModal && (
         <div className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 bg-gray-900/80 backdrop-blur-xl">
-           <div className="bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-[3rem] p-6 sm:p-10 space-y-5 sm:space-y-6 shadow-2xl pb-[env(safe-area-inset-bottom)]">
+           <div className="bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-4 sm:p-6 space-y-5 shadow-2xl max-h-[min(90dvh,90vh)] overflow-y-auto pb-[env(safe-area-inset-bottom)]">
               <h3 className="text-2xl font-black">Nouveau Jalon</h3>
               <div className="space-y-4">
                  <Input label="Heure précise" type="time" value={momentForm.time} onChange={e => setMomentForm({...momentForm, time: e.target.value})} />
                  <Input label="Description" placeholder="Ex: Arrivée du photographe" value={momentForm.label} onChange={e => setMomentForm({...momentForm, label: e.target.value})} />
               </div>
               <div className="flex gap-4">
-                 <button onClick={() => setShowMomentModal(false)} className="flex-1 py-4 font-bold text-gray-400 text-[10px] uppercase">Annuler</button>
-                 <button onClick={handleAddKeyMoment} className="flex-[2] py-4 bg-teal-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-teal-100">Confirmer</button>
+                 <button onClick={() => setShowMomentModal(false)} className="flex-1 py-4 font-bold text-gray-400 text-xs uppercase">Annuler</button>
+                 <button onClick={handleAddKeyMoment} className="flex-[2] py-4 bg-teal-600 text-white rounded-2xl font-black text-xs uppercase shadow-xl shadow-teal-100">Confirmer</button>
               </div>
            </div>
         </div>
@@ -2162,7 +2162,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
         };
         return (
           <div className="fixed inset-0 z-[270] flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 bg-gray-900/80 backdrop-blur-xl">
-            <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[85vh] overflow-hidden flex flex-col pb-[env(safe-area-inset-bottom)]">
+            <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[min(88dvh,88vh)] overflow-hidden flex flex-col pb-[env(safe-area-inset-bottom)]">
               <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between shrink-0">
                 <h3 className="text-lg font-semibold text-slate-900">Ajouter depuis la liste globale</h3>
                 <button type="button" onClick={() => { setShowAddFromGlobalListModal(false); setAddFromGlobalSelectedIds(new Set()); }} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100" aria-label="Fermer">

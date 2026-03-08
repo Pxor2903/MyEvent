@@ -123,7 +123,7 @@ export const GuestDetailModal: React.FC<GuestDetailModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[280] flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 bg-gray-900/80 backdrop-blur-xl">
-      <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[90vh] overflow-hidden flex flex-col pb-[env(safe-area-inset-bottom)]">
+      <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[min(90dvh,90vh)] overflow-hidden flex flex-col pb-[env(safe-area-inset-bottom)]">
         <div className="p-4 sm:p-5 border-b border-slate-200 shrink-0 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-slate-900">Fiche invité</h3>
           <button type="button" onClick={onClose} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100" aria-label="Fermer">

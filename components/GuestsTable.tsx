@@ -221,14 +221,66 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
         </div>
       </div>
 
-      {/* Tableau scrollable */}
-      <div className="flex-1 overflow-auto min-h-0">
+      {/* Contenu : vide / cartes mobile / tableau desktop */}
+      <div className="flex-1 overflow-auto min-h-0 min-w-0">
         {guests.length === 0 ? (
-          <div className="p-12 text-center text-slate-500 text-sm">
+          <div className="p-8 sm:p-12 text-center text-slate-500 text-sm">
             {filterSubEventId ? 'Aucun invité pour cette séquence.' : 'Aucun invité. Ajoutez-en depuis le Programme (sélectionnez une séquence) ou importez des contacts.'}
           </div>
         ) : (
-          <table className="w-full text-left text-sm border-collapse">
+          <>
+            {/* Vue cartes — mobile uniquement */}
+            <ul className="md:hidden divide-y divide-slate-100 p-3 space-y-0">
+              {guests.map((g) => {
+                const canEditThis = canEditGuest(g, currentUserId, event);
+                return (
+                  <li key={g.id} className="py-3 px-2">
+                    <div
+                      role={onGuestClick ? 'button' : undefined}
+                      tabIndex={onGuestClick ? 0 : undefined}
+                      onClick={onGuestClick ? () => onGuestClick(g) : undefined}
+                      onKeyDown={onGuestClick ? (e) => e.key === 'Enter' && onGuestClick(g) : undefined}
+                      className={`w-full text-left rounded-xl p-3 border border-slate-100 bg-slate-50/50 flex flex-col gap-1 ${onGuestClick ? 'hover:bg-slate-50 hover:border-slate-200 active:bg-slate-100 min-h-[44px] cursor-pointer' : ''}`}
+                    >
+                      <span className="font-medium text-slate-900">
+                        {g.firstName} {g.lastName}
+                      </span>
+                      {g.email && <span className="text-xs text-slate-500 truncate">{g.email}</span>}
+                      {!g.email && g.phone && <span className="text-xs text-slate-500">{g.phone}</span>}
+                      {!isGlobalView && (
+                        <span className={`inline-flex self-start mt-1 px-2 py-0.5 rounded-md text-xs font-medium ${
+                          g.status === 'confirmed' ? 'bg-emerald-100 text-emerald-800' :
+                          g.status === 'declined' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {STATUS_LABELS[g.status]}
+                        </span>
+                      )}
+                      {!isGlobalView && filterSubEventId && (
+                        <span className="text-xs text-slate-500 mt-0.5">
+                          Présents : {effectiveAttendanceForRow(g, filterSubEventId)} / {effectiveGuestCount(g)}
+                        </span>
+                      )}
+                    </div>
+                    {canManage && (
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteGuest(g); }}
+                          disabled={deletingId === g.id}
+                          className="touch-target p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 text-xs font-medium"
+                          aria-label="Supprimer"
+                        >
+                          Supprimer
+                        </button>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Tableau — desktop */}
+            <table className="hidden md:table w-full text-left text-sm border-collapse">
             <thead className="sticky top-0 bg-slate-100 border-b border-slate-200 z-10">
               <tr>
                 <th className="px-2 py-3 font-semibold text-slate-700 whitespace-nowrap max-w-[140px]">Étiquettes</th>
@@ -351,7 +403,8 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
                 );
               })}
             </tbody>
-          </table>
+            </table>
+          </>
         )}
       </div>
     </div>
