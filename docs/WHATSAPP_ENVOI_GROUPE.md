@@ -66,6 +66,25 @@ Ce qui suit explique **étape par étape** comment configurer ce numéro global 
 
 ---
 
+## Tu n’as pas encore créé / vérifié ton entreprise ? (pas d’impasse)
+
+Si tu es en train de **développer** l’app et que tu **ne veux pas** lancer la vérification Meta (ou créer ton entreprise) tout de suite, tu peux quand même **tester l’envoi « à tous en un clic »** avec le **sandbox WhatsApp Twilio**. Aucun compte Meta ni vérification d’entreprise nécessaires.
+
+**À faire :**
+
+1. **Twilio** → **Messaging** → **Try it out** → **Send a WhatsApp message** (ou menu **WhatsApp** → **Sandbox**). Tu vois un **numéro Twilio** (ex. +1 415 523 8886) et un **code à rejoindre** (ex. « join hello-world »).
+2. **Sur Vercel** (Settings → Environment Variables) :
+   - **`TWILIO_WHATSAPP_FROM`** = **le numéro du sandbox** au format `whatsapp:+14155238886` (remplace par le numéro affiché dans la page Sandbox Twilio, sans espace).
+   - **Supprime** la variable **`TWILIO_WHATSAPP_CONTENT_SID`** (ou laisse-la vide). Sans Content SID, l’API envoie en mode **texte libre** (Body), ce qui fonctionne en sandbox et ne demande pas de template ni de vérification Meta.
+3. **Redéploie** le projet sur Vercel.
+4. **Destinataires de test** : chaque personne qui doit recevoir les messages doit **une fois** envoyer sur WhatsApp au numéro du sandbox le message indiqué par Twilio (ex. `join hello-world`). Après ça, elle recevra les messages envoyés depuis MyEvent.
+
+**Résumé** : en dev, utilise le **numéro sandbox** + **pas de CONTENT_SID**. Tu peux finir ton app, tester l’envoi groupé, et plus tard seulement créer/vérifier ton entreprise Meta et passer en production (numéro perso + template + `TWILIO_WHATSAPP_CONTENT_SID`).
+
+**Alternative sans WhatsApp du tout** : en attendant d’ouvrir ta société, tu peux utiliser **uniquement l’envoi par SMS** (« Envoyer par SMS à tous »). Aucun compte Meta ni WhatsApp Business nécessaire — juste Twilio (même compte) avec un numéro SMS. Voir `docs/SMS_ENVOI_GROUPE.md`.
+
+---
+
 ## Par où commencer (tu as déjà ton compte Meta)
 
 Tu as ton **compte Meta professionnel** : tu peux choisir l’une de ces deux voies.
@@ -73,7 +92,7 @@ Tu as ton **compte Meta professionnel** : tu peux choisir l’une de ces deux vo
 **Option A – Démarrer en sandbox (le plus rapide pour tester)**  
 1. Crée un **compte Twilio** (Partie 1.1).  
 2. Active le **sandbox WhatsApp** dans Twilio (Partie 1.4) et note le numéro d’envoi.  
-3. Configure les **variables sur Vercel** (Partie 2) et redéploie.  
+3. Configure les **variables sur Vercel** (Partie 2) — **sans** `TWILIO_WHATSAPP_CONTENT_SID` — et redéploie.  
 4. Teste dans MyEvent : le bouton « Envoyer à tous en un clic » apparaît. Les destinataires devront envoyer « join &lt;code&gt; » au numéro Twilio pour recevoir (limitation du sandbox).  
 → Tu n’utilises pas encore ton compte Meta ; c’est pour valider que tout fonctionne.
 
@@ -379,6 +398,44 @@ Les variables sont prises en compte au **déploiement**. Il faut donc déclenche
 5. **Erreur 405 (Method not allowed)** : le serveur reçoit une requête en GET au lieu de POST. Souvent à cause d’une **redirection** (l’URL avec un slash final ou en `http://` est redirigée, et le navigateur transforme le POST en GET). **À faire** :
    - Sur Vercel, définis `VITE_WHATSAPP_API_URL` **exactement** ainsi : `https://ton-domaine.vercel.app/api/send-whatsapp` (en **HTTPS**, **sans slash** à la fin).
    - Redéploie, puis refais un build de l’app (y compris mobile : `npm run build` puis `npx cap sync ios` et relance depuis Xcode).
+
+### Messages « Failed » ou « Undelivered » dans les logs Twilio
+
+L’app affiche « Envoyé à X contacts » mais dans **Twilio** (Monitor → Logs → Messaging) les messages sont en **Failed** ou **Undelivered**. Twilio accepte l’envoi, mais WhatsApp/Meta refuse ou ne livre pas.
+
+**1. Récupérer le code d’erreur exact**
+
+- Dans Twilio : **Monitor** → **Logs** → **Messaging**.
+- Clique sur **un message en Failed ou Undelivered** (ou sur **Troubleshoot** à côté du statut).
+- Note le **code d’erreur** et le **message** (ex. 63016, 131047, « Media download failed », etc.). C’est indispensable pour cibler la cause.
+
+**2. Vérifier l’URL du document (template avec pièce jointe)**
+
+Si tu envoies **avec un document** (template média avec variable `{{2}}`) :
+
+- Les serveurs **WhatsApp** doivent pouvoir **télécharger** l’URL du document. Si l’URL renvoie 403 (accès refusé) ou n’est pas accessible en HTTPS public, le message échoue.
+- **À faire** : le bucket Supabase **event-files** doit être **Public** (voir `docs/STORAGE_BUCKET_DOCUMENTS.md`). En navigation privée, ouvre l’URL du document dans le navigateur : le fichier doit se télécharger sans demande de connexion.
+- Si le bucket est privé, soit tu le passes en Public (et tu configures les policies pour que seuls les uploads soient protégés si besoin), soit pour l’envoi WhatsApp « à tous en un clic » il faudrait générer une **URL signée temporaire** et l’utiliser comme `documentUrl` (à mettre en place côté code si tu restes en privé).
+
+**3. Tester sans document**
+
+Pour savoir si le problème vient du **média** ou du **template / destinataires** :
+
+- Dans MyEvent, envoie **sans** sélectionner de document à partager (ou avec un message seul, sans pièce jointe). Si les messages sont livrés dans ce cas, le souci vient très probablement de l’URL du document (accessibilité ou type de fichier).
+
+**4. Template et production**
+
+- Vérifie que le template (ex. « texteinvitation ») est **Approved** dans Meta et que le **Content SID** sur Vercel (`TWILIO_WHATSAPP_CONTENT_SID`) correspond bien à ce template.
+- Les numéros doivent être au format **E.164** (ex. `+33612345678`).
+
+**Erreur 63112 (compte désactivé par Meta)**  
+« The Meta and/or WhatsApp Business Accounts connected to this Sender were disabled by Meta » — le **numéro d’envoi** ou le **compte WhatsApp Business (WABA)** lié à Twilio a été **désactivé par Meta**, ou la **vérification d’entreprise** est en attente. Ce n’est pas un bug de l’app ni de l’URL du document. À faire :
+- Connexion à [Meta Business](https://business.facebook.com/) → section **WhatsApp** : vérifier les alertes et le statut du numéro / WABA.
+- **Business verification** : Business Settings → Security Center → suivre la procédure de vérification si elle est en attente.
+- Si tu as supprimé puis réenregistré un expéditeur : WhatsApp Manager → ce numéro → Two-step verification → **désactiver** la 2FA avant de réenregistrer.
+- Si tu estimes que la désactivation est une erreur : [WhatsApp Business Help Center](https://www.whatsapp.com/business/help) → soumettre un recours (appeal) avec les explications demandées.
+
+Une fois le **code d’erreur** Twilio en main, tu peux le chercher dans la [doc Twilio](https://www.twilio.com/docs/api/errors) ou [WhatsApp Business](https://developers.facebook.com/docs/whatsapp/cloud-api/support/error-codes/) pour appliquer la correction adaptée.
 
 ### L’app sur téléphone ne montre pas les changements
 

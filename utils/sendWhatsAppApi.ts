@@ -78,6 +78,7 @@ export async function sendWhatsAppToMany(
       console.error('[WhatsApp API]', res.status, msg, trimmed?.slice(0, 200));
       return { ok: false, error: msg };
     }
+    console.log('[WhatsApp API] Réponse:', data.sent, 'envoyé(s),', data.failed, 'échec(s)', data.error ? '— ' + data.error : '');
     return {
       ok: true,
       sent: data.sent ?? numbers.length,
