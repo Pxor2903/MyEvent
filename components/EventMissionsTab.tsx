@@ -66,7 +66,6 @@ export const EventMissionsTab: React.FC<EventMissionsTabProps> = ({
       missions: missions.map((m) => (m.id === missionId ? { ...m, ...updates } : m))
     };
     await onUpdate(updated);
-    setEditingId(null);
   };
 
   const deleteMission = async (missionId: string) => {
