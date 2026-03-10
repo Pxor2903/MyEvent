@@ -1,7 +1,7 @@
 import path from 'path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import mkcert from 'vite-plugin-mkcert';
+import basicSsl from '@vitejs/plugin-basic-ssl';
 
 export default defineConfig(() => ({
   server: {
@@ -9,7 +9,7 @@ export default defineConfig(() => ({
     host: '0.0.0.0',
     https: true,
   },
-  plugins: [react(), mkcert()],
+  plugins: [react(), basicSsl()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, '.'),
