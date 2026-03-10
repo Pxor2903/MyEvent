@@ -1068,12 +1068,20 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 currentUserId={user.id}
                 canManage={isOwner || (currentOrganizer?.status === 'confirmed')}
                 onUpdate={async (updated) => {
+                  onUpdate(updated);
                   try {
                     const saved = await dbService.updateEventAtomic(event.id, () => updated);
                     onUpdate(saved);
                   } catch (e) {
                     console.error(e);
-                    alert('Impossible de sauvegarder les missions.');
+                    onUpdate(event);
+                    const errMsg = e instanceof Error ? e.message : String(e);
+                    const isColumnError = /column.*missions|does not exist/i.test(errMsg);
+                    alert(
+                      isColumnError
+                        ? "La colonne « missions » n'existe pas encore en base. Exécute la migration :\n\nsupabase db push\n\nou exécute manuellement le fichier supabase/migrations/20250602_event_missions.sql dans le SQL Editor de Supabase."
+                        : `Impossible de sauvegarder les missions : ${errMsg}`
+                    );
                   }
                 }}
                 teamMembers={[
