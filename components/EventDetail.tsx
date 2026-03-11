@@ -26,6 +26,7 @@ import { CHART_PALETTE, UNALLOCATED_COLOR } from '@/core/constants/chartColors';
 import type { BudgetAllocation } from '@/core/types';
 import { EventDocumentsTab } from './EventDocumentsTab';
 import { EventMissionsTab } from './EventMissionsTab';
+import { EventManagementTab } from './EventManagementTab';
 
 interface EventDetailProps {
   event: Event;
@@ -81,7 +82,7 @@ function GuestsTableSegmentBar({
 }
 
 export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, onUpdate, onRefreshEvent }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'program' | 'chat' | 'settings' | 'budget' | 'guests' | 'documents' | 'missions'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'gestion' | 'program' | 'chat' | 'settings' | 'budget' | 'guests' | 'documents' | 'missions'>('overview');
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
   const [subTab, setSubTab] = useState<'sequence' | 'chat' | 'guests' | 'budget' | 'documents'>('sequence');
   /** Filtre optionnel pour l’onglet Invités (niveau événement principal). */
@@ -825,12 +826,10 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
           <nav className="flex gap-0 sm:gap-1 px-2 sm:px-4 pt-2 pb-1 border-b border-slate-200 overflow-x-auto no-scrollbar overflow-y-hidden" style={{ WebkitOverflowScrolling: 'touch' }} aria-label="Onglets">
             {[
               { id: 'overview', label: "Vue d'ensemble" },
-              { id: 'missions', label: 'Missions' },
+              { id: 'gestion', label: 'Gestion' },
               { id: 'program', label: 'Programme' },
               { id: 'guests', label: 'Invités' },
               { id: 'chat', label: 'Chat' },
-              { id: 'documents', label: 'Documents' },
-              { id: 'settings', label: 'Équipe' },
               ...(canViewBudget ? [{ id: 'budget', label: 'Budget' }] : [])
             ].map(tab => (
               (tab.id !== 'settings' || isOwner) && (
@@ -1060,6 +1059,19 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                   <button type="button" onClick={handleShare} className="px-4 py-2.5 bg-teal-600 text-white text-sm font-medium rounded-xl hover:bg-teal-700 shrink-0">Partager l'invitation</button>
                 </div>
               </div>
+            )}
+
+            {activeTab === 'gestion' && (
+              <EventManagementTab
+                event={event}
+                currentUser={user}
+                currentOrganizer={currentOrganizer}
+                permissions={permissions}
+                isOwner={isOwner}
+                onUpdateEvent={(updated) => onUpdate(updated)}
+                onOpenDocuments={() => setActiveTab('documents')}
+                onOpenTeamSettings={() => setActiveTab('settings')}
+              />
             )}
 
             {activeTab === 'missions' && (
