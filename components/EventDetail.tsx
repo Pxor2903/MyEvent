@@ -82,7 +82,7 @@ function GuestsTableSegmentBar({
 }
 
 export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, onUpdate, onRefreshEvent }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'gestion' | 'program' | 'chat' | 'settings' | 'budget' | 'guests' | 'documents' | 'missions'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'gestion' | 'program' | 'chat' | 'settings' | 'budget' | 'guests' | 'documents'>('overview');
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
   const [subTab, setSubTab] = useState<'sequence' | 'chat' | 'guests' | 'budget' | 'documents'>('sequence');
   /** Filtre optionnel pour l’onglet Invités (niveau événement principal). */
@@ -104,6 +104,27 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
 
   const chatChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMissionsUpdate = useCallback(
+    async (updated: Event) => {
+      onUpdate(updated);
+      try {
+        const saved = await dbService.updateEventAtomic(event.id, () => updated);
+        onUpdate(saved);
+      } catch (e) {
+        console.error(e);
+        onUpdate(event);
+        const errMsg = e instanceof Error ? e.message : String(e);
+        const isColumnError = /column.*missions|does not exist/i.test(errMsg);
+        alert(
+          isColumnError
+            ? "La colonne « missions » n'existe pas encore en base. Exécute la migration :\n\nsupabase db push\n\nou exécute manuellement le fichier supabase/migrations/20250602_event_missions.sql dans le SQL Editor de Supabase."
+            : `Impossible de sauvegarder les missions : ${errMsg}`
+        );
+      }
+    },
+    [event, onUpdate]
+  );
 
   // Rafraîchir l’événement à l’ouverture de l’onglet Invités pour afficher les réponses (statut, nb personnes) à jour
   const onRefreshEventRef = useRef(onRefreshEvent);
@@ -1068,43 +1089,9 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 currentOrganizer={currentOrganizer}
                 permissions={permissions}
                 isOwner={isOwner}
-                onUpdateEvent={(updated) => onUpdate(updated)}
+                onUpdateEvent={handleMissionsUpdate}
                 onOpenDocuments={() => setActiveTab('documents')}
                 onOpenTeamSettings={() => setActiveTab('settings')}
-              />
-            )}
-
-            {activeTab === 'missions' && (
-              <EventMissionsTab
-                event={event}
-                currentUserId={user.id}
-                canManage={isOwner || (currentOrganizer?.status === 'confirmed')}
-                onUpdate={async (updated) => {
-                  onUpdate(updated);
-                  try {
-                    const saved = await dbService.updateEventAtomic(event.id, () => updated);
-                    onUpdate(saved);
-                  } catch (e) {
-                    console.error(e);
-                    onUpdate(event);
-                    const errMsg = e instanceof Error ? e.message : String(e);
-                    const isColumnError = /column.*missions|does not exist/i.test(errMsg);
-                    alert(
-                      isColumnError
-                        ? "La colonne « missions » n'existe pas encore en base. Exécute la migration :\n\nsupabase db push\n\nou exécute manuellement le fichier supabase/migrations/20250602_event_missions.sql dans le SQL Editor de Supabase."
-                        : `Impossible de sauvegarder les missions : ${errMsg}`
-                    );
-                  }
-                }}
-                teamMembers={[
-                  { userId: event.creatorId, label: event.creatorId === user.id ? 'Propriétaire (vous)' : 'Propriétaire' },
-                  ...(event.organizers ?? [])
-                    .filter((o) => o.status === 'confirmed' && o.userId !== event.creatorId)
-                    .map((o) => ({
-                      userId: o.userId,
-                      label: `${o.firstName} ${o.lastName}`.trim() || 'Co-organisateur'
-                    }))
-                ]}
               />
             )}
 
@@ -1452,7 +1439,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 Séquence
                 {subTab === 'sequence' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-teal-600 rounded-t-full" />}
               </button>
-              <button key="missions" type="button" onClick={() => { setSelectedSubId(null); setActiveTab('missions'); }} className="py-4 sm:py-5 px-4 sm:px-6 text-xs font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center text-gray-400 hover:text-teal-600">
+              <button key="missions" type="button" onClick={() => { setSelectedSubId(null); setActiveTab('gestion'); }} className="py-4 sm:py-5 px-4 sm:px-6 text-xs font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center text-gray-400 hover:text-teal-600">
                 Missions
               </button>
               <button key="guests" type="button" onClick={() => setSubTab('guests')} className={`py-4 sm:py-5 px-4 sm:px-6 text-xs font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'guests' ? 'text-teal-600' : 'text-gray-400'}`}>

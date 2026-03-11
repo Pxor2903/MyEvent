@@ -1,5 +1,6 @@
-import React from 'react';
-import type { Event, User, Organizer, Permission } from '@/core/types';
+import React, { useEffect, useState } from 'react';
+import type { Event, User, Organizer, Permission, EventAttachment } from '@/core/types';
+import { dbService, ATTACHMENT_TYPE_LABELS } from '@/api';
 import { EventMissionsTab } from './EventMissionsTab';
 
 interface EventManagementTabProps {
@@ -28,6 +29,29 @@ export const EventManagementTab: React.FC<EventManagementTabProps> = ({
 }) => {
   const canManageMissions = isOwner || (currentOrganizer?.status === 'confirmed') || permissions.includes('manage_subevents') || permissions.includes('all');
 
+  const [attachments, setAttachments] = useState<EventAttachment[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoadingDocs(true);
+      try {
+        const all = await dbService.listAllAttachments(event.id);
+        const globals = all.filter((a) => !a.subEventId);
+        if (!cancelled) setAttachments(globals);
+      } catch (e) {
+        console.error('[EventManagementTab] load attachments failed', e);
+        if (!cancelled) setAttachments([]);
+      } finally {
+        if (!cancelled) setLoadingDocs(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [event.id]);
+
   const teamMembers = [
     {
       userId: event.creatorId,
@@ -53,17 +77,77 @@ export const EventManagementTab: React.FC<EventManagementTabProps> = ({
         </p>
       </header>
 
-      {/* Bloc Missions */}
+      {/* Bloc Documents (en premier) */}
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm p-4 sm:p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold text-slate-900">Documents partagés</h3>
+            <p className="text-xs sm:text-sm text-slate-500 max-w-xl">
+              Aperçu rapide des invitations, menus, plans et autres fichiers liés à l’événement.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenDocuments}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-600 text-white text-xs sm:text-sm font-semibold shadow-sm hover:bg-teal-700"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Gérer tous les documents
+          </button>
+        </div>
+
+        <div className="mt-2">
+          {loadingDocs ? (
+            <p className="text-xs text-slate-500">Chargement des documents…</p>
+          ) : attachments.length === 0 ? (
+            <p className="text-xs text-slate-500">Aucun document pour le moment. Tu pourras en ajouter depuis l’onglet Documents.</p>
+          ) : (
+            <>
+              <ul className="divide-y divide-slate-100 rounded-xl border border-slate-100 bg-slate-50/60">
+                {attachments.slice(0, 5).map((att) => (
+                  <li key={att.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">{att.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {ATTACHMENT_TYPE_LABELS[att.type] ?? att.type}
+                      </p>
+                    </div>
+                    <span className="ml-2 inline-flex items-center justify-center rounded-full bg-white border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-500">
+                      {new Date(att.createdAt).toLocaleDateString('fr-FR')}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {attachments.length > 5 && (
+                <button
+                  type="button"
+                  onClick={onOpenDocuments}
+                  className="mt-2 text-xs font-medium text-teal-600 hover:text-teal-700"
+                >
+                  Voir tous les documents ({attachments.length})
+                </button>
+              )}
+            </>
+          )}
+        </div>
+        <p className="text-[11px] text-slate-500 mt-2">
+          Astuce : marque tes cartes d’invitation avec le type <span className="font-semibold">« Carte d’invitation »</span> pour activer les liens de réponse automatiques.
+        </p>
+      </section>
+
+      {/* Bloc Missions (plus compact, contenu scrollable) */}
+      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm p-4 sm:p-6 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-lg font-semibold text-slate-900">Missions</h3>
             <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-xl">
-              Liste des tâches à faire pour l’événement. Les organisateurs peuvent s’auto-assigner des missions ou en créer de nouvelles.
+              Répartition des tâches entre les organisateurs. La liste détaillée est limitée ici pour garder une vue d’ensemble légère.
             </p>
           </div>
         </div>
-        <div className="mt-2">
+        <div className="mt-1 max-h-[420px] overflow-y-auto pr-1">
           <EventMissionsTab
             event={event}
             currentUserId={currentUser.id}
