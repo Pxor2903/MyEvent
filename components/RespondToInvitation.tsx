@@ -131,114 +131,116 @@ export const RespondToInvitation: React.FC<RespondToInvitationProps> = ({ token 
   return (
     <div className="min-h-screen min-h-[100dvh] bg-slate-50 flex flex-col items-center py-8 px-4 pb-[env(safe-area-inset-bottom)]">
       <Logo />
-      <div className="w-full max-w-md mt-8 rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
-        {info.attachments && info.attachments.length > 0 && (() => {
-          const doc = info.attachments![0];
-          const isImage = /\.(png|jpe?g|gif|webp)$/i.test(doc.url);
-          const isPdf = /\.pdf$/i.test(doc.url);
-          return (
-            <div className="bg-slate-50 border-b border-slate-100">
-              {isImage ? (
-                <img
-                  src={doc.url}
-                  alt={doc.name}
-                  className="w-full h-auto max-h-[480px] object-contain"
-                />
-              ) : isPdf ? (
+      {/* Bloc carte d’invitation plein cadre en haut */}
+      {info.attachments && info.attachments.length > 0 && (() => {
+        const doc = info.attachments![0];
+        const isImage = /\.(png|jpe?g|gif|webp)$/i.test(doc.url);
+        const isPdf = /\.pdf$/i.test(doc.url);
+        return (
+          <div className="w-full max-w-3xl mt-6">
+            {isImage ? (
+              <img
+                src={doc.url}
+                alt={doc.name}
+                className="w-full h-auto max-h-[80vh] object-contain rounded-3xl shadow-md bg-white"
+              />
+            ) : isPdf ? (
+              <div className="rounded-3xl overflow-hidden shadow-md bg-white">
                 <iframe
                   src={doc.url}
                   title={doc.name}
-                  className="w-full h-80 border-0 bg-slate-50"
-                />
-              ) : (
-                <a
-                  href={doc.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block p-4 text-sm text-teal-700 underline text-center"
-                >
-                  Ouvrir la carte d’invitation
-                </a>
-              )}
-            </div>
-          );
-        })()}
-
-        <div className="p-5 border-t border-slate-100">
-          <div className="mb-4">
-            <h1 className="text-lg font-semibold text-slate-900">Répondre à l’invitation</h1>
-            <p className="mt-1 text-slate-600">
-              {info.guestFirstName} {info.guestLastName}, vous êtes invité(e) à
-            </p>
-            <p className="mt-2 font-medium text-teal-700">{info.eventTitle}</p>
-          </div>
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Présence</label>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setConfirmed(true)}
-                  className={`flex-1 py-3 rounded-xl border-2 text-sm font-medium transition-colors ${
-                    confirmed === true
-                      ? 'border-teal-600 bg-teal-50 text-teal-700'
-                      : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                  }`}
-                >
-                  Je viens
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmed(false)}
-                  className={`flex-1 py-3 rounded-xl border-2 text-sm font-medium transition-colors ${
-                    confirmed === false
-                      ? 'border-slate-600 bg-slate-100 text-slate-700'
-                      : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                  }`}
-                >
-                  Je ne peux pas
-                </button>
-              </div>
-            </div>
-            {confirmed === true && (
-              <div>
-                <label htmlFor="guestCount" className="block text-sm font-medium text-slate-700 mb-1">
-                  Nombre de personnes
-                </label>
-                <input
-                  id="guestCount"
-                  type="number"
-                  min={1}
-                  max={99}
-                  value={guestCount}
-                  onChange={(e) => setGuestCount(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base"
+                  className="w-full h-[70vh] border-0 bg-slate-50"
                 />
               </div>
+            ) : (
+              <a
+                href={doc.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block mt-6 text-sm text-teal-700 underline text-center"
+              >
+                Ouvrir la carte d’invitation
+              </a>
             )}
+          </div>
+        );
+      })()}
+
+      {/* Bloc réponse en dessous de la carte */}
+      <div className="w-full max-w-md mt-8 rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-5 border-b border-slate-100">
+          <h1 className="text-lg font-semibold text-slate-900">Répondre à l’invitation</h1>
+          <p className="mt-1 text-slate-600">
+            {info.guestFirstName} {info.guestLastName}, vous êtes invité(e) à
+          </p>
+          <p className="mt-2 font-medium text-teal-700">{info.eventTitle}</p>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Présence</label>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmed(true)}
+                className={`flex-1 py-3 rounded-xl border-2 text-sm font-medium transition-colors ${
+                  confirmed === true
+                    ? 'border-teal-600 bg-teal-50 text-teal-700'
+                    : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                }`}
+              >
+                Je viens
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmed(false)}
+                className={`flex-1 py-3 rounded-xl border-2 text-sm font-medium transition-colors ${
+                  confirmed === false
+                    ? 'border-slate-600 bg-slate-100 text-slate-700'
+                    : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                }`}
+              >
+                Je ne peux pas
+              </button>
+            </div>
+          </div>
+          {confirmed === true && (
             <div>
-              <label htmlFor="message" className="block text-sm font-medium text-slate-700 mb-1">
-                Message (optionnel)
+              <label htmlFor="guestCount" className="block text-sm font-medium text-slate-700 mb-1">
+                Nombre de personnes
               </label>
-              <textarea
-                id="message"
-                rows={2}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Ex : Merci pour l’invitation…"
-                className="w-full min-w-0 rounded-xl border border-slate-200 px-4 py-3 text-base resize-none"
+              <input
+                id="guestCount"
+                type="number"
+                min={1}
+                max={99}
+                value={guestCount}
+                onChange={(e) => setGuestCount(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base"
               />
             </div>
-            {submitError && <p className="text-sm text-red-600">{submitError}</p>}
-            <button
-              type="submit"
-              disabled={confirmed === null || submitting}
-              className="w-full py-3 rounded-xl bg-teal-600 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {submitting ? 'Envoi…' : 'Envoyer ma réponse'}
-            </button>
-          </form>
-        </div>
+          )}
+          <div>
+            <label htmlFor="message" className="block text-sm font-medium text-slate-700 mb-1">
+              Message (optionnel)
+            </label>
+            <textarea
+              id="message"
+              rows={2}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Ex : Merci pour l’invitation…"
+              className="w-full min-w-0 rounded-xl border border-slate-200 px-4 py-3 text-base resize-none"
+            />
+          </div>
+          {submitError && <p className="text-sm text-red-600">{submitError}</p>}
+          <button
+            type="submit"
+            disabled={confirmed === null || submitting}
+            className="w-full py-3 rounded-xl bg-teal-600 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {submitting ? 'Envoi…' : 'Envoyer ma réponse'}
+          </button>
+        </form>
       </div>
     </div>
   );
