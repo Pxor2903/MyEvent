@@ -137,7 +137,7 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
   const shareData = shareDoc
     ? getShareToAllData(guestsForSub, shareMessage, {
         subject: `${event.title} – Document`,
-        documentUrl: shareDoc.url,
+        documentUrl: isInvitationDoc(shareDoc) ? undefined : shareDoc.url,
         onlyChannel
       })
     : { entries: [] as ShareToAllGuestEntry[], pending: [] as PendingContactUpdate[] };
@@ -238,7 +238,10 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
                   {(() => {
                     const withWhatsApp = shareData.entries.filter(e => e.canShare && e.whatsappUrl);
                     const phoneNumbers = withWhatsApp.map((e) => toE164((e.guest.phone ?? '').trim())).filter((n) => n);
-                    const fullMessage = shareMessage + (shareDoc ? `\n\n${shareDoc.url}` : '');
+                    const baseMessage = shareMessage;
+                    const fullMessage = isInvitationDoc(shareDoc)
+                      ? baseMessage
+                      : baseMessage + (shareDoc ? `\n\n${shareDoc.url}` : '');
                     const apiConfigured = isWhatsAppApiConfigured();
                     return (
                       <div className="flex flex-col gap-4">
