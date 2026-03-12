@@ -131,7 +131,9 @@ export const RespondToInvitation: React.FC<RespondToInvitationProps> = ({ token 
   return (
     <div className="min-h-screen min-h-[100dvh] bg-slate-50 flex flex-col items-center py-8 px-4 pb-[env(safe-area-inset-bottom)]">
       <Logo />
-      {/* Bloc carte d’invitation plein cadre en haut */}
+      {/* Bloc carte d’invitation en haut : l’image occupe toute la hauteur de la page
+          (c’est la “ville de fond”). Pour les PDF, on ouvre dans un nouvel onglet
+          car les navigateurs imposent leur propre fenêtre de défilement. */}
       {info.attachments && info.attachments.length > 0 && (() => {
         const doc = info.attachments![0];
         const isImage = /\.(png|jpe?g|gif|webp)$/i.test(doc.url);
@@ -142,16 +144,17 @@ export const RespondToInvitation: React.FC<RespondToInvitationProps> = ({ token 
               <img
                 src={doc.url}
                 alt={doc.name}
-                className="w-full h-auto max-h-[80vh] object-contain rounded-3xl shadow-md bg-white"
+                className="w-full h-auto object-contain"
               />
             ) : isPdf ? (
-              <div className="rounded-3xl overflow-hidden shadow-md bg-white">
-                <iframe
-                  src={doc.url}
-                  title={doc.name}
-                  className="w-full h-[70vh] border-0 bg-slate-50"
-                />
-              </div>
+              <a
+                href={doc.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-center text-sm text-teal-700 underline"
+              >
+                Ouvrir la carte d’invitation (PDF) dans un nouvel onglet
+              </a>
             ) : (
               <a
                 href={doc.url}
