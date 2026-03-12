@@ -147,23 +147,21 @@ export const RespondToInvitation: React.FC<RespondToInvitationProps> = ({ token 
                 className="w-full h-auto object-contain"
               />
             ) : isPdf ? (
-              <a
-                href={doc.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block text-center text-sm text-teal-700 underline"
-              >
-                Ouvrir la carte d’invitation (PDF) dans un nouvel onglet
-              </a>
+              <div className="rounded-3xl overflow-hidden shadow-md bg-white">
+                <iframe
+                  src={doc.url}
+                  title={doc.name}
+                  className="w-full h-[80vh] border-0 bg-slate-50"
+                />
+              </div>
             ) : (
-              <a
-                href={doc.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block mt-6 text-sm text-teal-700 underline text-center"
-              >
-                Ouvrir la carte d’invitation
-              </a>
+              <div className="rounded-3xl overflow-hidden shadow-md bg-white">
+                <iframe
+                  src={doc.url}
+                  title={doc.name}
+                  className="w-full h-[80vh] border-0 bg-slate-50"
+                />
+              </div>
             )}
           </div>
         );
