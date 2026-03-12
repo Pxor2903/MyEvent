@@ -67,14 +67,31 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Charger les pièces jointes de type "invitation" liées à l'événement (niveau global)
+  // Charger les pièces jointes de type "invitation" liées à l'événement
   const { data: attachmentsRows } = await supabase
     .from('event_attachments')
     .select('id, name, type, url, sub_event_id')
     .eq('event_id', link.event_id);
-  const invitationDocs = (attachmentsRows || []).filter(
-    (a) => a.type === 'invitation' && (a.sub_event_id === null || a.sub_event_id === undefined)
-  );
+  const allAttachments = attachmentsRows || [];
+  let invitationDocs = allAttachments.filter((a) => a.type === 'invitation');
+
+  // Si l'invité est lié à un ou plusieurs sous-événements, on essaie de prendre une carte rattachée à ces sous-événements en priorité
+  const guestLinkedSubIds = Array.isArray(guest.linkedSubEventIds) ? guest.linkedSubEventIds : [];
+  if (invitationDocs.length && guestLinkedSubIds.length) {
+    const bySub = invitationDocs.filter(
+      (a) => a.sub_event_id && guestLinkedSubIds.includes(a.sub_event_id)
+    );
+    if (bySub.length) {
+      invitationDocs = bySub;
+    }
+  }
+
+  // Si on n'a toujours rien, on retombe sur une carte globale (sans sous-événement)
+  if (!invitationDocs.length) {
+    invitationDocs = allAttachments.filter(
+      (a) => a.type === 'invitation' && (a.sub_event_id === null || a.sub_event_id === undefined)
+    );
+  }
 
   const subEvents = eventRow.sub_events || [];
   res.status(200).json({
