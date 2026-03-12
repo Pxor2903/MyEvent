@@ -251,18 +251,10 @@ export const EventMissionsTab: React.FC<EventMissionsTabProps> = ({
 
   return (
     <div className="space-y-8">
-      {/* Bandeau visible pour confirmer le nouveau design */}
-      <div className="rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 text-white px-4 py-3 text-center text-sm font-bold">
-        ✓ Nouveau design chargé — Missions libres à saisir vs assignées
-      </div>
-
       {/* En-tête */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h3 className="text-xl font-bold text-slate-900">Missions</h3>
-            <span className="px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 text-xs font-semibold">Nouveau design</span>
-          </div>
+          <h3 className="text-xl font-bold text-slate-900">Missions</h3>
           <p className="text-sm text-slate-500 mt-1 max-w-md">
             Créez des tâches. Assignez-les ou laissez-les libres pour qu'un organisateur s'en empare.
           </p>
