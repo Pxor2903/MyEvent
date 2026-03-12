@@ -67,6 +67,15 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Charger les pièces jointes de type "invitation" liées à l'événement (niveau global)
+  const { data: attachmentsRows } = await supabase
+    .from('event_attachments')
+    .select('id, name, type, url, sub_event_id')
+    .eq('event_id', link.event_id);
+  const invitationDocs = (attachmentsRows || []).filter(
+    (a) => a.type === 'invitation' && (a.sub_event_id === null || a.sub_event_id === undefined)
+  );
+
   const subEvents = eventRow.sub_events || [];
   res.status(200).json({
     eventId: eventRow.id,
@@ -74,5 +83,11 @@ export default async function handler(req, res) {
     guestFirstName: guest.firstName || '',
     guestLastName: guest.lastName || '',
     subEvents: subEvents.map((s) => ({ id: s.id, title: s.title || 'Séquence' })),
+    attachments: invitationDocs.map((a) => ({
+      id: a.id,
+      name: a.name,
+      type: a.type,
+      url: a.url
+    }))
   });
 }

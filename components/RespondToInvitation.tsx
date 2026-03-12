@@ -14,6 +14,7 @@ interface InvitationInfo {
   guestFirstName: string;
   guestLastName: string;
   subEvents: { id: string; title: string }[];
+  attachments?: { id: string; name: string; type: string; url: string }[];
 }
 
 interface RespondToInvitationProps {
@@ -130,15 +131,56 @@ export const RespondToInvitation: React.FC<RespondToInvitationProps> = ({ token 
   return (
     <div className="min-h-screen min-h-[100dvh] bg-slate-50 flex flex-col items-center py-8 px-4 pb-[env(safe-area-inset-bottom)]">
       <Logo />
-      <div className="w-full max-w-md mt-8 rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-5 border-b border-slate-100">
-          <h1 className="text-lg font-semibold text-slate-900">Répondre à l’invitation</h1>
-          <p className="mt-1 text-slate-600">
-            {info.guestFirstName} {info.guestLastName}, vous êtes invité(e) à
-          </p>
-          <p className="mt-2 font-medium text-teal-700">{info.eventTitle}</p>
-        </div>
-        <form onSubmit={handleSubmit} className="p-5 space-y-5">
+      <div className="w-full max-w-md mt-8 space-y-4">
+        {info.attachments && info.attachments.length > 0 && (
+          <div className="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+            {(() => {
+              const doc = info.attachments![0];
+              const isImage = /\.(png|jpe?g|gif|webp)$/i.test(doc.url);
+              const isPdf = /\.pdf$/i.test(doc.url);
+              return (
+                <>
+                  <div className="p-4 border-b border-slate-100">
+                    <h2 className="text-sm font-semibold text-slate-900">Carte d’invitation</h2>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Retrouvez ici la carte reçue par message, puis répondez juste en dessous.
+                    </p>
+                  </div>
+                  <div className="bg-slate-50">
+                    {isImage ? (
+                      <img src={doc.url} alt={doc.name} className="w-full h-auto max-h-[420px] object-contain bg-slate-50" />
+                    ) : isPdf ? (
+                      <iframe
+                        src={doc.url}
+                        title={doc.name}
+                        className="w-full h-80 border-0 bg-slate-50"
+                      />
+                    ) : (
+                      <a
+                        href={doc.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block p-4 text-sm text-teal-700 underline"
+                      >
+                        Ouvrir la carte d’invitation
+                      </a>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        )}
+
+        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-5 border-b border-slate-100">
+            <h1 className="text-lg font-semibold text-slate-900">Répondre à l’invitation</h1>
+            <p className="mt-1 text-slate-600">
+              {info.guestFirstName} {info.guestLastName}, vous êtes invité(e) à
+            </p>
+            <p className="mt-2 font-medium text-teal-700">{info.eventTitle}</p>
+          </div>
+          <form onSubmit={handleSubmit} className="p-5 space-y-5">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Présence</label>
             <div className="flex gap-3">
@@ -196,6 +238,7 @@ export const RespondToInvitation: React.FC<RespondToInvitationProps> = ({ token 
             {submitting ? 'Envoi…' : 'Envoyer ma réponse'}
           </button>
         </form>
+        </div>
       </div>
     </div>
   );

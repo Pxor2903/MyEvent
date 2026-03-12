@@ -362,6 +362,7 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
                                   setSmsResult(null);
                                   setSmsSending(true);
                                   try {
+                                    const baseMessage = shareMessage;
                                     let messageToSend = fullMessage;
                                     let messagesOpt: string[] | undefined;
                                     if (isInvitationDoc(shareDoc)) {
@@ -371,7 +372,12 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
                                         try {
                                           const links = await getOrCreateInvitationLinks(event.id, guestIds, baseUrl);
                                           if (Object.keys(links).length > 0) {
-                                            messagesOpt = withSms.map((e) => fullMessage + (shareDoc?.url ? `\n\n${shareDoc.url}` : '') + `\n\nRépondre à l'invitation : ${links[e.guest.id] ?? ''}`);
+                                            messageToSend = baseMessage;
+                                            messagesOpt = withSms.map(
+                                              (e) =>
+                                                baseMessage +
+                                                `\n\nRépondre à l'invitation : ${links[e.guest.id] ?? ''}`
+                                            );
                                           }
                                         } catch (err) {
                                           alert(err instanceof Error ? err.message : 'Liens d’invitation indisponibles.');
@@ -431,6 +437,7 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
                                 setWhatsAppResult(null);
                                 setWhatsAppSending(true);
                                 try {
+                                  const baseMessage = shareMessage;
                                   let messagesOpt: string[] | undefined;
                                   if (isInvitationDoc(shareDoc)) {
                                     const withWhatsAppEntries = shareData.entries.filter(e => e.canShare && e.whatsappUrl);
@@ -440,7 +447,11 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
                                       try {
                                         const links = await getOrCreateInvitationLinks(event.id, guestIds, baseUrl);
                                         if (Object.keys(links).length > 0) {
-                                          messagesOpt = withWhatsAppEntries.map((e) => fullMessage + (shareDoc?.url ? `\n\n${shareDoc.url}` : '') + `\n\nRépondre à l'invitation : ${links[e.guest.id] ?? ''}`);
+                                          messagesOpt = withWhatsAppEntries.map(
+                                            (e) =>
+                                              baseMessage +
+                                              `\n\nRépondre à l'invitation : ${links[e.guest.id] ?? ''}`
+                                          );
                                         }
                                       } catch (err) {
                                         alert(err instanceof Error ? err.message : 'Liens d’invitation indisponibles.');
@@ -449,7 +460,14 @@ export const EventDocumentsTab: React.FC<EventDocumentsTabProps> = ({
                                       }
                                     }
                                   }
-                                  const result = await sendWhatsAppToMany(phoneNumbers, fullMessage, shareDoc?.url, messagesOpt);
+                                  const documentUrlToSend =
+                                    isInvitationDoc(shareDoc) ? undefined : shareDoc?.url;
+                                  const result = await sendWhatsAppToMany(
+                                    phoneNumbers,
+                                    fullMessage,
+                                    documentUrlToSend,
+                                    messagesOpt
+                                  );
                                   if (result.ok) {
                                     setWhatsAppResult({
                                       sent: result.sent ?? phoneNumbers.length,

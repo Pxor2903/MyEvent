@@ -73,11 +73,12 @@ export default async function handler(req, res) {
     const bodyParams = { To: toWhatsApp, From: twilioFrom };
     if (useTemplate) {
       bodyParams.ContentSid = contentSid.trim();
-      bodyParams.ContentVariables = JSON.stringify(
-        hasDocumentUrl ? { 1: msgText, 2: documentUrl.trim() } : { 1: msgText }
-      );
+      bodyParams.ContentVariables = JSON.stringify({ 1: msgText });
     } else {
       bodyParams.Body = msgText;
+      if (hasDocumentUrl) {
+        bodyParams.MediaUrl = documentUrl.trim();
+      }
     }
     try {
       const r = await fetch(
