@@ -1990,6 +1990,11 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                       const s = `${c.firstName} ${c.lastName} ${c.email} ${c.phone}`.toLowerCase();
                       return s.includes(q);
                     })
+                    .sort((a, b) => {
+                      const nameA = `${a.c.lastName} ${a.c.firstName}`.trim().toLowerCase();
+                      const nameB = `${b.c.lastName} ${b.c.firstName}`.trim().toLowerCase();
+                      return nameA.localeCompare(nameB, 'fr');
+                    })
                     .map(({ c, idx }) => {
                       const selected = deviceContactSelected.has(idx);
                       return (
@@ -2021,7 +2026,10 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
               <>
                 <div className="p-5 sm:p-6 border-b border-slate-200 shrink-0">
                   <h2 className="text-xl font-bold text-slate-900">Ajouter des invités</h2>
-                  <p className="text-sm text-slate-500 mt-1">Importez depuis un fichier, depuis les contacts de l’appareil (si disponible) ou ajoutez à la main.</p>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Depuis un ordinateur : exporte ton carnet (Contacts Mac, Outlook…) en fichier vCard (.vcf) ou CSV puis importe-le ici.
+                    Depuis un téléphone : sur Android (Chrome), tu peux aussi choisir directement des contacts de l’appareil.
+                  </p>
                   {importedContacts.length === 0 ? (
                     <div className="mt-5 space-y-4">
                       <input ref={importFileInputRef} type="file" accept=".vcf,.csv,.txt,text/vcard,text/csv,text/plain" className="hidden" onChange={handleImportFile} />
@@ -2042,7 +2050,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                           onClick={handleImportFromDevice}
                           className="w-full min-h-[48px] py-3 px-4 rounded-xl border-2 border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 hover:border-slate-300 disabled:opacity-70 flex items-center justify-center gap-2"
                         >
-                          {loadingNativeContacts ? 'Chargement…' : 'Depuis mon téléphone'}
+                          {loadingNativeContacts ? 'Chargement…' : 'Depuis les contacts du téléphone'}
                         </button>
                       ) : null}
 
@@ -2056,9 +2064,17 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                       </button>
 
                       {!importSources.fromDevice ? (
-                        <div className="rounded-xl bg-slate-100 border border-slate-200 p-3 text-xs text-slate-600">
+                        <div className="rounded-xl bg-slate-100 border border-slate-200 p-3 text-xs text-slate-600 space-y-1">
                           <p className="font-medium text-slate-700">Sur cet appareil</p>
-                          <p className="mt-1">L’accès direct au carnet n’est pas disponible (Safari, ordinateur…). Utilisez un fichier, Google ou l’ajout à la main.</p>
+                          <p>
+                            Les navigateurs de bureau (et Safari sur iPhone/iPad) ne donnent pas encore d’accès direct au carnet de contacts pour les sites web.
+                          </p>
+                          <p>
+                            Pour importer vos contacts MyEvent :
+                            - Sur Mac / PC : exportez vos contacts en fichier <strong>.vcf</strong> ou <strong>.csv</strong> puis utilisez « Importer depuis un fichier ».
+                            - Sur iPhone / iPad : passez par iCloud / Contacts → Exporter vCard, ou utilisez l’import Google.
+                            - Sur Android (Chrome) : ouvrez MyEvent dans Chrome et utilisez « Depuis les contacts du téléphone ».
+                          </p>
                         </div>
                       ) : null}
 
