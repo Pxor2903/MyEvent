@@ -25,7 +25,7 @@ export const RespondToInvitation: React.FC<RespondToInvitationProps> = ({ token 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState<boolean | null>(null);
-  const [guestCount, setGuestCount] = useState(1);
+  const [guestCount, setGuestCount] = useState<string>('1');
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -61,6 +61,13 @@ export const RespondToInvitation: React.FC<RespondToInvitationProps> = ({ token 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (confirmed === null) return;
+    const parsedGuestCount = confirmed
+      ? Math.max(1, Math.min(99, parseInt(guestCount, 10) || 0))
+      : 1;
+    if (confirmed && (!guestCount.trim() || !parsedGuestCount)) {
+      setSubmitError('Merci d’indiquer le nombre de personnes.');
+      return;
+    }
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -70,7 +77,7 @@ export const RespondToInvitation: React.FC<RespondToInvitationProps> = ({ token 
         body: JSON.stringify({
           token,
           confirmed,
-          guestCount: Math.max(1, Math.min(99, guestCount)),
+          guestCount: parsedGuestCount,
           message: message.trim() || undefined
         })
       });
@@ -162,7 +169,7 @@ export const RespondToInvitation: React.FC<RespondToInvitationProps> = ({ token 
                 min={1}
                 max={99}
                 value={guestCount}
-                onChange={(e) => setGuestCount(parseInt(e.target.value, 10) || 1)}
+                onChange={(e) => setGuestCount(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base"
               />
             </div>
