@@ -158,6 +158,9 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
   const [showImportGuestsModal, setShowImportGuestsModal] = useState(false);
   const [importedContacts, setImportedContacts] = useState<ImportedContact[]>([]);
   const [importedCustomQualifierInputs, setImportedCustomQualifierInputs] = useState<Record<number, string>>({});
+  const [showDeleteEventModal, setShowDeleteEventModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deletingEvent, setDeletingEvent] = useState(false);
   const [showExportHelp, setShowExportHelp] = useState(false);
   const [deviceContactList, setDeviceContactList] = useState<ImportedContact[] | null>(null);
   const [deviceContactSelected, setDeviceContactSelected] = useState<Set<number>>(new Set());
@@ -1357,6 +1360,23 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                           </tbody>
                        </table>
                     </div>
+
+                 <div className="mt-8 rounded-3xl border border-red-100 bg-red-50/60 p-6 space-y-3">
+                   <h4 className="text-sm font-black text-red-700 uppercase tracking-wide">Supprimer l’événement</h4>
+                   <p className="text-xs text-red-700">
+                     Cette action est définitive. Tous les invités, documents, missions et réponses seront supprimés.
+                   </p>
+                   <button
+                     type="button"
+                     onClick={() => setShowDeleteEventModal(true)}
+                     className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-red-200 text-red-700 text-xs font-semibold bg-white hover:bg-red-50"
+                   >
+                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3m-9 0h10" />
+                     </svg>
+                     Supprimer cet événement
+                   </button>
+                 </div>
                  </div>
               </div>
             )}
@@ -2164,6 +2184,72 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 )}
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {showDeleteEventModal && (
+        <div className="fixed inset-0 z-[260] flex items-center justify-center bg-gray-900/80 backdrop-blur-xl px-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6 space-y-4 shadow-2xl">
+            <h3 className="text-lg font-semibold text-slate-900">Confirmer la suppression</h3>
+            <p className="text-sm text-slate-700">
+              Pour supprimer l’événement <span className="font-semibold">« {event.title} »</span>, tape
+              les <span className="font-semibold">10 premières lettres</span> de son nom ci‑dessous.
+            </p>
+            <p className="text-xs text-slate-500">
+              Exemple : si le titre est « Mariage Sarah & Marc », tape «{' '}
+              <span className="font-mono">mariage sa</span> » (sans guillemets, insensible à la casse).
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              placeholder="Tape ici pour confirmer"
+            />
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteEventModal(false);
+                  setDeleteConfirmText('');
+                }}
+                className="flex-1 py-2.5 text-slate-600 text-sm font-medium rounded-xl border border-slate-200"
+                disabled={deletingEvent}
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                disabled={
+                  deletingEvent ||
+                  deleteConfirmText.trim().toLowerCase() !== event.title.slice(0, 10).toLowerCase()
+                }
+                onClick={async () => {
+                  if (
+                    deleteConfirmText.trim().toLowerCase() !==
+                    event.title.slice(0, 10).toLowerCase()
+                  )
+                    return;
+                  setDeletingEvent(true);
+                  try {
+                    await dbService.deleteEvent(event.id);
+                    onUpdate(null);
+                  } catch (e) {
+                    console.error(e);
+                    alert(
+                      e instanceof Error
+                        ? e.message
+                        : "Impossible de supprimer l’événement pour le moment."
+                    );
+                    setDeletingEvent(false);
+                  }
+                }}
+                className="flex-1 py-2.5 bg-red-600 text-white text-sm font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deletingEvent ? 'Suppression…' : 'Supprimer'}
+              </button>
+            </div>
           </div>
         </div>
       )}

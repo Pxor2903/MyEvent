@@ -26,8 +26,11 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [joinData, setJoinData] = useState({ code: '', password: '' });
   const [joinError, setJoinError] = useState('');
+  const [creatingEvent, setCreatingEvent] = useState(false);
 
   const handleCreate = async (data: any) => {
+    if (creatingEvent) return;
+    setCreatingEvent(true);
     try {
       const shareCode = await dbService.generateUniqueShareCode();
       const sharePassword = generateSharePassword();
@@ -45,6 +48,8 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
     } catch (error: any) {
       console.error('Event creation failed', error);
       alert("Impossible de créer l'événement pour le moment. Réessaie.");
+    } finally {
+      setCreatingEvent(false);
     }
   };
 
@@ -203,7 +208,12 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
 
         {view === 'create-event' ? (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 max-w-2xl mx-auto w-full min-w-0">
-            <EventForm user={user} onCancel={() => setView('dashboard')} onSubmit={handleCreate} />
+            <EventForm
+              user={user}
+              onCancel={() => setView('dashboard')}
+              onSubmit={handleCreate}
+              submitting={creatingEvent}
+            />
           </div>
         ) : view === 'event-detail' ? (
           selectedEvent ? (

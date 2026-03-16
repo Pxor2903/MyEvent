@@ -7,9 +7,10 @@ interface EventFormProps {
   user: User;
   onSubmit: (event: Omit<Event, 'id' | 'shareCode' | 'sharePassword' | 'isGuestChatEnabled' | 'organizers'>) => void;
   onCancel: () => void;
+  submitting?: boolean;
 }
 
-export const EventForm: React.FC<EventFormProps> = ({ user, onSubmit, onCancel }) => {
+export const EventForm: React.FC<EventFormProps> = ({ user, onSubmit, onCancel, submitting }) => {
   const [isPeriod, setIsPeriod] = useState(false);
   const [isDateTBD, setIsDateTBD] = useState(false);
   const [isLocationUndecided, setIsLocationUndecided] = useState(false);
@@ -121,7 +122,13 @@ export const EventForm: React.FC<EventFormProps> = ({ user, onSubmit, onCancel }
 
       <div className="flex gap-3 pt-4">
         <button type="button" onClick={onCancel} className="px-4 py-2.5 text-slate-600 text-sm font-medium rounded-xl hover:bg-slate-100">Annuler</button>
-        <button type="submit" className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700">Créer l’événement</button>
+        <button
+          type="submit"
+          disabled={!!submitting}
+          className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {submitting ? 'Création…' : 'Créer l’événement'}
+        </button>
       </div>
     </form>
   );
