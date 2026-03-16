@@ -1752,6 +1752,38 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                       <option value="email">Email uniquement</option>
                     </select>
                   </div>
+
+                  {isOwner && (
+                    <div className="mt-4 rounded-2xl border border-red-100 bg-red-50/70 p-4 space-y-2">
+                      <h4 className="text-xs font-black text-red-700 uppercase tracking-wide">
+                        Zone dangereuse
+                      </h4>
+                      <p className="text-xs text-red-700">
+                        Supprimer ce projet effacera définitivement les invités, documents, missions et
+                        réponses associées. Cette action ne peut pas être annulée.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowDeleteEventModal(true)}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-red-200 text-red-700 text-xs font-semibold bg-white hover:bg-red-50"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3m-9 0h10"
+                          />
+                        </svg>
+                        Supprimer cet événement
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
               {eventSettingsTab === 'appearance' && (
