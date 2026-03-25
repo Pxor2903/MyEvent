@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import type { User, Event } from '@/core/types';
 import { HomeV2 } from './HomeV2';
 import { EventV2 } from './EventV2';
-import { SubEventV2 } from './SubEventV2';
+import { SubEventV2New } from './SubEventV2New';
 import { RespondToInvitationV2 } from './RespondToInvitationV2';
 
 interface V2RouterProps {
@@ -20,7 +20,7 @@ export const V2Router: React.FC<V2RouterProps> = ({ user, onLogout, invitationTo
     <Routes>
       <Route path="/" element={<HomeV2 user={user} onLogout={onLogout} />} />
       <Route path="/event/:eventId" element={<EventV2 user={user} />} />
-      <Route path="/event/:eventId/sub/:subEventId" element={<SubEventV2 user={user} />} />
+      <Route path="/event/:eventId/sub/:subEventId" element={<SubEventV2New user={user} />} />
 
       {/* Route publique invitation (basée sur query string). */}
       <Route
