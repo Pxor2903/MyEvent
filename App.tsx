@@ -10,7 +10,11 @@ import { LoginForm } from './components/LoginForm';
 import { RegisterForm } from './components/RegisterForm';
 import { Home } from './components/Home';
 import { RespondToInvitation } from './components/RespondToInvitation';
+import { HomeV2 } from './components/V2/HomeV2';
+import { V2Router } from './components/V2/V2Router';
+import { RespondToInvitationV2 } from './components/V2/RespondToInvitationV2';
 import { Toast } from './components/Toast';
+import { BrowserRouter } from 'react-router-dom';
 
 function getInvitationToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -21,8 +25,16 @@ function getInvitationToken(): string | null {
   }
 }
 
+type UiMode = 'v1' | 'v2';
+function getUiMode(): UiMode {
+  if (typeof window === 'undefined') return 'v1';
+  const v = window.localStorage.getItem('uiMode');
+  return v === 'v2' ? 'v2' : 'v1';
+}
+
 const App: React.FC = () => {
   const [invitationToken] = useState<string | null>(getInvitationToken);
+  const [uiMode, setUiMode] = useState<UiMode>(getUiMode);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [isLoading, setIsLoading] = useState(false);
@@ -30,6 +42,14 @@ const App: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onUiModeChanged = () => setUiMode(getUiMode());
+    window.addEventListener('uiModeChanged', onUiModeChanged);
+    return () => {
+      window.removeEventListener('uiModeChanged', onUiModeChanged);
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -167,7 +187,7 @@ const App: React.FC = () => {
   };
 
   if (invitationToken) {
-    return <RespondToInvitation token={invitationToken} />;
+    return uiMode === 'v2' ? <RespondToInvitationV2 token={invitationToken} /> : <RespondToInvitation token={invitationToken} />;
   }
 
   if (isInitializing) {
@@ -181,7 +201,13 @@ const App: React.FC = () => {
   return (
     <div className="w-full max-w-full min-w-0 overflow-x-hidden">
       {currentUser ? (
-        <Home user={currentUser} onLogout={handleLogout} />
+        uiMode === 'v2' ? (
+          <BrowserRouter>
+            <V2Router user={currentUser} onLogout={handleLogout} invitationToken={invitationToken} />
+          </BrowserRouter>
+        ) : (
+          <Home user={currentUser} onLogout={handleLogout} />
+        )
       ) : (
         <AuthLayout>
           <div className="space-y-6">

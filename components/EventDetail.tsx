@@ -35,6 +35,33 @@ interface EventDetailProps {
   onUpdate: (updated: Event | null) => void;
   /** Appelé pour rafraîchir l’événement affiché (ex. réponses d’invités). Reçoit l’id de l’événement, charge les données à jour et met à jour le parent. */
   onRefreshEvent?: (eventId: string) => void | Promise<void>;
+  /**
+   * Permet d’ouvrir directement une séquence (utile pour les routes V2 du type /event/:eventId/sub/:subEventId).
+   * Si absent, l’interface démarre sur la vue événement principale.
+   */
+  initialSubEventId?: string | null;
+
+  /**
+   * Active la version V2 : masquer la navigation interne et laisser la “shell” V2 piloter l’affichage.
+   * (On conserve l’implémentation existante des vues, mais on contrôle l’onglet via overrides.)
+   */
+  variant?: 'v1' | 'v2';
+
+  /**
+   * Override de l’onglet principal (événement) quand `variant='v2'` et qu’aucune séquence n’est sélectionnée.
+   */
+  activeTabOverride?: 'overview' | 'gestion' | 'program' | 'guests' | 'chat' | 'budget';
+
+  /**
+   * Override de l’onglet de séquence quand `variant='v2'` et qu’une séquence est sélectionnée.
+   */
+  subTabOverride?: 'sequence' | 'guests' | 'budget' | 'documents' | 'chat';
+
+  /** Ouvre une séquence dans une navigation externe (routes V2). */
+  onOpenSubEvent?: (subEventId: string) => void;
+
+  /** Retour à l’écran événement principal (routes V2). */
+  onBackToEvent?: () => void;
 }
 
 /** Barre de filtrage par responsable (qui a ajouté les invités) dans l'onglet Invités. */
@@ -81,7 +108,19 @@ function GuestsTableSegmentBar({
   );
 }
 
-export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, onUpdate, onRefreshEvent }) => {
+export const EventDetail: React.FC<EventDetailProps> = ({
+  event,
+  user,
+  onBack,
+  onUpdate,
+  onRefreshEvent,
+  initialSubEventId,
+  variant,
+  activeTabOverride,
+  subTabOverride,
+  onOpenSubEvent,
+  onBackToEvent
+}) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'gestion' | 'program' | 'chat' | 'settings' | 'budget' | 'guests' | 'documents'>('overview');
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
   const [subTab, setSubTab] = useState<'sequence' | 'chat' | 'guests' | 'budget' | 'documents'>('sequence');
@@ -101,6 +140,31 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [typingNames, setTypingNames] = useState<string[]>([]);
+
+  // Route V2 : ouverture directe d’une séquence via prop (sinon on conserve le state interne V1).
+  useEffect(() => {
+    if (initialSubEventId === undefined) return; // non fourni -> ne pas “reset” la navigation interne
+    if (initialSubEventId) {
+      setSelectedSubId(initialSubEventId);
+      setSubTab('sequence');
+      setActiveTab('program');
+    } else {
+      setSelectedSubId(null);
+      setSubTab('sequence');
+      setActiveTab('overview');
+    }
+  }, [initialSubEventId]);
+
+  // V2 : laisse le “shell” piloter l’onglet principal / séquence.
+  useEffect(() => {
+    if (variant !== 'v2') return;
+    if (activeTabOverride) setActiveTab(activeTabOverride);
+  }, [variant, activeTabOverride]);
+
+  useEffect(() => {
+    if (variant !== 'v2') return;
+    if (subTabOverride) setSubTab(subTabOverride);
+  }, [variant, subTabOverride]);
 
   const chatChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -847,7 +911,8 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
 
       {!selectedSubId ? (
         <>
-          <nav className="flex gap-0 sm:gap-1 px-2 sm:px-4 pt-2 pb-1 border-b border-slate-200 overflow-x-auto no-scrollbar overflow-y-hidden" style={{ WebkitOverflowScrolling: 'touch' }} aria-label="Onglets">
+          {variant === 'v2' ? null : (
+            <nav className="flex gap-0 sm:gap-1 px-2 sm:px-4 pt-2 pb-1 border-b border-slate-200 overflow-x-auto no-scrollbar overflow-y-hidden" style={{ WebkitOverflowScrolling: 'touch' }} aria-label="Onglets">
             {[
               { id: 'overview', label: "Vue d'ensemble" },
               { id: 'gestion', label: 'Gestion' },
@@ -864,7 +929,8 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 </button>
               )
             ))}
-          </nav>
+            </nav>
+          )}
 
           <div className="flex-1 p-4 sm:p-6 overflow-y-auto min-w-0 space-y-4 sm:space-y-6">
             {activeTab === 'overview' && (
@@ -963,7 +1029,14 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                                 <li key={sub.id}>
                                   <button
                                     type="button"
-                                    onClick={() => { setSelectedSubId(sub.id); setActiveTab('program'); setSubTab('sequence'); }}
+                                    onClick={() => {
+                                      if (onOpenSubEvent) onOpenSubEvent(sub.id);
+                                      else {
+                                        setSelectedSubId(sub.id);
+                                        setActiveTab('program');
+                                        setSubTab('sequence');
+                                      }
+                                    }}
                                     className="w-full text-left flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors relative"
                                   >
                                     <span className="flex flex-col items-center shrink-0 w-12 pt-0.5 relative z-10">
@@ -1120,7 +1193,18 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                   onUpdate(updated);
                 }}
                 onBack={() => setActiveTab('overview')}
-                onNavigateToSubEventBudget={hasPermission('edit_details') || hasPermission('view_budget') ? (subEventId) => { setSelectedSubId(subEventId); setActiveTab('program'); setSubTab('budget'); } : undefined}
+                onNavigateToSubEventBudget={
+                  hasPermission('edit_details') || hasPermission('view_budget')
+                    ? (subEventId) => {
+                        if (onOpenSubEvent) onOpenSubEvent(subEventId);
+                        else {
+                          setSelectedSubId(subEventId);
+                          setActiveTab('program');
+                          setSubTab('budget');
+                        }
+                      }
+                    : undefined
+                }
               />
             )}
 
@@ -1132,7 +1216,18 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {event.subEvents.map(sub => (
-                    <button key={sub.id} type="button" onClick={() => { setSelectedSubId(sub.id); setSubTab('sequence'); }} className="p-4 rounded-xl border border-slate-200 bg-white hover:border-teal-300 hover:shadow-md text-left transition-all">
+                    <button
+                      key={sub.id}
+                      type="button"
+                      onClick={() => {
+                        if (onOpenSubEvent) onOpenSubEvent(sub.id);
+                        else {
+                          setSelectedSubId(sub.id);
+                          setSubTab('sequence');
+                        }
+                      }}
+                      className="p-4 rounded-xl border border-slate-200 bg-white hover:border-teal-300 hover:shadow-md text-left transition-all"
+                    >
                       <span className="text-xs font-medium text-teal-600 bg-teal-50 px-2 py-1 rounded-md">{sub.date ? new Date(sub.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBD'}</span>
                       <h4 className="text-base font-semibold text-slate-900 mt-2 truncate">{sub.title}</h4>
                       <p className="text-slate-500 text-xs mt-1 truncate flex items-center gap-1"><svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>{sub.location || "Lieu global"}</p>
@@ -1439,7 +1534,15 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
         <div className="flex-1 flex flex-col bg-white min-w-0 animate-in slide-in-from-right-8 duration-500">
            <header className="px-4 sm:px-6 md:px-8 py-4 sm:py-6 bg-gray-900 text-white flex items-center justify-between gap-3 sm:gap-4">
               <div className="flex items-center gap-3 sm:gap-6 min-w-0 flex-1">
-                 <button type="button" onClick={() => setSelectedSubId(null)} className="min-w-[44px] min-h-[44px] p-3 flex items-center justify-center bg-white/10 rounded-xl sm:rounded-2xl hover:bg-white/20 transition-all" aria-label="Retour au programme">
+                 <button
+                   type="button"
+                   onClick={() => {
+                     if (onBackToEvent) onBackToEvent();
+                     else setSelectedSubId(null);
+                   }}
+                   className="min-w-[44px] min-h-[44px] p-3 flex items-center justify-center bg-white/10 rounded-xl sm:rounded-2xl hover:bg-white/20 transition-all"
+                   aria-label="Retour au programme"
+                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7"/></svg>
                  </button>
                  <div className="min-w-0">
@@ -1454,12 +1557,24 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
               )}
            </header>
 
-           <nav className="flex px-2 sm:px-4 border-b border-gray-100 bg-gray-50/30 overflow-x-auto no-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+           {variant === 'v2' ? null : (
+            <nav className="flex px-2 sm:px-4 border-b border-gray-100 bg-gray-50/30 overflow-x-auto no-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
               <button key="sequence" type="button" onClick={() => setSubTab('sequence')} className={`py-4 sm:py-5 px-4 sm:px-6 text-xs font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'sequence' ? 'text-teal-600' : 'text-gray-400'}`}>
                 Séquence
                 {subTab === 'sequence' && <div className="absolute bottom-0 left-4 right-4 h-1 bg-teal-600 rounded-t-full" />}
               </button>
-              <button key="missions" type="button" onClick={() => { setSelectedSubId(null); setActiveTab('gestion'); }} className="py-4 sm:py-5 px-4 sm:px-6 text-xs font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center text-gray-400 hover:text-teal-600">
+              <button
+                key="missions"
+                type="button"
+                onClick={() => {
+                  if (onBackToEvent) onBackToEvent();
+                  else {
+                    setSelectedSubId(null);
+                    setActiveTab('gestion');
+                  }
+                }}
+                className="py-4 sm:py-5 px-4 sm:px-6 text-xs font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center text-gray-400 hover:text-teal-600"
+              >
                 Missions
               </button>
               <button key="guests" type="button" onClick={() => setSubTab('guests')} className={`py-4 sm:py-5 px-4 sm:px-6 text-xs font-black uppercase tracking-widest relative whitespace-nowrap min-h-[44px] flex items-center ${subTab === 'guests' ? 'text-teal-600' : 'text-gray-400'}`}>
@@ -1483,6 +1598,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ event, user, onBack, o
                 </button>
               )}
            </nav>
+           )}
 
            <div className="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto min-w-0 space-y-6 sm:space-y-10">
               {subTab === 'sequence' && (

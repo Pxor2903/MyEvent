@@ -2,7 +2,7 @@
  * Écran principal après connexion : liste des événements (useEvents), création, navigation vers détail.
  */
 import React, { useState } from 'react';
-import { User, Event, HomeView } from '@/core/types';
+import type { User, Event, HomeView } from '@/core/types';
 import { Logo } from '@/core/constants';
 import { dbService } from '@/api';
 import { useEvents } from '@/hooks/useEvents';
@@ -18,6 +18,13 @@ interface HomeProps {
   onLogout: () => void;
 }
 
+type UiMode = 'v1' | 'v2';
+function getUiMode(): UiMode {
+  if (typeof window === 'undefined') return 'v1';
+  const v = window.localStorage.getItem('uiMode');
+  return v === 'v2' ? 'v2' : 'v1';
+}
+
 export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
   const [view, setView] = useState<HomeView>('dashboard');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -27,6 +34,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
   const [joinData, setJoinData] = useState({ code: '', password: '' });
   const [joinError, setJoinError] = useState('');
   const [creatingEvent, setCreatingEvent] = useState(false);
+  const [uiMode, setUiMode] = useState<UiMode>(getUiMode());
 
   const handleCreate = async (data: any) => {
     if (creatingEvent) return;
@@ -173,6 +181,13 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
     </div>
   );
 
+  const toggleUiMode = () => {
+    const next: UiMode = uiMode === 'v2' ? 'v1' : 'v2';
+    setUiMode(next);
+    window.localStorage.setItem('uiMode', next);
+    window.dispatchEvent(new Event('uiModeChanged'));
+  };
+
   return (
     <div className="min-h-screen min-h-[100dvh] bg-slate-50 flex flex-col overflow-hidden">
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-50 shrink-0" style={{ paddingTop: 'env(safe-area-inset-top)' }} aria-label="Navigation">
@@ -183,6 +198,14 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
           <div className="flex items-center gap-1 sm:gap-3 min-w-0">
             <span className="text-sm text-slate-600 hidden sm:inline truncate max-w-[100px]">Bonjour, {user.firstName}</span>
             <img src={`https://ui-avatars.com/api/?name=${user.firstName}+${user.lastName}&background=14b8a6&color=fff`} className="w-9 h-9 rounded-full shrink-0" alt="" />
+            <button
+              type="button"
+              onClick={toggleUiMode}
+              className="hidden sm:inline-flex touch-target px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold hover:bg-slate-50"
+              title="Basculer l’interface"
+            >
+              {uiMode === 'v2' ? 'UI V2' : 'UI V1'}
+            </button>
             <button type="button" onClick={onLogout} className="touch-target p-2 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50" aria-label="Déconnexion">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7" /></svg>
             </button>
