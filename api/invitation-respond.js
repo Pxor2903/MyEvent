@@ -1,7 +1,9 @@
 /**
  * POST /api/invitation-respond
  * Public : enregistre la réponse d’un invité (présence + nombre de personnes).
- * Body: { token, confirmed, guestCount?, message? }
+ * Body rétrocompatible:
+ * - ancien: { token, confirmed, guestCount?, message? }
+ * - nouveau: { token, subResponses: [{ subEventId, confirmed, guestCount }], message? }
  * Met à jour events.guests (status, guestCount) et insert/upsert invitation_responses.
  * Variables Vercel : SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  */
@@ -39,6 +41,7 @@ export default async function handler(req, res) {
   const confirmed = Boolean(body.confirmed);
   const guestCount = Math.max(1, Math.min(99, parseInt(body.guestCount, 10) || 1));
   const message = typeof body.message === 'string' ? body.message.trim().slice(0, 500) : null;
+  const rawSubResponses = Array.isArray(body.subResponses) ? body.subResponses : null;
 
   if (!token) {
     res.status(400).json({ error: 'Token requis' });
@@ -82,22 +85,52 @@ export default async function handler(req, res) {
   }
 
   const guest = guests[guestIndex];
-  // Séquences liées à l'invité, ou toutes les séquences si aucune liaison (fallback)
   const subEvents = Array.isArray(eventRow.sub_events) ? eventRow.sub_events : [];
   const allSubIds = subEvents.map((s) => s.id).filter(Boolean);
   const linkedIds =
     Array.isArray(guest.linkedSubEventIds) && guest.linkedSubEventIds.length > 0
       ? guest.linkedSubEventIds
       : allSubIds;
-  const presentCount = confirmed ? guestCount : 0;
   const attendance = { ...(guest.attendance || {}) };
-  linkedIds.forEach((subId) => {
-    attendance[subId] = presentCount;
-  });
+
+  let finalConfirmed = confirmed;
+  let finalGuestCount = guestCount;
+
+  if (rawSubResponses && rawSubResponses.length > 0) {
+    const bySubId = new Map();
+    rawSubResponses.forEach((r) => {
+      const subId = (r?.subEventId || '').toString();
+      if (!subId || !linkedIds.includes(subId)) return;
+      const subConfirmed = Boolean(r?.confirmed);
+      const subCount = Math.max(1, Math.min(99, parseInt(r?.guestCount, 10) || 1));
+      bySubId.set(subId, { confirmed: subConfirmed, guestCount: subCount });
+    });
+
+    linkedIds.forEach((subId) => {
+      const r = bySubId.get(subId);
+      if (!r) return;
+      attendance[subId] = r.confirmed ? r.guestCount : 0;
+    });
+
+    const confirmedCounts = linkedIds
+      .map((subId) => Number(attendance[subId] ?? 0))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    finalConfirmed = confirmedCounts.length > 0;
+    finalGuestCount = finalConfirmed ? Math.max(...confirmedCounts) : 1;
+  } else {
+    // Ancien mode: même réponse appliquée à toutes les séquences liées.
+    const presentCount = confirmed ? guestCount : 0;
+    linkedIds.forEach((subId) => {
+      attendance[subId] = presentCount;
+    });
+    finalConfirmed = confirmed;
+    finalGuestCount = guestCount;
+  }
+
   guests[guestIndex] = {
     ...guest,
-    status: confirmed ? 'confirmed' : 'declined',
-    guestCount,
+    status: finalConfirmed ? 'confirmed' : 'declined',
+    guestCount: finalGuestCount,
     attendance,
   };
 
@@ -118,8 +151,8 @@ export default async function handler(req, res) {
     {
       event_id: link.event_id,
       guest_id: link.guest_id,
-      confirmed,
-      guest_count: guestCount,
+      confirmed: finalConfirmed,
+      guest_count: finalGuestCount,
       message: message || null,
       responded_at: new Date().toISOString(),
     },

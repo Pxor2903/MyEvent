@@ -11,7 +11,8 @@ interface InvitationInfo {
   guestFirstName: string;
   guestLastName: string;
   subEvents: { id: string; title: string }[];
-  attachments?: { id: string; name: string; type: string; url: string }[];
+  subEventResponses?: { subEventId: string; confirmed: boolean; guestCount: number }[];
+  attachments?: { id: string; name: string; type: string; url: string; subEventId?: string | null }[];
 }
 
 export const RespondToInvitationV2: React.FC<{ token: string }> = ({ token }) => {
@@ -21,9 +22,16 @@ export const RespondToInvitationV2: React.FC<{ token: string }> = ({ token }) =>
 
   const [confirmed, setConfirmed] = useState<boolean | null>(null);
   const [guestCount, setGuestCount] = useState<string>('1'); // string pour permettre d’effacer
+  const [subResponses, setSubResponses] = useState<Record<string, { confirmed: boolean | null; guestCount: string }>>({});
   const [message, setMessage] = useState('');
+  const [selectedDocIndex, setSelectedDocIndex] = useState(0);
 
   const { pending: submitting, run: runSubmit } = useAsyncAction();
+  const openInApp = () => {
+    const appUrl = `myevent://repondre?token=${encodeURIComponent(token)}`;
+    window.location.href = appUrl;
+  };
+
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -42,6 +50,19 @@ export const RespondToInvitationV2: React.FC<{ token: string }> = ({ token }) =>
         }
 
         setInfo(data);
+        if (Array.isArray(data.subEvents)) {
+          const initial: Record<string, { confirmed: boolean | null; guestCount: string }> = {};
+          const respMap = new Map(
+            (Array.isArray(data.subEventResponses) ? data.subEventResponses : []).map((r: any) => [
+              r.subEventId,
+              { confirmed: Boolean(r.confirmed), guestCount: String(Math.max(1, Math.min(99, Number(r.guestCount) || 1))) }
+            ])
+          );
+          data.subEvents.forEach((s: any) => {
+            initial[s.id] = respMap.get(s.id) ?? { confirmed: null, guestCount: '1' };
+          });
+          setSubResponses(initial);
+        }
         setError(null);
       } catch {
         if (!cancelled) {
@@ -69,17 +90,38 @@ export const RespondToInvitationV2: React.FC<{ token: string }> = ({ token }) =>
     }
 
     setSubmitError(null);
+    const hasSubEvents = Array.isArray(info?.subEvents) && info!.subEvents.length > 0;
+    let payload: any = {
+      token,
+      confirmed,
+      guestCount: parsedGuestCount,
+      message: message.trim() || undefined
+    };
+
+    if (hasSubEvents) {
+      const rows = info!.subEvents.map((s) => ({
+        subEventId: s.id,
+        confirmed: Boolean(subResponses[s.id]?.confirmed),
+        guestCount: Math.max(1, Math.min(99, parseInt(subResponses[s.id]?.guestCount || '1', 10) || 1))
+      }));
+      const hasMissing = rows.some((r) => subResponses[r.subEventId]?.confirmed === null);
+      if (hasMissing) {
+        setSubmitError('Merci de répondre à chaque sous-événement.');
+        return;
+      }
+      payload = {
+        token,
+        subResponses: rows,
+        message: message.trim() || undefined
+      };
+    }
+
     await runSubmit(async () => {
       try {
         const res = await fetch(RESPOND_API, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            token,
-            confirmed,
-            guestCount: parsedGuestCount,
-            message: message.trim() || undefined
-          })
+          body: JSON.stringify(payload)
         });
 
         const data = await res.json().catch(() => ({}));
@@ -94,7 +136,7 @@ export const RespondToInvitationV2: React.FC<{ token: string }> = ({ token }) =>
     });
   };
 
-  const doc = info?.attachments?.[0];
+  const doc = info?.attachments?.[selectedDocIndex] ?? info?.attachments?.[0];
   const isImage = doc ? /\.(png|jpe?g|gif|webp)$/i.test(doc.url) : false;
   const isPdf = doc ? /\.pdf$/i.test(doc.url) : false;
 
@@ -141,6 +183,16 @@ export const RespondToInvitationV2: React.FC<{ token: string }> = ({ token }) =>
         </div>
       </header>
 
+      <div className="px-4 sm:px-6">
+        <button
+          type="button"
+          onClick={openInApp}
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-2xl border border-white/20 bg-white/10 text-white text-sm font-semibold hover:bg-white/15"
+        >
+          Ouvrir dans l’application
+        </button>
+      </div>
+
       {/* Document full-bleed */}
       <div className="w-full bg-black/20 border-y border-white/5">
         {doc ? (
@@ -159,6 +211,25 @@ export const RespondToInvitationV2: React.FC<{ token: string }> = ({ token }) =>
           </div>
         )}
       </div>
+      {Array.isArray(info.attachments) && info.attachments.length > 1 && (
+        <div className="px-4 sm:px-6 py-3 flex flex-wrap gap-2">
+          {info.attachments.map((a, idx) => (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => setSelectedDocIndex(idx)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${
+                selectedDocIndex === idx
+                  ? 'bg-white text-slate-900 border-white'
+                  : 'bg-white/10 text-white border-white/20'
+              }`}
+              title={a.name}
+            >
+              {a.subEventId ? `Carte séquence ${idx + 1}` : `Carte ${idx + 1}`}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Bottom-sheet RSVP */}
       <div className="mt-auto pb-[env(safe-area-inset-bottom)]">
@@ -173,7 +244,7 @@ export const RespondToInvitationV2: React.FC<{ token: string }> = ({ token }) =>
 
             <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-5">
               <div>
-                <label className="block text-sm font-semibold text-slate-800 mb-2">Présence</label>
+                <label className="block text-sm font-semibold text-slate-800 mb-2">Présence globale</label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
@@ -221,6 +292,47 @@ export const RespondToInvitationV2: React.FC<{ token: string }> = ({ token }) =>
                     className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-base"
                     inputMode="numeric"
                   />
+                </div>
+              )}
+
+              {Array.isArray(info.subEvents) && info.subEvents.length > 0 && (
+                <div className="space-y-3">
+                  <label className="block text-sm font-semibold text-slate-800">Réponses par sous-événement</label>
+                  {info.subEvents.map((s) => {
+                    const r = subResponses[s.id] ?? { confirmed: null, guestCount: '1' };
+                    return (
+                      <div key={s.id} className="rounded-2xl border border-slate-200 p-3">
+                        <p className="text-sm font-semibold text-slate-900">{s.title}</p>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSubResponses((p) => ({ ...p, [s.id]: { ...r, confirmed: true } }))}
+                            className={`py-2 rounded-xl border text-sm font-semibold ${r.confirmed === true ? 'border-teal-600 bg-teal-50 text-teal-700' : 'border-slate-200 text-slate-600'}`}
+                          >
+                            Oui
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSubResponses((p) => ({ ...p, [s.id]: { ...r, confirmed: false } }))}
+                            className={`py-2 rounded-xl border text-sm font-semibold ${r.confirmed === false ? 'border-slate-700 bg-slate-100 text-slate-800' : 'border-slate-200 text-slate-600'}`}
+                          >
+                            Non
+                          </button>
+                        </div>
+                        {r.confirmed === true && (
+                          <input
+                            type="number"
+                            min={1}
+                            max={99}
+                            value={r.guestCount}
+                            onChange={(e) => setSubResponses((p) => ({ ...p, [s.id]: { ...r, guestCount: e.target.value } }))}
+                            className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                            placeholder="Nb personnes"
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 

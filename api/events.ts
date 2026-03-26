@@ -227,5 +227,25 @@ export const eventsApi = {
       return { success: false, error: errAdd.message ?? "Impossible d'envoyer la demande." };
     }
     return { success: true };
+  },
+
+  /** Événements où l'utilisateur est invité (matching via invités: email/phone). */
+  async getGuestEventsByUser(user: User): Promise<Event[]> {
+    const { data, error } = await supabase.from(TABLE).select('*');
+    if (error || !data) return [];
+
+    const email = (user.email ?? '').trim().toLowerCase();
+    const phoneDigits = (user.phone ?? '').replace(/\D+/g, '');
+
+    const isGuestMatch = (guest: Guest) => {
+      const guestEmail = (guest.email ?? '').trim().toLowerCase();
+      const guestPhoneDigits = (guest.phone ?? '').replace(/\D+/g, '');
+      const emailOk = !!email && !!guestEmail && guestEmail === email;
+      const phoneOk = !!phoneDigits && !!guestPhoneDigits && guestPhoneDigits.endsWith(phoneDigits);
+      return emailOk || phoneOk;
+    };
+
+    const filtered = (data as DbEvent[]).filter((evt) => (evt.guests ?? []).some(isGuestMatch));
+    return filtered.map((row) => fromDb(row));
   }
 };

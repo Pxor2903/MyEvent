@@ -4,6 +4,7 @@ import type { User, HomeView } from '@/core/types';
 import { Logo } from '@/core/constants';
 import { dbService } from '@/api';
 import { useEvents } from '@/hooks/useEvents';
+import { useGuestEvents } from '@/hooks/useGuestEvents';
 import { generateSharePassword } from '@/utils/sharePassword';
 import { EventCard } from '../EventCard';
 import { Footer } from '../Footer';
@@ -23,6 +24,9 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
   const [view, setView] = useState<HomeView>('dashboard');
   const navigate = useNavigate();
   const { events, fetchEvents } = useEvents(user.id);
+  const { events: guestEvents, fetchGuestEvents } = useGuestEvents(user);
+  const [activeRoleView, setActiveRoleView] = useState<'organizer' | 'guest'>('organizer');
+  const [providerMode, setProviderMode] = useState(false);
 
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [joinData, setJoinData] = useState({ code: '', password: '' });
@@ -76,6 +80,7 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
       setShowJoinModal(false);
       setJoinData({ code: '', password: '' });
       fetchEvents();
+      fetchGuestEvents();
       alert("Demande envoyée. Le créateur doit vous approuver dans l’onglet Équipe.");
     });
   };
@@ -108,40 +113,78 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
           </div>
         ) : (
           <>
+            <section className="mb-4 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveRoleView('organizer')}
+                className={`px-4 py-2 rounded-2xl text-sm font-semibold border ${activeRoleView === 'organizer' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
+              >
+                Organisateur
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveRoleView('guest')}
+                className={`px-4 py-2 rounded-2xl text-sm font-semibold border ${activeRoleView === 'guest' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
+              >
+                Invité
+              </button>
+              <button
+                type="button"
+                onClick={() => setProviderMode((v) => !v)}
+                className={`ml-auto px-4 py-2 rounded-2xl text-sm font-semibold border ${providerMode ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
+                title="Prépare le mode prestataire"
+              >
+                {providerMode ? 'Mode prestataire ON' : 'Mode prestataire OFF'}
+              </button>
+            </section>
             <section className="space-y-4">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Vos événements</h2>
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  {activeRoleView === 'organizer' ? 'Événements organisés' : 'Événements où je suis invité'}
+                </h2>
                 <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setView('create-event')}
-                    className="min-h-[44px] px-4 py-2 bg-teal-600 text-white text-sm font-semibold rounded-xl hover:bg-teal-700"
-                  >
-                    + Créer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowJoinModal(true)}
-                    className="min-h-[44px] px-4 py-2 border border-slate-200 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50"
-                  >
-                    Rejoindre
-                  </button>
+                  {activeRoleView === 'organizer' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setView('create-event')}
+                        className="min-h-[44px] px-4 py-2 bg-teal-600 text-white text-sm font-semibold rounded-xl hover:bg-teal-700"
+                      >
+                        + Créer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowJoinModal(true)}
+                        className="min-h-[44px] px-4 py-2 border border-slate-200 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50"
+                      >
+                        Rejoindre
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {events.map((e) => (
+                {(activeRoleView === 'organizer' ? events : guestEvents).map((e) => (
                   <button
                     key={e.id}
                     type="button"
                     onClick={() => {
-                      navigate(`/event/${e.id}`);
+                      if (activeRoleView === 'organizer') navigate(`/event/${e.id}`);
+                      else navigate(`/guest/event/${e.id}`);
                     }}
                     className="text-left rounded-2xl overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
                   >
                     <EventCard event={e} />
                   </button>
                 ))}
+                {(activeRoleView === 'organizer' ? events : guestEvents).length === 0 && (
+                  <div className="col-span-full rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+                    {activeRoleView === 'organizer'
+                      ? "Aucun événement organisé pour l'instant."
+                      : "Aucun événement invité trouvé (vérifie email/téléphone sur ton profil)."}
+                  </div>
+                )}
               </div>
             </section>
           </>

@@ -22,6 +22,7 @@ export const dbService = {
   getProfileById: (id: string) => profilesApi.getById(id),
   upsertProfile: (profile: User) => profilesApi.upsert(profile),
   getEventsByUserId: (userId: string) => eventsApi.getByUserId(userId),
+  getGuestEventsByUser: (user: User) => eventsApi.getGuestEventsByUser(user),
   findEventById: (id: string) => eventsApi.getById(id),
   findEventByShareCodeOnly: (code: string) => eventsApi.findByShareCodeOnly(code),
   findEventByShareCodeAndPassword: (code: string, password: string) =>

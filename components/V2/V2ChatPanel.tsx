@@ -6,7 +6,7 @@ interface V2ChatPanelProps {
   eventId: string;
   channelId: string;
   user: User;
-  role: 'owner' | 'organizer';
+  role: 'owner' | 'organizer' | 'guest';
   canSend: boolean;
 }
 

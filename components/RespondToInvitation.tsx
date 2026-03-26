@@ -14,7 +14,8 @@ interface InvitationInfo {
   guestFirstName: string;
   guestLastName: string;
   subEvents: { id: string; title: string }[];
-  attachments?: { id: string; name: string; type: string; url: string }[];
+  subEventResponses?: { subEventId: string; confirmed: boolean; guestCount: number }[];
+  attachments?: { id: string; name: string; type: string; url: string; subEventId?: string | null }[];
 }
 
 interface RespondToInvitationProps {
@@ -27,10 +28,17 @@ export const RespondToInvitation: React.FC<RespondToInvitationProps> = ({ token 
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState<boolean | null>(null);
   const [guestCount, setGuestCount] = useState<string>('1');
+  const [subResponses, setSubResponses] = useState<Record<string, { confirmed: boolean | null; guestCount: string }>>({});
   const [message, setMessage] = useState('');
+  const [selectedDocIndex, setSelectedDocIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const openInApp = () => {
+    const appUrl = `myevent://repondre?token=${encodeURIComponent(token)}`;
+    window.location.href = appUrl;
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -44,6 +52,19 @@ export const RespondToInvitation: React.FC<RespondToInvitationProps> = ({ token 
             setInfo(null);
           } else {
             setInfo(data);
+            if (Array.isArray(data.subEvents)) {
+              const initial: Record<string, { confirmed: boolean | null; guestCount: string }> = {};
+              const respMap = new Map(
+                (Array.isArray(data.subEventResponses) ? data.subEventResponses : []).map((r: any) => [
+                  r.subEventId,
+                  { confirmed: Boolean(r.confirmed), guestCount: String(Math.max(1, Math.min(99, Number(r.guestCount) || 1))) }
+                ])
+              );
+              data.subEvents.forEach((s: any) => {
+                initial[s.id] = respMap.get(s.id) ?? { confirmed: null, guestCount: '1' };
+              });
+              setSubResponses(initial);
+            }
             setError(null);
           }
         }
@@ -69,18 +90,38 @@ export const RespondToInvitation: React.FC<RespondToInvitationProps> = ({ token 
       setSubmitError('Merci d’indiquer le nombre de personnes.');
       return;
     }
+    const hasSubEvents = Array.isArray(info?.subEvents) && info!.subEvents.length > 0;
+    let payload: any = {
+      token,
+      confirmed,
+      guestCount: parsedGuestCount,
+      message: message.trim() || undefined
+    };
+    if (hasSubEvents) {
+      const rows = info!.subEvents.map((s) => ({
+        subEventId: s.id,
+        confirmed: Boolean(subResponses[s.id]?.confirmed),
+        guestCount: Math.max(1, Math.min(99, parseInt(subResponses[s.id]?.guestCount || '1', 10) || 1))
+      }));
+      const hasMissing = rows.some((r) => subResponses[r.subEventId]?.confirmed === null);
+      if (hasMissing) {
+        setSubmitError('Merci de répondre à chaque sous-événement.');
+        return;
+      }
+      payload = {
+        token,
+        subResponses: rows,
+        message: message.trim() || undefined
+      };
+    }
+
     setSubmitting(true);
     setSubmitError(null);
     try {
       const res = await fetch(RESPOND_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token,
-          confirmed,
-          guestCount: parsedGuestCount,
-          message: message.trim() || undefined
-        })
+        body: JSON.stringify(payload)
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.ok) {
@@ -134,8 +175,18 @@ export const RespondToInvitation: React.FC<RespondToInvitationProps> = ({ token 
       {/* Bloc carte d’invitation en haut : l’image occupe toute la hauteur de la page
           (c’est la “ville de fond”). Pour les PDF, on ouvre dans un nouvel onglet
           car les navigateurs imposent leur propre fenêtre de défilement. */}
+      <div className="w-full max-w-3xl mt-4">
+        <button
+          type="button"
+          onClick={openInApp}
+          className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50"
+        >
+          Ouvrir dans l’application
+        </button>
+      </div>
+
       {info.attachments && info.attachments.length > 0 && (() => {
-        const doc = info.attachments![0];
+        const doc = info.attachments![selectedDocIndex] ?? info.attachments![0];
         const isImage = /\.(png|jpe?g|gif|webp)$/i.test(doc.url);
         const isPdf = /\.pdf$/i.test(doc.url);
         return (
@@ -166,6 +217,24 @@ export const RespondToInvitation: React.FC<RespondToInvitationProps> = ({ token 
           </div>
         );
       })()}
+      {Array.isArray(info.attachments) && info.attachments.length > 1 && (
+        <div className="w-full max-w-3xl mt-3 flex flex-wrap gap-2">
+          {info.attachments.map((a, idx) => (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => setSelectedDocIndex(idx)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${
+                selectedDocIndex === idx
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white text-slate-700 border-slate-200'
+              }`}
+            >
+              {a.subEventId ? `Carte séquence ${idx + 1}` : `Carte ${idx + 1}`}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Bloc réponse en dessous de la carte */}
       <div className="w-full max-w-md mt-8 rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
@@ -218,6 +287,46 @@ export const RespondToInvitation: React.FC<RespondToInvitationProps> = ({ token 
                 onChange={(e) => setGuestCount(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base"
               />
+            </div>
+          )}
+          {Array.isArray(info.subEvents) && info.subEvents.length > 0 && (
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Réponses par sous-événement</label>
+              {info.subEvents.map((s) => {
+                const r = subResponses[s.id] ?? { confirmed: null, guestCount: '1' };
+                return (
+                  <div key={s.id} className="rounded-xl border border-slate-200 p-3">
+                    <p className="text-sm font-semibold text-slate-900">{s.title}</p>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSubResponses((p) => ({ ...p, [s.id]: { ...r, confirmed: true } }))}
+                        className={`flex-1 py-2 rounded-lg border text-sm font-medium ${r.confirmed === true ? 'border-teal-600 bg-teal-50 text-teal-700' : 'border-slate-200 text-slate-600'}`}
+                      >
+                        Oui
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSubResponses((p) => ({ ...p, [s.id]: { ...r, confirmed: false } }))}
+                        className={`flex-1 py-2 rounded-lg border text-sm font-medium ${r.confirmed === false ? 'border-slate-600 bg-slate-100 text-slate-700' : 'border-slate-200 text-slate-600'}`}
+                      >
+                        Non
+                      </button>
+                    </div>
+                    {r.confirmed === true && (
+                      <input
+                        type="number"
+                        min={1}
+                        max={99}
+                        value={r.guestCount}
+                        onChange={(e) => setSubResponses((p) => ({ ...p, [s.id]: { ...r, guestCount: e.target.value } }))}
+                        className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                        placeholder="Nombre de personnes"
+                      />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
           <div>
