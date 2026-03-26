@@ -25,12 +25,36 @@ export const RespondToInvitationV2: React.FC<{ token: string }> = ({ token }) =>
   const [subResponses, setSubResponses] = useState<Record<string, { confirmed: boolean | null; guestCount: string }>>({});
   const [message, setMessage] = useState('');
   const [selectedDocIndex, setSelectedDocIndex] = useState(0);
+  const [deepLinkStatus, setDeepLinkStatus] = useState<'idle' | 'trying' | 'fallback'>('idle');
 
   const { pending: submitting, run: runSubmit } = useAsyncAction();
-  const openInApp = () => {
+  const openInApp = (isAuto = false) => {
     const appUrl = `myevent://repondre?token=${encodeURIComponent(token)}`;
+    setDeepLinkStatus('trying');
+    const start = Date.now();
+    const timer = window.setTimeout(() => {
+      if (Date.now() - start > 1000) {
+        setDeepLinkStatus('fallback');
+      }
+    }, 1200);
     window.location.href = appUrl;
+    if (!isAuto) {
+      window.setTimeout(() => {
+        window.clearTimeout(timer);
+      }, 2000);
+    }
   };
+
+  useEffect(() => {
+    const ua = navigator.userAgent || '';
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
+    if (!isMobile) return;
+    const autoKey = `invite:auto-open:${token}`;
+    if (window.sessionStorage.getItem(autoKey) === '1') return;
+    window.sessionStorage.setItem(autoKey, '1');
+    const t = window.setTimeout(() => openInApp(true), 500);
+    return () => window.clearTimeout(t);
+  }, [token]);
 
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -186,11 +210,17 @@ export const RespondToInvitationV2: React.FC<{ token: string }> = ({ token }) =>
       <div className="px-4 sm:px-6">
         <button
           type="button"
-          onClick={openInApp}
+          onClick={() => openInApp(false)}
           className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-2xl border border-white/20 bg-white/10 text-white text-sm font-semibold hover:bg-white/15"
         >
           Ouvrir dans l’application
         </button>
+        {deepLinkStatus === 'trying' && (
+          <p className="mt-2 text-xs text-white/70">Ouverture de l’application…</p>
+        )}
+        {deepLinkStatus === 'fallback' && (
+          <p className="mt-2 text-xs text-white/70">Application non détectée. Continue sur le web.</p>
+        )}
       </div>
 
       {/* Document full-bleed */}
@@ -225,7 +255,9 @@ export const RespondToInvitationV2: React.FC<{ token: string }> = ({ token }) =>
               }`}
               title={a.name}
             >
-              {a.subEventId ? `Carte séquence ${idx + 1}` : `Carte ${idx + 1}`}
+              {a.subEventId
+                ? info.subEvents.find((s) => s.id === a.subEventId)?.title || `Carte séquence ${idx + 1}`
+                : `Carte globale ${idx + 1}`}
             </button>
           ))}
         </div>
