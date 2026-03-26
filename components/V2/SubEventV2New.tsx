@@ -8,6 +8,7 @@ import { GuestDetailModal } from '../GuestDetailModal';
 import { SubEventBudgetPage } from '../SubEventBudgetPage';
 import { Input } from '../Input';
 import { V2ChatPanel } from './V2ChatPanel';
+import { V2Card, V2SectionTitle, V2_PAGE_BG, v2BtnDanger, v2BtnPrimary, v2BtnSoft } from './ui';
 
 type SubSection = 'sequence' | 'guests' | 'documents' | 'chat' | 'budget';
 
@@ -264,7 +265,7 @@ export const SubEventV2New: React.FC<{ user: User }> = ({ user }) => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className={`min-h-screen ${V2_PAGE_BG}`}>
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200">
         <div className="page-container content-padding h-16 flex items-center justify-between gap-3">
           <button
@@ -331,25 +332,22 @@ export const SubEventV2New: React.FC<{ user: User }> = ({ user }) => {
           <div className="h-full overflow-y-auto">
             {activeSubSection === 'sequence' && (
               <section className="space-y-5">
-                <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
+                <V2Card className="p-5 sm:p-6">
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-lg font-black text-slate-900">Timeline</h2>
-                      <p className="text-sm text-slate-600 mt-1">Moments clés.</p>
-                    </div>
+                    <V2SectionTitle title="Timeline" subtitle="Moments clés." />
                     {canManageSubProgramHere && (
                       <div className="flex gap-2 flex-wrap justify-end">
-                        <button type="button" onClick={() => setShowMomentModal(true)} className="px-4 py-2 rounded-2xl bg-teal-600 text-white font-semibold text-sm hover:bg-teal-700">
+                        <button type="button" onClick={() => setShowMomentModal(true)} className={v2BtnPrimary}>
                           + Moment
                         </button>
-                        <button type="button" onClick={handleOpenSequenceEdit} className="px-4 py-2 rounded-2xl border border-slate-200 bg-white text-slate-700 font-semibold text-sm hover:bg-slate-50">
+                        <button type="button" onClick={handleOpenSequenceEdit} className={v2BtnSoft}>
                           Modifier
                         </button>
                         <button
                           type="button"
                           onClick={() => void handleDeleteSequence()}
                           disabled={sequenceDeletingId === subEventId}
-                          className="px-4 py-2 rounded-2xl border border-red-200 bg-white text-red-700 font-semibold text-sm hover:bg-red-50 disabled:opacity-60 disabled:cursor-not-allowed"
+                          className={v2BtnDanger}
                         >
                           {sequenceDeletingId === subEventId ? '…' : 'Supprimer'}
                         </button>
@@ -380,7 +378,7 @@ export const SubEventV2New: React.FC<{ user: User }> = ({ user }) => {
                       </div>
                     )}
                   </div>
-                </div>
+                </V2Card>
               </section>
             )}
 

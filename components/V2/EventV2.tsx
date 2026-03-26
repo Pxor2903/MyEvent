@@ -10,6 +10,7 @@ import { EventManagementTab } from '../EventManagementTab';
 import { GuestDetailModal } from '../GuestDetailModal';
 import { Input } from '../Input';
 import { V2ChatPanel } from './V2ChatPanel';
+import { V2Card, V2SectionTitle, V2_PAGE_BG, v2BtnDanger, v2BtnPrimary, v2BtnSoft } from './ui';
 
 type EventSection = 'overview' | 'gestion' | 'program' | 'guests' | 'chat' | 'budget';
 type GestionPanel = 'summary' | 'documents' | 'access';
@@ -239,7 +240,7 @@ export const EventV2: React.FC<{ user: User }> = ({ user }) => {
   const canChatNow = canChat;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className={`min-h-screen ${V2_PAGE_BG}`}>
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200">
         <div className="page-container content-padding h-16 flex items-center justify-between gap-3">
@@ -310,20 +311,20 @@ export const EventV2: React.FC<{ user: User }> = ({ user }) => {
           <div className="h-full overflow-y-auto">
             {activeSection === 'overview' && (
               <section className="space-y-5">
-                <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
-                  <h2 className="text-lg font-black text-slate-900">Description</h2>
+                <V2Card className="p-5 sm:p-6">
+                  <V2SectionTitle title="Description" />
                   <p className="mt-2 text-sm text-slate-600 whitespace-pre-wrap">{event.description || 'Aucune description.'}</p>
-                </div>
+                </V2Card>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
+                  <V2Card className="p-5 lg:col-span-2">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <h3 className="text-base font-bold text-slate-900">Programme</h3>
                         <p className="text-xs text-slate-500 mt-1">Accède à chaque séquence (Timeline, Invités, Docs, Chat).</p>
                       </div>
                       {canManageProgram && (
-                        <button type="button" onClick={() => setShowSequenceModal(true)} className="px-4 py-2 rounded-2xl bg-teal-600 text-white font-semibold text-sm hover:bg-teal-700">
+                        <button type="button" onClick={() => setShowSequenceModal(true)} className={v2BtnPrimary}>
                           + Séquence
                         </button>
                       )}
@@ -354,9 +355,9 @@ export const EventV2: React.FC<{ user: User }> = ({ user }) => {
                         ))
                       )}
                     </div>
-                  </div>
+                  </V2Card>
 
-                  <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <V2Card className="p-5">
                     <h3 className="text-base font-bold text-slate-900">Missions & équipe</h3>
                     <p className="text-xs text-slate-500 mt-1">Vue compacte. Pour gérer, va dans “Gestion”.</p>
                     <div className="mt-4">
@@ -368,26 +369,23 @@ export const EventV2: React.FC<{ user: User }> = ({ user }) => {
                         teamMembers={teamMembers}
                       />
                     </div>
-                  </div>
+                  </V2Card>
                 </div>
               </section>
             )}
 
             {activeSection === 'gestion' && (
               <section className="space-y-5">
-                <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
+                <V2Card className="p-5 sm:p-6">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div>
-                      <h2 className="text-lg font-black text-slate-900">Gestion</h2>
-                      <p className="text-sm text-slate-600 mt-1">Missions, documents, accès & équipe.</p>
-                    </div>
+                    <V2SectionTitle title="Gestion" subtitle="Missions, documents, accès & équipe." />
                     <div className="flex flex-wrap gap-2">
                       <button type="button" onClick={() => setGestionPanel('summary')} className={`px-3 py-2 rounded-2xl border text-sm font-semibold ${gestionPanel === 'summary' ? 'bg-teal-50 border-teal-100 text-teal-900' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}>Aperçu</button>
                       <button type="button" onClick={() => setGestionPanel('documents')} className={`px-3 py-2 rounded-2xl border text-sm font-semibold ${gestionPanel === 'documents' ? 'bg-teal-50 border-teal-100 text-teal-900' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}>Documents</button>
                       <button type="button" onClick={() => setGestionPanel('access')} className={`px-3 py-2 rounded-2xl border text-sm font-semibold ${gestionPanel === 'access' ? 'bg-teal-50 border-teal-100 text-teal-900' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}>Accès</button>
                     </div>
                   </div>
-                </div>
+                </V2Card>
 
                 {gestionPanel === 'summary' && (
                   <EventManagementTab
@@ -416,8 +414,8 @@ export const EventV2: React.FC<{ user: User }> = ({ user }) => {
                 )}
 
                 {gestionPanel === 'access' && (
-                  <div className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
-                    <h3 className="text-lg font-black text-slate-900">Accès & invitation</h3>
+                  <V2Card className="p-4 sm:p-6">
+                    <V2SectionTitle title="Accès & invitation" />
                     <p className="text-sm text-slate-600 mt-1">Informations d’accès + validation des demandes.</p>
                     <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50">
@@ -454,7 +452,7 @@ export const EventV2: React.FC<{ user: User }> = ({ user }) => {
                                       ...event,
                                       organizers: (event.organizers ?? []).filter((x) => x.userId !== o.userId)
                                     })}
-                                    className="px-4 py-2 rounded-2xl border border-amber-200 bg-white text-amber-800 text-sm font-semibold hover:bg-amber-100"
+                                    className={v2BtnSoft}
                                   >
                                     Refuser
                                   </button>
@@ -468,7 +466,7 @@ export const EventV2: React.FC<{ user: User }> = ({ user }) => {
                                           : x
                                       )
                                     })}
-                                    className="px-4 py-2 rounded-2xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700"
+                                    className={v2BtnPrimary}
                                   >
                                     Approuver
                                   </button>
@@ -479,7 +477,7 @@ export const EventV2: React.FC<{ user: User }> = ({ user }) => {
                         );
                       })()}
                     </div>
-                  </div>
+                  </V2Card>
                 )}
               </section>
             )}
@@ -487,12 +485,9 @@ export const EventV2: React.FC<{ user: User }> = ({ user }) => {
             {activeSection === 'program' && (
               <section className="space-y-5">
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-lg font-black text-slate-900">Programme</h2>
-                    <p className="text-sm text-slate-600 mt-1">Séquences du projet.</p>
-                  </div>
+                  <V2SectionTitle title="Programme" subtitle="Séquences du projet." />
                   {canManageProgram && (
-                    <button type="button" onClick={() => setShowSequenceModal(true)} className="px-4 py-2 rounded-2xl bg-teal-600 text-white font-semibold text-sm hover:bg-teal-700">
+                    <button type="button" onClick={() => setShowSequenceModal(true)} className={v2BtnPrimary}>
                       + Séquence
                     </button>
                   )}
@@ -530,7 +525,7 @@ export const EventV2: React.FC<{ user: User }> = ({ user }) => {
                                 type="button"
                                 disabled={sequenceDeletingId === sub.id}
                                 onClick={() => void handleDeleteSequence(sub.id)}
-                                className="shrink-0 px-3 py-2 rounded-2xl border border-red-200 bg-white text-red-700 text-xs font-semibold hover:bg-red-50 disabled:opacity-60 disabled:cursor-not-allowed"
+                                className={`shrink-0 ${v2BtnDanger} text-xs px-3 py-2`}
                               >
                                 {sequenceDeletingId === sub.id ? '…' : 'Supprimer'}
                               </button>
