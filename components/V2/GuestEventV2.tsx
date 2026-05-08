@@ -42,7 +42,10 @@ export const GuestEventV2: React.FC<{ user: User }> = ({ user }) => {
 
   return (
     <div className={`min-h-screen ${V2_PAGE_BG}`}>
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200">
+      <header
+        className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200"
+        style={{ paddingTop: 'calc(1rem + var(--safe-area-top))' }}
+      >
         <div className="page-container content-padding h-16 flex items-center justify-between gap-3">
           <button
             type="button"
@@ -58,7 +61,7 @@ export const GuestEventV2: React.FC<{ user: User }> = ({ user }) => {
         </div>
       </header>
 
-      <main className="page-container content-padding py-6 space-y-5">
+      <main className="page-container content-padding py-6 space-y-5" style={{ paddingBottom: 'calc(5rem + var(--safe-area-bottom))' }}>
         <V2Card className="p-5">
           <V2SectionTitle
             title="Informations"

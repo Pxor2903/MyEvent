@@ -1,5 +1,5 @@
 /**
- * Export de la liste d’invités en Excel (xlsx) ou PDF.
+ * Export de la liste d’invités en Excel (exceljs) ou PDF.
  */
 
 import type { Event, Guest } from '@/core/types';
@@ -58,13 +58,30 @@ export function buildExportRows(event: Event): { headers: string[]; rows: (strin
 }
 
 export async function exportGuestsToExcel(event: Event, filename?: string): Promise<void> {
-  const { utils, writeFile } = await import('xlsx');
+  const ExcelJS = await import('exceljs');
   const { headers, rows } = buildExportRows(event);
-  const ws = utils.aoa_to_sheet([headers, ...rows]);
-  const wb = utils.book_new();
-  utils.book_append_sheet(wb, ws, 'Invités');
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Invités');
+  sheet.addRow(headers);
+  sheet.addRows(rows);
+
+  // Rend l'entête plus lisible dans le fichier exporté.
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true };
+
   const name = filename || `invites-${event.title.replace(/[^a-z0-9]/gi, '-').slice(0, 30)}.xlsx`;
-  writeFile(wb, name);
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 export async function exportGuestsToPdf(event: Event, filename?: string): Promise<void> {

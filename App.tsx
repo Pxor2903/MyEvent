@@ -5,49 +5,61 @@
 import React, { useState, useEffect } from 'react';
 import type { User, AuthMode, RegisterData } from '@/core/types';
 import { authService, supabase } from '@/api';
+import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 import { AuthLayout } from './components/AuthLayout';
 import { LoginForm } from './components/LoginForm';
 import { RegisterForm } from './components/RegisterForm';
-import { Home } from './components/Home';
-import { RespondToInvitation } from './components/RespondToInvitation';
-import { HomeV2 } from './components/V2/HomeV2';
 import { V2Router } from './components/V2/V2Router';
-import { RespondToInvitationV2 } from './components/V2/RespondToInvitationV2';
 import { Toast } from './components/Toast';
 import { BrowserRouter } from 'react-router-dom';
 
-function getInvitationToken(): string | null {
-  if (typeof window === 'undefined') return null;
+function extractInvitationTokenFromUrl(rawUrl: string): string | null {
   try {
-    return new URLSearchParams(window.location.search).get('token');
+    const url = new URL(rawUrl);
+    return url.searchParams.get('token');
   } catch {
     return null;
   }
 }
 
-type UiMode = 'v1' | 'v2';
-function getUiMode(): UiMode {
-  if (typeof window === 'undefined') return 'v1';
-  const v = window.localStorage.getItem('uiMode');
-  return v === 'v2' ? 'v2' : 'v1';
-}
-
 const App: React.FC = () => {
-  const [invitationToken] = useState<string | null>(getInvitationToken);
-  const [uiMode, setUiMode] = useState<UiMode>(getUiMode);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [isLoading, setIsLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<'google' | 'apple' | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [initError, setInitError] = useState<string | null>(null);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    const onUiModeChanged = () => setUiMode(getUiMode());
-    window.addEventListener('uiModeChanged', onUiModeChanged);
+    if (!Capacitor.isNativePlatform()) return;
+
+    let active = true;
+    const sub = CapacitorApp.addListener('appUrlOpen', ({ url }) => {
+      if (!active || !url) return;
+      const token = extractInvitationTokenFromUrl(url);
+      if (token) {
+        window.history.pushState({}, '', `/repondre?token=${encodeURIComponent(token)}`);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }
+    });
+
+    CapacitorApp.getLaunchUrl()
+      .then((result) => {
+        if (!active || !result?.url) return;
+        const token = extractInvitationTokenFromUrl(result.url);
+        if (token) {
+          window.history.pushState({}, '', `/repondre?token=${encodeURIComponent(token)}`);
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }
+      })
+      .catch(() => {});
+
     return () => {
-      window.removeEventListener('uiModeChanged', onUiModeChanged);
+      active = false;
+      void sub.then((s) => s.remove());
     };
   }, []);
 
@@ -56,19 +68,31 @@ const App: React.FC = () => {
     authService.initSocialProviders();
 
     const syncUserFromDb = async () => {
-      const user = await authService.getCurrentUser();
-      if (isMounted) setCurrentUser(user);
-      return user;
+      try {
+        const user = await authService.getCurrentUser();
+        if (!isMounted) return;
+        setCurrentUser(user);
+      } catch (e) {
+        console.error('[Auth] syncUserFromDb:', e);
+        if (!isMounted) return;
+        setCurrentUser(null);
+      } finally {
+        if (isMounted) {
+          setInitError(null);
+          setIsInitializing(false);
+        }
+      }
     };
 
     const { data: authSubscription } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!isMounted) return;
       if (session?.user) {
-        syncUserFromDb();
+        void syncUserFromDb();
       } else {
         setCurrentUser(null);
+        setInitError(null);
+        setIsInitializing(false);
       }
-      setIsInitializing(false);
     });
 
     const init = async () => {
@@ -83,43 +107,20 @@ const App: React.FC = () => {
               showToast("Échec de connexion Google. Réessaie.", "error");
             }
           }
-          if (sessionUser && isMounted) {
-            try {
-              await syncUserFromDb();
-            } catch (e) {
-              console.error('[Auth] syncUserFromDb après OAuth:', e);
-              showToast("Connexion OK mais chargement du profil en erreur. Réessaie.", "error");
-            }
-          }
           if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('auth_redirect_origin');
           window.history.replaceState({}, document.title, window.location.pathname);
-          if (isMounted) setIsInitializing(false);
           return;
-        }
-
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (isMounted) {
-          if (sessionData.session?.user) {
-            try {
-              await syncUserFromDb();
-            } catch (e) {
-              console.error('[Auth] syncUserFromDb au chargement:', e);
-              setCurrentUser(null);
-            }
-          } else {
-            setCurrentUser(null);
-          }
-          setIsInitializing(false);
         }
       } catch (e) {
         console.error('[Auth] init:', e);
-        if (isMounted) setIsInitializing(false);
       }
     };
 
     const timeout = setTimeout(() => {
-      if (isMounted) setIsInitializing(false);
-    }, 12000);
+      if (!isMounted) return;
+      setIsInitializing(false);
+      setInitError("Le chargement prend trop de temps. Vérifiez votre connexion.");
+    }, 8000);
     init().finally(() => clearTimeout(timeout));
 
     return () => {
@@ -138,7 +139,6 @@ const App: React.FC = () => {
     setIsLoading(false);
     
     if (result.success && result.user) {
-      setCurrentUser(result.user);
       setNotice(null);
       showToast("Connexion réussie. Bienvenue !", "success");
     } else {
@@ -169,7 +169,6 @@ const App: React.FC = () => {
     setIsLoading(false);
     
     if (result.success && result.user) {
-      setCurrentUser(result.user);
       setNotice(null);
       showToast("Votre compte a été créé avec succès !", "success");
     } else if (result.needsEmailConfirmation) {
@@ -186,56 +185,61 @@ const App: React.FC = () => {
     showToast("Déconnexion réussie", "success");
   };
 
-  if (invitationToken) {
-    return uiMode === 'v2' ? <RespondToInvitationV2 token={invitationToken} /> : <RespondToInvitation token={invitationToken} />;
-  }
-
   if (isInitializing) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-white gap-4">
+        <div className="text-4xl font-bold text-teal-500">myEvent</div>
+        <div className="w-8 h-8 border-[3px] border-teal-100 border-t-teal-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (initError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-md rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center">
+          <p className="text-sm font-semibold text-amber-800">{initError}</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="w-full max-w-full min-w-0 overflow-x-hidden">
-      {currentUser ? (
-        uiMode === 'v2' ? (
-          <BrowserRouter>
-            <V2Router user={currentUser} onLogout={handleLogout} invitationToken={invitationToken} />
-          </BrowserRouter>
-        ) : (
-          <Home user={currentUser} onLogout={handleLogout} />
-        )
-      ) : (
-        <AuthLayout>
-          <div className="space-y-6">
-            {notice && (
-              <div className="px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm font-semibold">
-                {notice}
+      <BrowserRouter>
+        <V2Router
+          user={currentUser}
+          onLogout={handleLogout}
+          authElement={
+            <AuthLayout>
+              <div className="space-y-6">
+                {notice && (
+                  <div className="px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm font-semibold">
+                    {notice}
+                  </div>
+                )}
+                {authMode === 'login' ? (
+                <LoginForm
+                  onSubmit={handleLogin}
+                  onSocialSubmit={handleSocialLogin}
+                  isLoading={isLoading}
+                  socialLoading={socialLoading}
+                  onSwitch={() => setAuthMode('register')}
+                />
+              ) : (
+                <RegisterForm
+                  onSubmit={handleRegister}
+                  onSocialSubmit={handleSocialLogin}
+                  isLoading={isLoading}
+                  socialLoading={socialLoading}
+                  onSwitch={() => setAuthMode('login')}
+                />
+              )}
               </div>
-            )}
-            {authMode === 'login' ? (
-            <LoginForm 
-              onSubmit={handleLogin} 
-              onSocialSubmit={handleSocialLogin}
-              isLoading={isLoading} 
-              socialLoading={socialLoading}
-              onSwitch={() => setAuthMode('register')} 
-            />
-          ) : (
-            <RegisterForm 
-              onSubmit={handleRegister} 
-              onSocialSubmit={handleSocialLogin}
-              isLoading={isLoading} 
-              socialLoading={socialLoading}
-              onSwitch={() => setAuthMode('login')} 
-            />
-          )}
-          </div>
-        </AuthLayout>
-      )}
+            </AuthLayout>
+          }
+        />
+      </BrowserRouter>
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>
   );

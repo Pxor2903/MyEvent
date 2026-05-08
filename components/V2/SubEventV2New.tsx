@@ -266,7 +266,10 @@ export const SubEventV2New: React.FC<{ user: User }> = ({ user }) => {
 
   return (
     <div className={`min-h-screen ${V2_PAGE_BG}`}>
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200">
+      <header
+        className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200"
+        style={{ paddingTop: 'calc(1rem + var(--safe-area-top))' }}
+      >
         <div className="page-container content-padding h-16 flex items-center justify-between gap-3">
           <button
             type="button"
@@ -328,7 +331,7 @@ export const SubEventV2New: React.FC<{ user: User }> = ({ user }) => {
           </div>
         </aside>
 
-        <main className="flex-1 min-w-0 p-3 sm:p-6 pb-24 md:pb-10 overflow-hidden">
+        <main className="flex-1 min-w-0 p-3 sm:p-6 md:pb-10 overflow-hidden" style={{ paddingBottom: 'calc(5rem + var(--safe-area-bottom))' }}>
           <div className="h-full overflow-y-auto">
             {activeSubSection === 'sequence' && (
               <section className="space-y-5">
@@ -457,7 +460,7 @@ export const SubEventV2New: React.FC<{ user: User }> = ({ user }) => {
         </main>
       </div>
 
-      <div className="md:hidden fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/90 backdrop-blur">
+      <div className="md:hidden fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/90 backdrop-blur" style={{ paddingBottom: 'calc(1rem + var(--safe-area-bottom))' }}>
         <div className="flex items-center justify-between px-2 py-2">
           {navItems.map((item) => (
             <button

@@ -62,3 +62,4 @@ Lancer ces commandes depuis la **racine du repo** (dossier où se trouvent `pack
 - **[docs/ONBOARDING.md](docs/ONBOARDING.md)** — Prise en main pour nouveaux devs.
 - **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** — Supabase, auth, redirects.
 - **[docs/DEPENDENCIES.md](docs/DEPENDENCIES.md)** — Paquets npm et variables d’environnement.
+- **[docs/DEEP_LINKS.md](docs/DEEP_LINKS.md)** — Universal Links / App Links (web -> app).

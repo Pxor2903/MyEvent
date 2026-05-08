@@ -1,36 +1,36 @@
-import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import type { User, Event } from '@/core/types';
-import { HomeV2 } from './HomeV2';
-import { EventV2 } from './EventV2';
-import { SubEventV2New } from './SubEventV2New';
-import { RespondToInvitationV2 } from './RespondToInvitationV2';
-import { GuestEventV2 } from './GuestEventV2';
+import React, { Suspense, lazy } from 'react';
+import { Routes, Route } from 'react-router-dom';
+import type { User } from '@/core/types';
+import { NotFound } from './NotFound';
+
+const HomeV2 = lazy(() => import('./HomeV2').then((m) => ({ default: m.HomeV2 })));
+const EventV2 = lazy(() => import('./EventV2').then((m) => ({ default: m.EventV2 })));
+const SubEventV2New = lazy(() => import('./SubEventV2New').then((m) => ({ default: m.SubEventV2New })));
+const RespondToInvitationV2 = lazy(() => import('./RespondToInvitationV2').then((m) => ({ default: m.RespondToInvitationV2 })));
+const GuestEventV2 = lazy(() => import('./GuestEventV2').then((m) => ({ default: m.GuestEventV2 })));
 
 interface V2RouterProps {
-  user: User;
+  user: User | null;
   onLogout: () => void;
-  /** L’API existante route l’invitation via query `?token=...` (pas un paramètre path). */
-  invitationToken: string | null;
-  /** Événement courant si on veut précharger; optionnel. */
-  initialEvent?: Event | null;
+  authElement: React.ReactElement;
 }
 
-export const V2Router: React.FC<V2RouterProps> = ({ user, onLogout, invitationToken }) => {
+export const V2Router: React.FC<V2RouterProps> = ({ user, onLogout, authElement }) => {
+  const withSuspense = (element: React.ReactElement) => (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-slate-500">Chargement...</div>}>
+      {element}
+    </Suspense>
+  );
+
   return (
     <Routes>
-      <Route path="/" element={<HomeV2 user={user} onLogout={onLogout} />} />
-      <Route path="/event/:eventId" element={<EventV2 user={user} />} />
-      <Route path="/event/:eventId/sub/:subEventId" element={<SubEventV2New user={user} />} />
-      <Route path="/guest/event/:eventId" element={<GuestEventV2 user={user} />} />
+      <Route path="/repondre" element={withSuspense(<RespondToInvitationV2 />)} />
+      <Route path="/" element={user ? withSuspense(<HomeV2 user={user} onLogout={onLogout} />) : authElement} />
+      <Route path="/event/:eventId" element={user ? withSuspense(<EventV2 user={user} />) : authElement} />
+      <Route path="/event/:eventId/sub/:subEventId" element={user ? withSuspense(<SubEventV2New user={user} />) : authElement} />
+      <Route path="/guest/event/:eventId" element={user ? withSuspense(<GuestEventV2 user={user} />) : authElement} />
 
-      {/* Route publique invitation (basée sur query string). */}
-      <Route
-        path="/repondre"
-        element={invitationToken ? <RespondToInvitationV2 token={invitationToken} /> : <Navigate to="/" replace />}
-      />
-
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };

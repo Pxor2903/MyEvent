@@ -47,5 +47,18 @@
 	<true/>
 	<key>NSContactsUsageDescription</key>
 	<string>MyEvent utilise tes contacts pour te permettre de choisir des invités à ajouter à ton événement. Seuls les contacts que tu sélectionnes sont utilisés.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.aaronmimoun.myevent</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>myevent</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

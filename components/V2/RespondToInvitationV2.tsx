@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Logo } from '@/core/constants';
 import { useAsyncAction } from './useAsyncAction';
 
@@ -15,7 +16,9 @@ interface InvitationInfo {
   attachments?: { id: string; name: string; type: string; url: string; subEventId?: string | null }[];
 }
 
-export const RespondToInvitationV2: React.FC<{ token: string }> = ({ token }) => {
+export const RespondToInvitationV2: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token') || '';
   const [info, setInfo] = useState<InvitationInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +63,12 @@ export const RespondToInvitationV2: React.FC<{ token: string }> = ({ token }) =>
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      setError('Lien invalide ou expiré');
+      setInfo(null);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {

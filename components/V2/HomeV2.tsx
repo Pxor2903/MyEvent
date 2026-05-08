@@ -10,21 +10,13 @@ import { EventCard } from '../EventCard';
 import { Footer } from '../Footer';
 import { EventForm } from '../EventForm';
 import { useAsyncAction } from './useAsyncAction';
-
-type UiMode = 'v1' | 'v2';
-
-function getUiMode(): UiMode {
-  if (typeof window === 'undefined') return 'v1';
-  const v = window.localStorage.getItem('uiMode');
-  return v === 'v2' ? 'v2' : 'v1';
-}
+import { SkeletonCard } from './ui/SkeletonCard';
 
 export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogout }) => {
-  const [uiMode, setUiMode] = useState<UiMode>(getUiMode());
   const [view, setView] = useState<HomeView>('dashboard');
   const navigate = useNavigate();
-  const { events, fetchEvents } = useEvents(user.id);
-  const { events: guestEvents, fetchGuestEvents } = useGuestEvents(user);
+  const { events, loading: organizerLoading, fetchEvents } = useEvents(user.id);
+  const { events: guestEvents, loading: guestLoading, fetchGuestEvents } = useGuestEvents(user);
   const [activeRoleView, setActiveRoleView] = useState<'organizer' | 'guest'>('organizer');
   const [providerMode, setProviderMode] = useState(false);
 
@@ -33,13 +25,6 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
   const [joinError, setJoinError] = useState('');
   const { pending: creatingEvent, run: runCreate } = useAsyncAction();
   const { pending: joiningEvent, run: runJoin } = useAsyncAction();
-
-  const toggleUiMode = () => {
-    const next: UiMode = uiMode === 'v2' ? 'v1' : 'v2';
-    setUiMode(next);
-    window.localStorage.setItem('uiMode', next);
-    window.dispatchEvent(new Event('uiModeChanged'));
-  };
 
   const handleCreate = async (data: any) => {
     await runCreate(async () => {
@@ -87,7 +72,10 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="page-container content-padding py-4 flex items-center justify-between gap-3 border-b border-slate-200">
+      <div
+        className="page-container content-padding py-4 flex items-center justify-between gap-3 border-b border-slate-200"
+        style={{ paddingTop: 'calc(1rem + var(--safe-area-top))' }}
+      >
         <div className="flex items-center gap-3 min-w-0">
           <Logo />
           <div className="min-w-0">
@@ -98,15 +86,14 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
 
         <button
           type="button"
-          onClick={toggleUiMode}
+          onClick={onLogout}
           className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium hover:bg-slate-50"
-          title="Basculer l’interface"
         >
-          {uiMode === 'v2' ? 'UI V2' : 'UI V1'}
+          Déconnexion
         </button>
       </div>
 
-      <main className="page-container content-padding py-6 pb-20">
+      <main className="page-container content-padding py-6" style={{ paddingBottom: 'calc(5rem + var(--safe-area-bottom))' }}>
         {view === 'create-event' ? (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 max-w-2xl mx-auto w-full min-w-0">
             <EventForm user={user} onCancel={() => setView('dashboard')} onSubmit={handleCreate} submitting={creatingEvent} />
@@ -165,25 +152,35 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {(activeRoleView === 'organizer' ? events : guestEvents).map((e) => (
-                  <button
-                    key={e.id}
-                    type="button"
-                    onClick={() => {
-                      if (activeRoleView === 'organizer') navigate(`/event/${e.id}`);
-                      else navigate(`/guest/event/${e.id}`);
-                    }}
-                    className="text-left rounded-2xl overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
-                  >
-                    <EventCard event={e} />
-                  </button>
-                ))}
-                {(activeRoleView === 'organizer' ? events : guestEvents).length === 0 && (
-                  <div className="col-span-full rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
-                    {activeRoleView === 'organizer'
-                      ? "Aucun événement organisé pour l'instant."
-                      : "Aucun événement invité trouvé (vérifie email/téléphone sur ton profil)."}
-                  </div>
+                {(activeRoleView === 'organizer' ? organizerLoading : guestLoading) ? (
+                  <>
+                    <SkeletonCard />
+                    <SkeletonCard />
+                    <SkeletonCard />
+                  </>
+                ) : (
+                  <>
+                    {(activeRoleView === 'organizer' ? events : guestEvents).map((e) => (
+                      <button
+                        key={e.id}
+                        type="button"
+                        onClick={() => {
+                          if (activeRoleView === 'organizer') navigate(`/event/${e.id}`);
+                          else navigate(`/guest/event/${e.id}`);
+                        }}
+                        className="text-left rounded-2xl overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
+                      >
+                        <EventCard event={e} />
+                      </button>
+                    ))}
+                    {(activeRoleView === 'organizer' ? events : guestEvents).length === 0 && (
+                      <div className="col-span-full rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+                        {activeRoleView === 'organizer'
+                          ? "Aucun événement organisé pour l'instant."
+                          : "Aucun événement invité trouvé (vérifie email/téléphone sur ton profil)."}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </section>
