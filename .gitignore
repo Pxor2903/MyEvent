@@ -35,3 +35,4 @@ dist-ssr
 code secret client.json
 *.secret.json
 metadata.json
+code secret client.json
