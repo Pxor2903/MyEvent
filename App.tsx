@@ -65,23 +65,55 @@ const App: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
+    let initTimedOut = false;
+    let loadingTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const clearLoadingTimeout = () => {
+      if (loadingTimeoutId !== null) {
+        clearTimeout(loadingTimeoutId);
+        loadingTimeoutId = null;
+      }
+    };
+
     authService.initSocialProviders();
 
-    const syncUserFromDb = async () => {
-      try {
-        const user = await authService.getCurrentUser();
-        if (!isMounted) return;
-        setCurrentUser(user);
-      } catch (e) {
-        console.error('[Auth] syncUserFromDb:', e);
-        if (!isMounted) return;
-        setCurrentUser(null);
-      } finally {
-        if (isMounted) {
-          setInitError(null);
+    loadingTimeoutId = setTimeout(() => {
+      if (!isMounted) return;
+      initTimedOut = true;
+      setInitError(
+        'Impossible de finaliser le chargement sous 8 secondes. Vérifie ta connexion internet, puis actualise la page.'
+      );
+      setIsInitializing(false);
+      loadingTimeoutId = null;
+    }, 8000);
+
+    let syncInFlight: Promise<void> | null = null;
+
+    /** Une seule synchronisation à la fois ; déclenchée uniquement via onAuthStateChange. */
+    const syncUserFromDb = (): Promise<void> => {
+      if (syncInFlight) return syncInFlight;
+      syncInFlight = (async () => {
+        let succeeded = false;
+        try {
+          const user = await authService.getCurrentUser();
+          if (!isMounted) return;
+          setCurrentUser(user);
+          succeeded = true;
+        } catch (e) {
+          console.error('[Auth] syncUserFromDb:', e);
+          if (!isMounted) return;
+          setCurrentUser(null);
+        } finally {
+          syncInFlight = null;
+          if (!isMounted) return;
+          clearLoadingTimeout();
           setIsInitializing(false);
+          if (succeeded || !initTimedOut) {
+            setInitError(null);
+          }
         }
-      }
+      })();
+      return syncInFlight;
     };
 
     const { data: authSubscription } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -89,9 +121,11 @@ const App: React.FC = () => {
       if (session?.user) {
         void syncUserFromDb();
       } else {
+        initTimedOut = false;
         setCurrentUser(null);
         setInitError(null);
         setIsInitializing(false);
+        clearLoadingTimeout();
       }
     });
 
@@ -116,15 +150,11 @@ const App: React.FC = () => {
       }
     };
 
-    const timeout = setTimeout(() => {
-      if (!isMounted) return;
-      setIsInitializing(false);
-      setInitError("Le chargement prend trop de temps. Vérifiez votre connexion.");
-    }, 8000);
-    init().finally(() => clearTimeout(timeout));
+    void init();
 
     return () => {
       isMounted = false;
+      clearLoadingTimeout();
       authSubscription?.subscription?.unsubscribe();
     };
   }, []);

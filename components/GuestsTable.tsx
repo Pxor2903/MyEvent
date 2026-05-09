@@ -6,7 +6,6 @@
 import React, { useState, useCallback } from 'react';
 import type { Event, Guest } from '@/core/types';
 import { canEditGuest, formatQualifierLabel } from '@/core/constants/guests';
-import { exportGuestsToExcel, exportGuestsToPdf } from '@/utils/exportGuests';
 
 const STATUS_LABELS: Record<Guest['status'], string> = {
   pending: 'En attente',
@@ -160,6 +159,7 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
   const handleExportExcel = useCallback(async () => {
     setExporting('excel');
     try {
+      const { exportGuestsToExcel } = await import('@/utils/exportGuests');
       await exportGuestsToExcel(event);
     } finally {
       setExporting(null);
@@ -169,6 +169,7 @@ export const GuestsTable: React.FC<GuestsTableProps> = ({
   const handleExportPdf = useCallback(async () => {
     setExporting('pdf');
     try {
+      const { exportGuestsToPdf } = await import('@/utils/exportGuests');
       await exportGuestsToPdf(event);
     } finally {
       setExporting(null);

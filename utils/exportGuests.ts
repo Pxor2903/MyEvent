@@ -58,7 +58,7 @@ export function buildExportRows(event: Event): { headers: string[]; rows: (strin
 }
 
 export async function exportGuestsToExcel(event: Event, filename?: string): Promise<void> {
-  const ExcelJS = await import('exceljs');
+  const { default: ExcelJS } = await import('exceljs');
   const { headers, rows } = buildExportRows(event);
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Invités');
@@ -85,8 +85,8 @@ export async function exportGuestsToExcel(event: Event, filename?: string): Prom
 }
 
 export async function exportGuestsToPdf(event: Event, filename?: string): Promise<void> {
-  const { jsPDF } = await import('jspdf');
-  const { autoTable } = await import('jspdf-autotable');
+  const { default: jsPDF } = await import('jspdf');
+  const { default: autoTable } = await import('jspdf-autotable');
   const { headers, rows } = buildExportRows(event);
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   doc.setFontSize(14);
