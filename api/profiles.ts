@@ -2,7 +2,7 @@
  * Profils utilisateur : lecture et mise à jour (table profiles Supabase).
  * Utilisé après auth pour stocker nom, email, adresse, etc.
  */
-import type { User } from '@/core/types';
+import type { User, UserRole } from '@/core/types';
 import { supabase } from './client';
 
 const TABLE = 'profiles';
@@ -18,7 +18,13 @@ type DbProfile = {
   zip_code: string | null;
   avatar_url: string | null;
   created_at: string;
+  role?: string | null;
 };
+
+function parseRole(raw: string | null | undefined): UserRole | undefined {
+  if (raw === 'standard' || raw === 'provider' || raw === 'admin') return raw;
+  return undefined;
+}
 
 function fromDb(row: DbProfile): User {
   return {
@@ -31,12 +37,13 @@ function fromDb(row: DbProfile): User {
     city: row.city ?? undefined,
     zipCode: row.zip_code ?? undefined,
     createdAt: row.created_at,
-    avatar: row.avatar_url ?? undefined
+    avatar: row.avatar_url ?? undefined,
+    role: parseRole(row.role)
   };
 }
 
 function toDb(profile: User): DbProfile {
-  return {
+  const row: DbProfile = {
     id: profile.id,
     email: profile.email,
     first_name: profile.firstName,
@@ -48,6 +55,10 @@ function toDb(profile: User): DbProfile {
     avatar_url: profile.avatar ?? null,
     created_at: profile.createdAt
   };
+  if (profile.role !== undefined) {
+    row.role = profile.role;
+  }
+  return row;
 }
 
 export const profilesApi = {

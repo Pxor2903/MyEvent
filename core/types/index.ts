@@ -3,6 +3,8 @@
  * Importer depuis ici : import type { Event, User } from '@/core/types'
  */
 export * from './user';
+export * from './provider';
+export * from './admin';
 export * from './event';
 export * from './auth';
 export * from './chat';

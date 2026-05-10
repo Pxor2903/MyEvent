@@ -8,6 +8,7 @@ export { eventsApi } from './events';
 export { messagesApi } from './messages';
 export { authApi } from './auth';
 export { attachmentsApi, ATTACHMENT_TYPE_LABELS } from './attachments';
+export * from './providers';
 
 import type { User } from '@/core/types';
 import type { ChatMessage, Event } from '@/core/types';

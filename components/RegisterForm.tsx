@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Input } from './Input';
 import { AddressAutocomplete } from './AddressAutocomplete';
-import type { RegisterData } from '@/core/types';
+import type { RegisterData, ProviderCategory } from '@/core/types';
+import { PROVIDER_CATEGORY_OPTIONS } from '@/components/V2/provider/ProviderRegistrationForm';
 
 interface RegisterFormProps {
   onSubmit: (data: RegisterData) => void;
@@ -28,6 +29,8 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
     zipCode: '',
     password: '',
     confirmPassword: '',
+    wantsProvider: false,
+    providerCategory: '' as ProviderCategory | '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -42,6 +45,9 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
     if (!formData.zipCode) newErrors.zipCode = 'Code postal requis';
     if (formData.password.length < 8) newErrors.password = '8 caractères minimum';
     if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Mots de passe différents';
+    if (formData.wantsProvider && !formData.providerCategory) {
+      newErrors.providerCategory = 'Choisis une catégorie pour votre activité.';
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -57,8 +63,22 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validate()) {
-      const { confirmPassword, ...data } = formData;
-      onSubmit(data as RegisterData);
+      const { confirmPassword, wantsProvider, providerCategory, ...rest } = formData;
+      const payload: RegisterData = {
+        firstName: rest.firstName,
+        lastName: rest.lastName,
+        email: rest.email,
+        phone: rest.phone,
+        street: rest.street,
+        city: rest.city,
+        zipCode: rest.zipCode,
+        password: rest.password,
+      };
+      if (wantsProvider) {
+        payload.wantsProvider = true;
+        payload.providerCategory = providerCategory as ProviderCategory;
+      }
+      onSubmit(payload);
     }
   };
 
@@ -93,6 +113,63 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
 
         <Input label="Mot de passe" type="password" placeholder="••••••••" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} error={errors.password} disabled={isAnyLoading} />
         <Input label="Confirmer le mot de passe" type="password" placeholder="••••••••" value={formData.confirmPassword} onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })} error={errors.confirmPassword} disabled={isAnyLoading} />
+
+        <div className="relative py-3">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-slate-200" />
+          </div>
+          <div className="relative flex justify-center">
+            <span className="bg-white px-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">—</span>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-4">
+          <p className="text-sm font-semibold text-slate-800">Vous proposez des services événementiels ?</p>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.wantsProvider}
+              onChange={(e) => {
+                const v = e.target.checked;
+                setFormData((prev) => ({ ...prev, wantsProvider: v, providerCategory: v ? prev.providerCategory : ('' as ProviderCategory | '') }));
+                setErrors((prev) => {
+                  const { providerCategory: _, ...rest } = prev;
+                  return rest;
+                });
+              }}
+              disabled={isAnyLoading}
+              className="mt-1 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <span className="text-sm text-slate-700 leading-snug">Je souhaite m&apos;inscrire comme prestataire</span>
+          </label>
+
+          {formData.wantsProvider && (
+            <>
+              <p className="text-xs text-slate-600 leading-relaxed bg-white/80 rounded-lg px-3 py-2 border border-slate-100">
+                Après votre inscription, vous serez redirigé vers le formulaire prestataire pour compléter votre profil.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Votre catégorie</label>
+                <select
+                  value={formData.providerCategory}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, providerCategory: e.target.value as ProviderCategory | '' }))
+                  }
+                  disabled={isAnyLoading}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                >
+                  <option value="">Choisir une catégorie…</option>
+                  {PROVIDER_CATEGORY_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                {errors.providerCategory ? <p className="mt-1 text-xs text-red-600">{errors.providerCategory}</p> : null}
+              </div>
+            </>
+          )}
+        </div>
 
         <button
           type="submit"

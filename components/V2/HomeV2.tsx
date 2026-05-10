@@ -5,12 +5,16 @@ import { Logo } from '@/core/constants';
 import { dbService } from '@/api';
 import { useEvents } from '@/hooks/useEvents';
 import { useGuestEvents } from '@/hooks/useGuestEvents';
+import { useProviderProfile } from '@/hooks/useProviderProfile';
 import { generateSharePassword } from '@/utils/sharePassword';
 import { EventCard } from '../EventCard';
 import { Footer } from '../Footer';
 import { EventForm } from '../EventForm';
 import { useAsyncAction } from './useAsyncAction';
 import { SkeletonCard } from './ui/SkeletonCard';
+import { ProviderDashboard } from './provider/ProviderDashboard';
+
+type ActiveSpace = 'organizer' | 'provider';
 
 export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogout }) => {
   const [view, setView] = useState<HomeView>('dashboard');
@@ -18,7 +22,8 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
   const { events, loading: organizerLoading, fetchEvents } = useEvents(user.id);
   const { events: guestEvents, loading: guestLoading, fetchGuestEvents } = useGuestEvents(user);
   const [activeRoleView, setActiveRoleView] = useState<'organizer' | 'guest'>('organizer');
-  const [providerMode, setProviderMode] = useState(false);
+  const { profile: providerProfile, isApprovedProvider } = useProviderProfile();
+  const [activeSpace, setActiveSpace] = useState<ActiveSpace>('organizer');
 
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [joinData, setJoinData] = useState({ code: '', password: '' });
@@ -84,17 +89,69 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onLogout}
-          className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium hover:bg-slate-50"
-        >
-          Déconnexion
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => navigate('/profile')}
+            className="flex items-center gap-2 rounded-xl border border-transparent px-2 py-1.5 hover:bg-slate-100 min-w-0 max-w-[200px]"
+            title="Mon profil"
+          >
+            {user.avatar ? (
+              <img src={user.avatar} alt="" className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0" />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-teal-100 text-teal-800 flex items-center justify-center text-xs font-bold border border-teal-200 shrink-0">
+                {(user.firstName?.[0] ?? '').concat(user.lastName?.[0] ?? '').toUpperCase() || '?'}
+              </div>
+            )}
+            <span className="hidden sm:inline text-sm font-semibold text-slate-800 truncate">
+              {user.firstName} {user.lastName}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium hover:bg-slate-50"
+          >
+            Déconnexion
+          </button>
+        </div>
       </div>
 
+      {isApprovedProvider && (
+        <div className="border-b border-slate-200 bg-white">
+          <div className="page-container content-padding py-2.5 flex justify-start sm:justify-center">
+            <div className="inline-flex w-[280px] max-w-full rounded-full border border-slate-200 bg-slate-50 p-1 gap-1">
+              <button
+                type="button"
+                onClick={() => setActiveSpace('organizer')}
+                className={`flex-1 min-h-[40px] rounded-full px-3 py-2 text-sm font-semibold transition-colors ${
+                  activeSpace === 'organizer'
+                    ? 'bg-teal-600 text-white shadow-sm'
+                    : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                🎪 Organisateur
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSpace('provider')}
+                className={`flex-1 min-h-[40px] rounded-full px-3 py-2 text-sm font-semibold transition-colors ${
+                  activeSpace === 'provider'
+                    ? 'bg-teal-600 text-white shadow-sm'
+                    : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                🎯 Prestataire
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main className="page-container content-padding py-6" style={{ paddingBottom: 'calc(5rem + var(--safe-area-bottom))' }}>
-        {view === 'create-event' ? (
+        {activeSpace === 'provider' ? (
+          <ProviderDashboard user={user} />
+        ) : view === 'create-event' ? (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 max-w-2xl mx-auto w-full min-w-0">
             <EventForm user={user} onCancel={() => setView('dashboard')} onSubmit={handleCreate} submitting={creatingEvent} />
           </div>
@@ -114,14 +171,6 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
                 className={`px-4 py-2 rounded-2xl text-sm font-semibold border ${activeRoleView === 'guest' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
               >
                 Invité
-              </button>
-              <button
-                type="button"
-                onClick={() => setProviderMode((v) => !v)}
-                className={`ml-auto px-4 py-2 rounded-2xl text-sm font-semibold border ${providerMode ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
-                title="Prépare le mode prestataire"
-              >
-                {providerMode ? 'Mode prestataire ON' : 'Mode prestataire OFF'}
               </button>
             </section>
             <section className="space-y-4">

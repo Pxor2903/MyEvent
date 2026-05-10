@@ -12,7 +12,7 @@ import { LoginForm } from './components/LoginForm';
 import { RegisterForm } from './components/RegisterForm';
 import { V2Router } from './components/V2/V2Router';
 import { Toast } from './components/Toast';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, useNavigate } from 'react-router-dom';
 
 function extractInvitationTokenFromUrl(rawUrl: string): string | null {
   try {
@@ -23,7 +23,13 @@ function extractInvitationTokenFromUrl(rawUrl: string): string | null {
   }
 }
 
-const App: React.FC = () => {
+const App: React.FC = () => (
+  <BrowserRouter>
+    <AppInner />
+  </BrowserRouter>
+);
+
+function AppInner() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [isLoading, setIsLoading] = useState(false);
@@ -32,6 +38,8 @@ const App: React.FC = () => {
   const [initError, setInitError] = useState<string | null>(null);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const [pendingRegisterProvider, setPendingRegisterProvider] = useState(false);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -163,6 +171,12 @@ const App: React.FC = () => {
     setToast({ message, type });
   };
 
+  useEffect(() => {
+    if (!currentUser || !pendingRegisterProvider) return;
+    navigate('/register-provider', { replace: true });
+    setPendingRegisterProvider(false);
+  }, [currentUser, pendingRegisterProvider, navigate]);
+
   const handleLogin = async (email: string, mdp: string) => {
     setIsLoading(true);
     const result = await authService.login(email, mdp);
@@ -195,24 +209,39 @@ const App: React.FC = () => {
 
   const handleRegister = async (data: RegisterData) => {
     setIsLoading(true);
+    const wantsProvider = data.wantsProvider === true;
     const result = await authService.register(data);
     setIsLoading(false);
-    
+
+    if (
+      result.success &&
+      result.user &&
+      wantsProvider &&
+      data.providerCategory &&
+      typeof sessionStorage !== 'undefined'
+    ) {
+      sessionStorage.setItem('register_provider_category', data.providerCategory);
+    }
+
     if (result.success && result.user) {
       setNotice(null);
-      showToast("Votre compte a été créé avec succès !", "success");
+      showToast('Votre compte a été créé avec succès !', 'success');
+      if (wantsProvider) {
+        setPendingRegisterProvider(true);
+      }
     } else if (result.needsEmailConfirmation) {
       setNotice(`Un email de confirmation a été envoyé à ${data.email}.`);
-      showToast("Confirmez votre email pour activer le compte.", "success");
+      showToast('Confirmez votre email pour activer le compte.', 'success');
     } else {
-      showToast(result.error || "Erreur lors de l'inscription", "error");
+      showToast(result.error || "Erreur lors de l'inscription", 'error');
     }
   };
 
   const handleLogout = () => {
     authService.logout();
     setCurrentUser(null);
-    showToast("Déconnexion réussie", "success");
+    setPendingRegisterProvider(false);
+    showToast('Déconnexion réussie', 'success');
   };
 
   if (isInitializing) {
@@ -236,19 +265,18 @@ const App: React.FC = () => {
 
   return (
     <div className="w-full max-w-full min-w-0 overflow-x-hidden">
-      <BrowserRouter>
-        <V2Router
-          user={currentUser}
-          onLogout={handleLogout}
-          authElement={
-            <AuthLayout>
-              <div className="space-y-6">
-                {notice && (
-                  <div className="px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm font-semibold">
-                    {notice}
-                  </div>
-                )}
-                {authMode === 'login' ? (
+      <V2Router
+        user={currentUser}
+        onLogout={handleLogout}
+        authElement={
+          <AuthLayout>
+            <div className="space-y-6">
+              {notice && (
+                <div className="px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm font-semibold">
+                  {notice}
+                </div>
+              )}
+              {authMode === 'login' ? (
                 <LoginForm
                   onSubmit={handleLogin}
                   onSocialSubmit={handleSocialLogin}
@@ -265,11 +293,10 @@ const App: React.FC = () => {
                   onSwitch={() => setAuthMode('login')}
                 />
               )}
-              </div>
-            </AuthLayout>
-          }
-        />
-      </BrowserRouter>
+            </div>
+          </AuthLayout>
+        }
+      />
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>
   );

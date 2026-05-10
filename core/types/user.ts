@@ -1,3 +1,5 @@
+import type { UserRole } from './admin';
+
 export interface User {
   id: string;
   email: string;
@@ -9,4 +11,5 @@ export interface User {
   zipCode?: string;
   createdAt: string;
   avatar?: string;
+  role?: UserRole; // 'standard' | 'provider' | 'admin'
 }

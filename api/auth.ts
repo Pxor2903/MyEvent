@@ -35,20 +35,21 @@ export const authApi = {
   initSocialProviders(): void {},
 
   async register(userData: RegisterData): Promise<AuthResponse> {
-    const { email, password, ...profileData } = userData;
+    const { email, password, wantsProvider: _wantsProvider, providerCategory: _providerCategory, ...profileFields } =
+      userData;
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: window.location.origin,
         data: {
-          first_name: profileData.firstName,
-          last_name: profileData.lastName,
-          full_name: `${profileData.firstName} ${profileData.lastName}`.trim(),
-          phone: profileData.phone ?? '',
-          street: profileData.street ?? '',
-          city: profileData.city ?? '',
-          zip_code: profileData.zipCode ?? ''
+          first_name: profileFields.firstName,
+          last_name: profileFields.lastName,
+          full_name: `${profileFields.firstName} ${profileFields.lastName}`.trim(),
+          phone: profileFields.phone ?? '',
+          street: profileFields.street ?? '',
+          city: profileFields.city ?? '',
+          zip_code: profileFields.zipCode ?? ''
         }
       }
     });
@@ -56,7 +57,7 @@ export const authApi = {
     const userId = data.user?.id;
     if (!userId) return { success: false, error: 'Création du compte incomplète.' };
     if (!data.session) return { success: true, needsEmailConfirmation: true };
-    const profile: User = { ...profileData, id: userId, email, createdAt: new Date().toISOString() };
+    const profile: User = { ...profileFields, id: userId, email, createdAt: new Date().toISOString() };
     await profilesApi.upsert(profile);
     return { success: true, user: profile };
   },
