@@ -31,6 +31,12 @@ dist-ssr
 *.sln
 *.sw?
 
+# Admin app
+admin/.env
+admin/.env.local
+admin/dist/
+admin/node_modules/
+
 # Secrets
 code secret client.json
 *.secret.json
