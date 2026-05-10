@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { AdminUser } from '../types.ts';
-import { getSupabaseAdmin } from '../api/admin.ts';
+import { supabase } from '../api/admin.ts';
 
 export function useAdminAuth() {
   const [user, setUser] = useState<AdminUser | null>(null);
@@ -8,12 +8,11 @@ export function useAdminAuth() {
 
   useEffect(() => {
     let cancelled = false;
-    const sb = getSupabaseAdmin();
 
     const run = async () => {
       const {
         data: { session },
-      } = await sb.auth.getSession();
+      } = await supabase.auth.getSession();
       if (!session?.user) {
         if (!cancelled) {
           setUser(null);
@@ -23,7 +22,7 @@ export function useAdminAuth() {
       }
 
       const uid = session.user.id;
-      const { data: profile } = await sb.from('profiles').select('*').eq('id', uid).maybeSingle();
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
 
       if (cancelled) return;
 
@@ -36,7 +35,7 @@ export function useAdminAuth() {
           role: 'admin',
         });
       } else {
-        await sb.auth.signOut();
+        await supabase.auth.signOut();
         setUser(null);
       }
       setLoading(false);
@@ -46,7 +45,7 @@ export function useAdminAuth() {
 
     const {
       data: { subscription },
-    } = sb.auth.onAuthStateChange(() => {
+    } = supabase.auth.onAuthStateChange(() => {
       void run();
     });
 

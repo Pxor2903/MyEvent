@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getSupabaseAdmin } from '../api/admin.ts';
+import { supabase } from '../api/admin.ts';
 
 export const LoginAdmin: React.FC = () => {
   const navigate = useNavigate();
@@ -13,8 +13,7 @@ export const LoginAdmin: React.FC = () => {
     e.preventDefault();
     setError(null);
     setPending(true);
-    const sb = getSupabaseAdmin();
-    const { error: signErr } = await sb.auth.signInWithPassword({ email, password });
+    const { error: signErr } = await supabase.auth.signInWithPassword({ email, password });
     setPending(false);
     if (signErr) {
       setError(signErr.message);
