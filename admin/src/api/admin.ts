@@ -3,7 +3,7 @@ import type { AdminAction, PlatformStats, Provider } from '../types.ts';
 
 export const supabase: SupabaseClient = createClient(
   import.meta.env.VITE_SUPABASE_URL as string,
-  import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY as string
+  import.meta.env.VITE_SUPABASE_ANON_KEY as string
 );
 
 /** Prestataires en attente de validation */
