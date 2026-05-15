@@ -5,6 +5,16 @@
 /* myEvent — design system + base (refonte UX/UI responsive) */
 
 :root {
+  /* Palette cognac — HomeV2 / EventCard */
+  --cognac: #C4873A;
+  --cognac-light: #FAF4ED;
+  --cognac-border: rgba(196, 135, 58, 0.2);
+  --dark: #0A0A0A;
+  --bg: #FAFAF7;
+  --card-border: #F0EDE8;
+  --text-muted: #BBB;
+  --text-secondary: #555;
+
   /* Couleurs — palette sobre et raffinée */
   --color-primary: 20 184 166;
   --color-primary-hover: 13 148 136;
@@ -165,6 +175,37 @@ button:focus-visible {
   transform: translateY(0);
   opacity: 1;
   transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+/* HomeV2 / EventCard */
+.event-card-hover:hover {
+  box-shadow: 0 8px 40px rgba(196, 135, 58, 0.12);
+}
+
+.home-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--cognac);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+
+.home-section-label::before {
+  content: '';
+  width: 16px;
+  height: 2px;
+  background: var(--cognac);
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+.join-modal-input:focus {
+  border-color: var(--cognac) !important;
+  box-shadow: 0 0 0 3px rgba(196, 135, 58, 0.15);
 }
 
 /* Masquer la scrollbar quand besoin (onglets, etc.) */
