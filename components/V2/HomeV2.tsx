@@ -39,10 +39,7 @@ function countActiveEvents(events: Event[]): number {
 }
 
 function countTotalGuests(events: Event[]): number {
-  return events.reduce((sum, e) => {
-    const fromGuests = (e.guests ?? []).reduce((s, g) => s + (g.guestCount ?? 1), 0);
-    return sum + fromGuests + (e.generalGuestsCount ?? 0);
-  }, 0);
+  return events.reduce((sum, e) => sum + (e.guests?.length ?? 0), 0);
 }
 
 export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogout }) => {
@@ -237,11 +234,11 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
           gap: 24,
-          padding: '40px 28px 28px',
+          padding: '0 28px 28px',
           alignItems: 'start',
         }}
       >
-        <div>
+        <div style={{ paddingTop: 56, paddingBottom: 40 }}>
           <span
             style={{
               display: 'inline-block',
@@ -260,7 +257,7 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
           <h1
             style={{
               margin: '16px 0 0',
-              fontSize: 38,
+              fontSize: 42,
               fontWeight: 800,
               letterSpacing: '-1.5px',
               color: 'var(--dark)',
@@ -356,7 +353,7 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
         style={{
           padding: '0 28px',
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
           gap: 14,
           paddingBottom: 16,
         }}

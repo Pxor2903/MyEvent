@@ -178,8 +178,18 @@ button:focus-visible {
 }
 
 /* HomeV2 / EventCard */
+.event-card {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  min-height: 0;
+}
+
 .event-card-hover:hover {
   box-shadow: 0 8px 40px rgba(196, 135, 58, 0.12);
+}
+
+.event-card-top-area {
+  position: relative;
 }
 
 .home-section-label {

@@ -42,12 +42,13 @@ function guestCount(event: Event): number {
 const cardBase: React.CSSProperties = {
   position: 'relative',
   aspectRatio: '1 / 1',
+  width: '100%',
+  minHeight: 0,
   borderRadius: 18,
   overflow: 'hidden',
   cursor: 'pointer',
   border: '1px solid var(--card-border)',
   transition: 'box-shadow 0.2s',
-  width: '100%',
 };
 
 function ThreeDotsIcon({ color }: { color: string }) {
@@ -113,10 +114,6 @@ function CardMenu({
         justifyContent: 'center',
         cursor: 'pointer',
         flexShrink: 0,
-        position: 'absolute',
-        top: 10,
-        right: 10,
-        zIndex: 2,
       };
 
   const itemStyle: React.CSSProperties = {
@@ -135,8 +132,12 @@ function CardMenu({
     textAlign: 'left',
   };
 
+  const wrapperStyle: React.CSSProperties = photoMode
+    ? { position: 'relative', zIndex: 5 }
+    : { position: 'absolute', top: 10, right: 10, zIndex: 5 };
+
   return (
-    <div ref={menuRef} style={{ position: 'relative', zIndex: 5 }}>
+    <div ref={menuRef} style={wrapperStyle}>
       <button
         type="button"
         aria-label="Menu"
@@ -153,7 +154,7 @@ function CardMenu({
           style={{
             position: 'absolute',
             top: 42,
-            right: 10,
+            right: photoMode ? 10 : 0,
             background: '#fff',
             border: '1px solid var(--card-border)',
             borderRadius: 12,
@@ -248,7 +249,7 @@ function PhotoCard({
       onClick={onClick}
       onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
       style={cardBase}
-      className="event-card-hover"
+      className="event-card event-card-hover"
     >
       <img
         src={event.image}
@@ -317,11 +318,13 @@ function TextCard({
       onClick={onClick}
       onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
       style={{ ...cardBase, background: '#fff', display: 'flex', flexDirection: 'column' }}
-      className="event-card-hover"
+      className="event-card event-card-hover"
     >
       <div
+        className="event-card-top-area"
         style={{
-          flex: 1,
+          flex: '1 1 0',
+          minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
