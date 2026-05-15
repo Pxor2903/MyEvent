@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Event, HomeView, User } from '@/core/types';
 import { dbService } from '@/api';
@@ -8,43 +8,90 @@ import { useGuestEvents } from '@/hooks/useGuestEvents';
 import { useProviderProfile } from '@/hooks/useProviderProfile';
 import { generateSharePassword } from '@/utils/sharePassword';
 import { EventCard, type EventCardMenuAction } from '../EventCard';
-import { Footer } from '../Footer';
 import { EventForm } from '../EventForm';
 import { useAsyncAction } from './useAsyncAction';
 import { ProviderDashboard } from './provider/ProviderDashboard';
+import './home/home-v2.css';
 
 type ActiveSpace = 'organizer' | 'provider';
+type NavTab = 'home' | 'events' | 'providers' | 'profile' | 'messages';
 
-function getGreeting(): string {
-  const h = new Date().getHours();
-  if (h < 18) return 'Bonjour,';
-  return 'Bonsoir,';
+function useIsDesktop(): boolean {
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const onChange = () => setIsDesktop(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return isDesktop;
+}
+
+function getGreetingWord(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Bonjour';
+  if (hour < 18) return 'Bon après-midi';
+  return 'Bonsoir';
+}
+
+function getInitials(title: string): string {
+  return title
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('');
+}
+
+function formatEventDate(event: Event): string {
+  const raw = event.startDate || event.date;
+  if (!raw) return 'Date à confirmer';
+  return new Date(raw).toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 function countActiveEvents(events: Event[]): number {
-  const now = Date.now();
-  const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
-  return events.filter((e) => {
-    if (e.endDate) {
-      return new Date(e.endDate).getTime() > now;
-    }
-    if (e.startDate) {
-      return new Date(e.startDate).getTime() > thirtyDaysAgo;
-    }
-    if (e.date) {
-      return new Date(e.date).getTime() > thirtyDaysAgo;
-    }
-    return (e.subEvents ?? []).some((se) => se.date && new Date(se.date).getTime() > now);
-  }).length;
+  const now = new Date();
+  return events.filter(
+    (e) => !e.startDate || new Date(e.endDate || e.startDate || '') >= now
+  ).length;
 }
 
-function countTotalGuests(events: Event[]): number {
-  return events.reduce((sum, e) => sum + (e.guests?.length ?? 0), 0);
+function getUpcomingEvent(events: Event[]): Event | undefined {
+  return events
+    .filter((e) => e.startDate && new Date(e.startDate) > new Date())
+    .sort((a, b) => new Date(a.startDate!).getTime() - new Date(b.startDate!).getTime())[0];
 }
+
+function daysUntil(dateIso: string): number {
+  return Math.ceil((new Date(dateIso).getTime() - Date.now()) / 86400000);
+}
+
+function countRecentConfirmed(events: Event[]): number {
+  return events.reduce(
+    (sum, e) => sum + (e.guests?.filter((g) => g.status === 'confirmed').length ?? 0),
+    0
+  );
+}
+
+// TODO: brancher sur getMyConversations() et compter unreadCount > 0
+const UNREAD_MESSAGES = 0;
 
 export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogout }) => {
-  const [view, setView] = useState<HomeView>('dashboard');
   const navigate = useNavigate();
+  const isDesktop = useIsDesktop();
+  const eventsListRef = useRef<HTMLDivElement>(null);
+
+  const [view, setView] = useState<HomeView>('dashboard');
+  const [mobileTab, setMobileTab] = useState<NavTab>('home');
+  const [desktopNav, setDesktopNav] = useState<NavTab>('home');
+
   const { events, loading: organizerLoading, fetchEvents } = useEvents(user.id);
   const { events: guestEvents, loading: guestLoading, fetchGuestEvents } = useGuestEvents(user);
   const [activeRoleView, setActiveRoleView] = useState<'organizer' | 'guest'>('organizer');
@@ -64,7 +111,25 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
   const displayedEvents = activeRoleView === 'organizer' ? events : guestEvents;
   const loading = activeRoleView === 'organizer' ? organizerLoading : guestLoading;
   const activeEventsCount = countActiveEvents(events);
-  const totalGuestsCount = countTotalGuests(events);
+  const upcoming = getUpcomingEvent(events);
+  const daysUntilUpcoming = upcoming?.startDate ? daysUntil(upcoming.startDate) : null;
+  const recentConfirmed = countRecentConfirmed(events);
+
+  const statsEvent = upcoming ?? events[0];
+  const totalGuests = statsEvent?.guests?.length ?? 0;
+  const confirmedGuests =
+    statsEvent?.guests?.filter((g) => g.status === 'confirmed').length ?? 0;
+  const pendingGuests =
+    statsEvent?.guests?.filter((g) => g.status === 'pending').length ?? 0;
+  const declinedGuests =
+    statsEvent?.guests?.filter((g) => g.status === 'declined').length ?? 0;
+
+  const userInitials =
+    (user.firstName?.[0] ?? '').concat(user.lastName?.[0] ?? '').toUpperCase() || '?';
+
+  const scrollToEvents = () => {
+    eventsListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const handleCreate = async (data: Record<string, unknown>) => {
     await runCreate(async () => {
@@ -130,10 +195,8 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file || !photoEventId) return;
-
     const event = events.find((ev) => ev.id === photoEventId);
     if (!event) return;
-
     setUploadingPhoto(true);
     try {
       const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
@@ -143,11 +206,7 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
         contentType: file.type || undefined,
       });
       if (uploadError) throw new Error(uploadError.message);
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('event-files').getPublicUrl(path);
-
+      const { data: { publicUrl } } = supabase.storage.from('event-files').getPublicUrl(path);
       await dbService.saveEvent({ ...event, image: publicUrl });
       fetchEvents();
     } catch (err) {
@@ -159,37 +218,96 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
     }
   };
 
-  const userInitials =
-    (user.firstName?.[0] ?? '').concat(user.lastName?.[0] ?? '').toUpperCase() || '?';
+  const goProviders = () => {
+    if (isApprovedProvider) navigate('/profile/prestataire');
+    else navigate('/profile/devenir-prestataire');
+  };
+
+  const handleMobileTab = (tab: NavTab) => {
+    setMobileTab(tab);
+    if (tab === 'profile') {
+      navigate('/profile');
+      return;
+    }
+    if (tab === 'providers') {
+      goProviders();
+      return;
+    }
+    if (tab === 'events') {
+      scrollToEvents();
+      return;
+    }
+    setMobileTab('home');
+  };
+
+  const handleDesktopNav = (tab: NavTab) => {
+    setDesktopNav(tab);
+    if (tab === 'profile') {
+      navigate('/profile');
+      return;
+    }
+    if (tab === 'providers') {
+      goProviders();
+      return;
+    }
+    if (tab === 'messages') {
+      // Route /messages à créer plus tard
+      return;
+    }
+    if (tab === 'events') {
+      scrollToEvents();
+    }
+  };
+
+  const openEvent = (ev: Event) => {
+    if (activeRoleView === 'organizer') navigate(`/event/${ev.id}`);
+    else navigate(`/guest/event/${ev.id}`);
+  };
+
+  const shell = (content: React.ReactNode) => (
+    <div className="home-v2">
+      {isDesktop && (
+        <DesktopSidebar
+          active={desktopNav}
+          user={user}
+          userInitials={userInitials}
+          onNav={handleDesktopNav}
+          unreadMessages={UNREAD_MESSAGES}
+        />
+      )}
+      <div className="home-v2-main">{content}</div>
+      {!isDesktop && (
+        <MobileBottomBar active={mobileTab} onTab={handleMobileTab} />
+      )}
+    </div>
+  );
 
   if (activeSpace === 'provider') {
-    return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-        <HomeNav user={user} userInitials={userInitials} onLogout={onLogout} />
+    return shell(
+      <>
+        {!isDesktop && <MobileHeader userInitials={userInitials} />}
         {isApprovedProvider && (
           <SpaceSwitcher activeSpace={activeSpace} onChange={setActiveSpace} />
         )}
-        <main style={{ padding: '24px 28px', paddingBottom: 'calc(5rem + var(--safe-area-bottom))' }}>
+        <div style={{ padding: isDesktop ? '24px 32px' : '16px' }}>
           <ProviderDashboard user={user} />
-        </main>
-        <Footer onNavigate={() => {}} />
-      </div>
+        </div>
+      </>
     );
   }
 
   if (view === 'create-event') {
-    return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-        <HomeNav user={user} userInitials={userInitials} onLogout={onLogout} />
+    return shell(
+      <>
+        {!isDesktop && <MobileHeader userInitials={userInitials} />}
         {isApprovedProvider && (
           <SpaceSwitcher activeSpace={activeSpace} onChange={setActiveSpace} />
         )}
-        <main
+        <div
           style={{
-            padding: '24px 28px',
+            padding: isDesktop ? '28px 32px' : '16px',
             maxWidth: 720,
             margin: '0 auto',
-            paddingBottom: 'calc(5rem + var(--safe-area-bottom))',
           }}
         >
           <div
@@ -198,7 +316,6 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
               borderRadius: 20,
               border: '1px solid var(--card-border)',
               padding: '20px 24px',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.06)',
             }}
           >
             <EventForm
@@ -208,200 +325,220 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
               submitting={creatingEvent}
             />
           </div>
-        </main>
-      </div>
+        </div>
+      </>
     );
   }
 
-  return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-      <input
-        ref={photoInputRef}
-        type="file"
-        accept="image/*"
-        hidden
-        onChange={handlePhotoFile}
-      />
+  return shell(
+    <>
+      <input ref={photoInputRef} type="file" accept="image/*" hidden onChange={handlePhotoFile} />
 
-      <HomeNav user={user} userInitials={userInitials} onLogout={onLogout} />
+      {!isDesktop && <MobileHeader userInitials={userInitials} />}
 
       {isApprovedProvider && (
         <SpaceSwitcher activeSpace={activeSpace} onChange={setActiveSpace} />
       )}
 
-      <section
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 24,
-          padding: '0 28px 28px',
-          alignItems: 'start',
-        }}
-      >
-        <div style={{ paddingTop: 56, paddingBottom: 40 }}>
-          <span
-            style={{
-              display: 'inline-block',
-              background: '#F5EAD8',
-              color: 'var(--cognac)',
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              padding: '6px 12px',
-              borderRadius: 100,
-            }}
-          >
-            Tableau de bord
-          </span>
-          <h1
-            style={{
-              margin: '16px 0 0',
-              fontSize: 42,
-              fontWeight: 800,
-              letterSpacing: '-1.5px',
-              color: 'var(--dark)',
-              lineHeight: 1.1,
-            }}
-          >
-            {getGreeting()}
-            <br />
-            <span style={{ color: 'var(--cognac)' }}>{user.firstName}</span>
-          </h1>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <StatBlock
-            dark
-            value={activeEventsCount}
-            label="Événements actifs"
-            icon={
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--cognac)" strokeWidth="2">
-                <rect x="3" y="4" width="18" height="18" rx="2" />
-                <path d="M16 2v4M8 2v4M3 10h18" />
-              </svg>
-            }
-          />
-          <StatBlock
-            value={totalGuestsCount}
-            label="Invités au total"
-            icon={
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--dark)" strokeWidth="2">
-                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
-              </svg>
-            }
-          />
-        </div>
+      <section className="home-v2-hero">
+        <h1 className="home-v2-greeting">
+          {getGreetingWord()}, {user.firstName}.
+        </h1>
       </section>
 
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '0 28px 22px',
-          flexWrap: 'wrap',
-          gap: 12,
-        }}
-      >
-        <RoleTabs active={activeRoleView} onChange={setActiveRoleView} />
-        {activeRoleView === 'organizer' && (
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button
-              type="button"
-              onClick={() => setView('create-event')}
-              style={{
-                background: 'var(--cognac)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 10,
-                fontWeight: 700,
-                fontSize: 14,
-                padding: '10px 18px',
-                cursor: 'pointer',
-              }}
-            >
-              + Créer
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowJoinModal(true)}
-              style={{
-                background: '#fff',
-                border: '1.5px solid #E8E8E8',
-                color: 'var(--text-secondary)',
-                borderRadius: 10,
-                fontWeight: 600,
-                fontSize: 14,
-                padding: '10px 18px',
-                cursor: 'pointer',
-              }}
-            >
-              Rejoindre
-            </button>
-          </div>
-        )}
-      </div>
-
-      <p className="home-section-label" style={{ padding: '0 28px 14px' }}>
-        {activeRoleView === 'organizer' ? 'Mes événements' : 'Invitations reçues'}
-      </p>
-
-      <div
-        style={{
-          padding: '0 28px',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-          gap: 14,
-          paddingBottom: 16,
-        }}
-      >
-        {loading ? (
-          Array.from({ length: 3 }).map((_, i) => (
-            <div
-              key={i}
-              style={{
-                aspectRatio: '1 / 1',
-                borderRadius: 18,
-                background: 'var(--cognac-light)',
-                border: '1px solid var(--card-border)',
-                animation: 'pulse 1.5s ease-in-out infinite',
-              }}
-            />
-          ))
-        ) : displayedEvents.length === 0 ? (
+      <section className="home-v2-stats">
+        <button
+          type="button"
+          className="home-v2-stat home-v2-stat--dark"
+          onClick={scrollToEvents}
+        >
           <div
+            className="home-v2-stat-value"
+            style={{ color: 'var(--cognac)' }}
+          >
+            {activeEventsCount}
+          </div>
+          <div className="home-v2-stat-label" style={{ color: 'rgba(196,135,58,0.5)' }}>
+            Événements actifs
+          </div>
+        </button>
+
+        <button
+          type="button"
+          className="home-v2-stat home-v2-stat--light"
+          onClick={() => {
+            if (upcoming) navigate(`/event/${upcoming.id}`);
+            else setView('create-event');
+          }}
+        >
+          {upcoming && daysUntilUpcoming != null ? (
+            <>
+              <div className="home-v2-stat-value" style={{ color: 'var(--dark)' }}>
+                {daysUntilUpcoming}j
+              </div>
+              <div className="home-v2-stat-label" style={{ color: 'var(--text-muted)' }}>
+                {(upcoming.title.length > 15
+                  ? `${upcoming.title.slice(0, 15)}…`
+                  : upcoming.title)}
+              </div>
+            </>
+          ) : (
+            <div
+              className="home-v2-stat-label"
+              style={{
+                color: 'var(--text-muted)',
+                fontSize: 12,
+                fontWeight: 600,
+                textAlign: 'center',
+                marginTop: 8,
+              }}
+            >
+              Aucun événement à venir
+            </div>
+          )}
+        </button>
+
+        <button
+          type="button"
+          className="home-v2-stat home-v2-stat--light"
+          onClick={() => {
+            /* navigate('/messages') — route à créer */
+          }}
+        >
+          <div
+            className="home-v2-stat-value"
+            style={{ color: UNREAD_MESSAGES > 0 ? 'var(--cognac)' : 'var(--dark)' }}
+          >
+            {UNREAD_MESSAGES}
+          </div>
+          <div
+            className="home-v2-stat-label"
             style={{
-              gridColumn: '1 / -1',
-              textAlign: 'center',
-              padding: 48,
-              color: 'var(--text-secondary)',
-              fontSize: 14,
-              border: '1px dashed var(--card-border)',
-              borderRadius: 18,
-              background: '#fff',
+              color: UNREAD_MESSAGES > 0 ? 'rgba(196,135,58,0.5)' : 'var(--text-muted)',
             }}
           >
-            {activeRoleView === 'organizer'
-              ? "Aucun événement organisé pour l'instant."
-              : 'Aucun événement invité trouvé (vérifie email/téléphone sur ton profil).'}
+            Messages non lus
           </div>
-        ) : (
-          displayedEvents.map((ev) => (
-            <EventCard
-              key={ev.id}
-              event={ev}
-              onClick={() => {
-                if (activeRoleView === 'organizer') navigate(`/event/${ev.id}`);
-                else navigate(`/guest/event/${ev.id}`);
-              }}
-              onMenuAction={activeRoleView === 'organizer' ? handleMenuAction : undefined}
+        </button>
+      </section>
+
+      {recentConfirmed > 0 && (
+        <div className="home-v2-alert">
+          <span className="home-v2-alert-dot" aria-hidden />
+          {recentConfirmed} invité{recentConfirmed > 1 ? 's ont' : ' a'} confirmé leur présence
+        </div>
+      )}
+
+      <div className="home-v2-body">
+        <div className="home-v2-body-main">
+          <div className="home-v2-events-header">
+            <div className="home-v2-role-tabs">
+              <button
+                type="button"
+                className={`home-v2-role-tab${activeRoleView === 'organizer' ? ' home-v2-role-tab--active' : ''}`}
+                onClick={() => setActiveRoleView('organizer')}
+              >
+                Organisateur
+              </button>
+              <button
+                type="button"
+                className={`home-v2-role-tab${activeRoleView === 'guest' ? ' home-v2-role-tab--active' : ''}`}
+                onClick={() => setActiveRoleView('guest')}
+              >
+                Invité
+              </button>
+            </div>
+            {activeRoleView === 'organizer' && (
+              <button
+                type="button"
+                className="home-v2-btn-create"
+                onClick={() => setView('create-event')}
+              >
+                + Créer
+              </button>
+            )}
+          </div>
+
+          <p className="home-v2-section-label">
+            {activeRoleView === 'organizer' ? 'Mes événements' : 'Invitations reçues'}
+          </p>
+
+          <div id="events-list" ref={eventsListRef}>
+            {!isDesktop && (
+              <EventsMobileStrip
+                loading={loading}
+                events={displayedEvents}
+                isOrganizer={activeRoleView === 'organizer'}
+                onOpen={openEvent}
+                onMenuAction={activeRoleView === 'organizer' ? handleMenuAction : undefined}
+                onCreate={() => setView('create-event')}
+              />
+            )}
+
+            {isDesktop && (
+              <EventsDesktopList
+                loading={loading}
+                events={displayedEvents}
+                isOrganizer={activeRoleView === 'organizer'}
+                onOpen={openEvent}
+                onCreate={() => setView('create-event')}
+              />
+            )}
+
+            {!loading && displayedEvents.length === 0 && (
+              <div className="home-v2-empty">
+                <p>
+                  {activeRoleView === 'organizer'
+                    ? 'Aucun événement organisé'
+                    : "Tu n'es invité à aucun événement pour l'instant."}
+                </p>
+                {activeRoleView === 'organizer' && (
+                  <button
+                    type="button"
+                    className="home-v2-btn-create"
+                    style={{ marginTop: 12 }}
+                    onClick={() => setView('create-event')}
+                  >
+                    + Créer mon premier événement
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <aside className="home-v2-body-aside">
+          <div className="home-v2-aside-desktop">
+            {upcoming && daysUntilUpcoming != null && (
+              <CountdownWidget event={upcoming} days={daysUntilUpcoming} />
+            )}
+            <GuestResponsesCard
+              total={totalGuests}
+              confirmed={confirmedGuests}
+              pending={pendingGuests}
+              declined={declinedGuests}
             />
-          ))
-        )}
+          </div>
+          <div className="home-v2-aside-mobile">
+            <GuestResponsesCard
+              total={totalGuests}
+              confirmed={confirmedGuests}
+              pending={pendingGuests}
+              declined={declinedGuests}
+            />
+          </div>
+        </aside>
       </div>
+
+      {!isDesktop && activeRoleView === 'organizer' && (
+        <button type="button" className="home-v2-join-fab" onClick={() => setShowJoinModal(true)}>
+          Rejoindre
+        </button>
+      )}
+
+      {!isApprovedProvider && activeRoleView === 'organizer' && (
+        <ProviderBanner onLearnMore={() => navigate('/profile/devenir-prestataire')} />
+      )}
 
       {uploadingPhoto && (
         <div
@@ -421,209 +558,222 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
         </div>
       )}
 
-      {!providerProfile && activeRoleView === 'organizer' && (
-        <div style={{ padding: '8px 28px 24px' }}>
-          <BecomeProviderBanner onLearnMore={() => navigate('/profile/devenir-prestataire')} />
-        </div>
-      )}
-
-      <Footer onNavigate={() => {}} />
-
-      {showJoinModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 200,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 16,
-            background: 'rgba(10,10,10,0.5)',
-          }}
-          onClick={() => !joiningEvent && setShowJoinModal(false)}
-        >
-          <div
-            style={{
-              background: '#fff',
-              width: '100%',
-              maxWidth: 420,
-              borderRadius: 20,
-              padding: 28,
-              boxShadow: '0 24px 64px rgba(0,0,0,0.12)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: 'var(--dark)' }}>
-              Rejoindre un événement
-            </h3>
-            <p style={{ margin: '8px 0 20px', fontSize: 14, color: 'var(--text-secondary)' }}>
-              Saisis la clé et le mot de passe partagés par l&apos;organisateur.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <JoinInput
-                placeholder="Clé"
-                value={joinData.code}
-                onChange={(code) => setJoinData((p) => ({ ...p, code }))}
-              />
-              <JoinInput
-                placeholder="Mot de passe"
-                type="password"
-                value={joinData.password}
-                onChange={(password) => setJoinData((p) => ({ ...p, password }))}
-              />
-              {joinError && (
-                <p style={{ margin: 0, fontSize: 13, color: '#E53E3E' }}>{joinError}</p>
-              )}
-              <button
-                type="button"
-                onClick={handleJoin}
-                disabled={joiningEvent}
-                style={{
-                  marginTop: 4,
-                  width: '100%',
-                  padding: '12px 16px',
-                  borderRadius: 10,
-                  border: 'none',
-                  background: 'var(--cognac)',
-                  color: '#fff',
-                  fontWeight: 700,
-                  fontSize: 15,
-                  cursor: joiningEvent ? 'wait' : 'pointer',
-                  opacity: joiningEvent ? 0.7 : 1,
-                }}
-              >
-                {joiningEvent ? 'Envoi…' : 'Envoyer'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      {showJoinModal && <JoinModal {...{ joinData, joinError, joiningEvent, setShowJoinModal, setJoinData, handleJoin }} />}
+    </>
   );
 };
 
-function HomeNav({
-  user,
-  userInitials,
-  onLogout,
-}: {
-  user: User;
-  userInitials: string;
-  onLogout: () => void;
-}) {
+/* ——— Sous-composants ——— */
+
+function MobileHeader({ userInitials }: { userInitials: string }) {
   const navigate = useNavigate();
   return (
-    <header
-      style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 50,
-        height: 60,
-        padding: '0 28px',
-        paddingTop: 'var(--safe-area-top)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        background: 'rgba(250,250,247,0.92)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(0,0,0,0.06)',
-      }}
+    <header className="home-v2-mobile-header">
+      <LogoMark />
+      <button
+        type="button"
+        onClick={() => navigate('/profile')}
+        aria-label="Profil"
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: '50%',
+          background: 'var(--cognac-light)',
+          border: '2px solid var(--cognac)',
+          color: 'var(--cognac)',
+          fontSize: 11,
+          fontWeight: 800,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {userInitials}
+      </button>
+    </header>
+  );
+}
+
+function LogoMark() {
+  return (
+    <span style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.5px' }}>
+      <span style={{ color: 'var(--dark)' }}>my</span>
+      <span style={{ color: 'var(--cognac)' }}>Event</span>
+    </span>
+  );
+}
+
+function MobileBottomBar({
+  active,
+  onTab,
+}: {
+  active: NavTab;
+  onTab: (t: NavTab) => void;
+}) {
+  const tab = (id: NavTab, label: string, icon: React.ReactNode) => (
+    <button
+      type="button"
+      className={`home-v2-tab ${active === id ? 'home-v2-tab--active' : 'home-v2-tab--inactive'}`}
+      onClick={() => onTab(id)}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+
+  return (
+    <nav className="home-v2-bottom-bar" aria-label="Navigation principale">
+      {tab(
+        'home',
+        'Accueil',
+        <svg viewBox="0 0 24 24">
+          <rect x="3" y="3" width="8" height="8" rx="1" />
+          <rect x="13" y="3" width="8" height="8" rx="1" />
+          <rect x="3" y="13" width="8" height="8" rx="1" />
+          <rect x="13" y="13" width="8" height="8" rx="1" />
+        </svg>
+      )}
+      {tab(
+        'events',
+        'Événements',
+        <svg viewBox="0 0 24 24">
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <path d="M16 2v4M8 2v4M3 10h18" />
+        </svg>
+      )}
+      {tab(
+        'providers',
+        'Prestataires',
+        <svg viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M20 20l-4-4" />
+        </svg>
+      )}
+      {tab(
+        'profile',
+        'Profil',
+        <svg viewBox="0 0 24 24">
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
+        </svg>
+      )}
+    </nav>
+  );
+}
+
+function DesktopSidebar({
+  active,
+  user,
+  userInitials,
+  onNav,
+  unreadMessages,
+}: {
+  active: NavTab;
+  user: User;
+  userInitials: string;
+  onNav: (t: NavTab) => void;
+  unreadMessages: number;
+}) {
+  const item = (id: NavTab, label: string, icon: React.ReactNode, badge?: number) => (
+    <button
+      type="button"
+      className={`home-v2-nav-item${active === id ? ' home-v2-nav-item--active' : ''}`}
+      onClick={() => onNav(id)}
+    >
+      {icon}
+      {label}
+      {badge != null && badge > 0 ? (
+        <span className="home-v2-nav-badge">{badge}</span>
+      ) : null}
+    </button>
+  );
+
+  return (
+    <aside className="home-v2-sidebar">
+      <div style={{ marginBottom: 32 }}>
+        <span style={{ fontSize: 18, fontWeight: 800 }}>
+          <span style={{ color: '#fff' }}>my</span>
+          <span style={{ color: 'var(--cognac)' }}>Event</span>
+        </span>
+      </div>
+
+      <nav style={{ flex: 1 }}>
+        {item(
+          'home',
+          'Accueil',
+          <svg viewBox="0 0 24 24">
+            <rect x="3" y="3" width="8" height="8" rx="1" />
+            <rect x="13" y="3" width="8" height="8" rx="1" />
+            <rect x="3" y="13" width="8" height="8" rx="1" />
+            <rect x="13" y="13" width="8" height="8" rx="1" />
+          </svg>
+        )}
+        {item(
+          'events',
+          'Événements',
+          <svg viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <path d="M16 2v4M8 2v4M3 10h18" />
+          </svg>
+        )}
+        {item(
+          'providers',
+          'Prestataires',
+          <svg viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M20 20l-4-4" />
+          </svg>
+        )}
+        {item(
+          'messages',
+          'Messages',
+          <svg viewBox="0 0 24 24">
+            <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />
+          </svg>,
+          unreadMessages
+        )}
+        {item(
+          'profile',
+          'Profil',
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
+          </svg>
+        )}
+      </nav>
+
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '10px 8px',
+          marginTop: 'auto',
+        }}
+      >
+        <span
           style={{
-            width: 30,
-            height: 30,
+            width: 36,
+            height: 36,
             borderRadius: 8,
-            background: 'var(--dark)',
+            background: 'rgba(196,135,58,0.2)',
+            border: '1px solid var(--cognac-border)',
+            color: 'var(--cognac)',
+            fontSize: 12,
+            fontWeight: 800,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cognac)" strokeWidth="2">
-            <rect x="3" y="4" width="18" height="18" rx="2" />
-            <path d="M16 2v4M8 2v4M3 10h18" />
-          </svg>
-        </div>
-        <span style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.5px' }}>
-          <span style={{ color: 'var(--dark)' }}>my</span>
-          <span style={{ color: 'var(--cognac)' }}>Event</span>
+          {userInitials}
+        </span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {user.firstName} {user.lastName}
         </span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button
-          type="button"
-          onClick={() => navigate('/profile')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            padding: '4px 8px',
-            borderRadius: 10,
-          }}
-        >
-          {user.avatar ? (
-            <img
-              src={user.avatar}
-              alt=""
-              style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }}
-            />
-          ) : (
-            <span
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: '50%',
-                background: '#F5EAD8',
-                color: 'var(--cognac)',
-                fontSize: 12,
-                fontWeight: 800,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {userInitials}
-            </span>
-          )}
-          <span
-            style={{
-              fontSize: 14,
-              fontWeight: 600,
-              color: 'var(--dark)',
-              maxWidth: 140,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {user.firstName}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={onLogout}
-          style={{
-            fontSize: 13,
-            fontWeight: 600,
-            color: 'var(--text-secondary)',
-            background: '#fff',
-            border: '1px solid #E8E8E8',
-            borderRadius: 8,
-            padding: '8px 12px',
-            cursor: 'pointer',
-          }}
-        >
-          Déconnexion
-        </button>
-      </div>
-    </header>
+    </aside>
   );
 }
 
@@ -634,7 +784,7 @@ function SpaceSwitcher({
   activeSpace: ActiveSpace;
   onChange: (s: ActiveSpace) => void;
 }) {
-  const tab = (id: ActiveSpace, label: string, emoji: string) => (
+  const tab = (id: ActiveSpace, label: string) => (
     <button
       type="button"
       onClick={() => onChange(id)}
@@ -648,15 +798,14 @@ function SpaceSwitcher({
         cursor: 'pointer',
         background: activeSpace === id ? 'var(--dark)' : 'transparent',
         color: activeSpace === id ? '#F5EAD8' : '#888',
-        transition: 'background 0.15s, color 0.15s',
       }}
     >
-      {emoji} {label}
+      {label}
     </button>
   );
 
   return (
-    <div style={{ padding: '12px 28px 0', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+    <div className="home-v2-space-switcher">
       <div
         style={{
           display: 'inline-flex',
@@ -668,156 +817,191 @@ function SpaceSwitcher({
           gap: 2,
         }}
       >
-        {tab('organizer', 'Organisateur', '🎪')}
-        {tab('provider', 'Prestataire', '🎯')}
+        {tab('organizer', '🎪 Organisateur')}
+        {tab('provider', '🎯 Prestataire')}
       </div>
     </div>
   );
 }
 
-function RoleTabs({
-  active,
-  onChange,
+function EventsMobileStrip({
+  loading,
+  events,
+  isOrganizer,
+  onOpen,
+  onMenuAction,
+  onCreate,
 }: {
-  active: 'organizer' | 'guest';
-  onChange: (v: 'organizer' | 'guest') => void;
+  loading: boolean;
+  events: Event[];
+  isOrganizer: boolean;
+  onOpen: (e: Event) => void;
+  onMenuAction?: (action: EventCardMenuAction, eventId: string) => void;
+  onCreate: () => void;
 }) {
-  const btn = (id: 'organizer' | 'guest', label: string) => (
-    <button
-      type="button"
-      onClick={() => onChange(id)}
-      style={{
-        padding: '8px 18px',
-        borderRadius: 100,
-        border: 'none',
-        fontSize: 13,
-        fontWeight: 700,
-        cursor: 'pointer',
-        background: active === id ? 'var(--dark)' : 'transparent',
-        color: active === id ? '#F5EAD8' : '#888',
-      }}
-    >
-      {label}
+  if (loading) {
+    return (
+      <div className="home-v2-events-scroll">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="home-v2-skeleton-card" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="home-v2-events-scroll">
+      {events.map((ev) => (
+        <div key={ev.id} className="home-v2-card-slot">
+          <EventCard event={ev} onClick={() => onOpen(ev)} onMenuAction={onMenuAction} />
+        </div>
+      ))}
+      {isOrganizer && (
+        <button type="button" className="home-v2-new-event" onClick={onCreate}>
+          <span className="home-v2-new-event-icon">+</span>
+          <span>Nouvel événement</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function EventsDesktopList({
+  loading,
+  events,
+  isOrganizer,
+  onOpen,
+  onCreate,
+}: {
+  loading: boolean;
+  events: Event[];
+  isOrganizer: boolean;
+  onOpen: (e: Event) => void;
+  onCreate: () => void;
+}) {
+  if (loading) {
+    return (
+      <div className="home-v2-events-list">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            style={{
+              height: 76,
+              borderRadius: 14,
+              background: 'var(--cognac-light)',
+              animation: 'home-v2-pulse 1.5s ease-in-out infinite',
+            }}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="home-v2-events-list">
+      {events.map((ev) => (
+        <EventRow key={ev.id} event={ev} onClick={() => onOpen(ev)} />
+      ))}
+      {isOrganizer && events.length === 0 ? null : null}
+    </div>
+  );
+}
+
+function EventRow({ event, onClick }: { event: Event; onClick: () => void }) {
+  const guests = event.guests ?? [];
+  const pending = guests.filter((g) => g.status === 'pending').length;
+  const hasPhoto = Boolean(event.image?.trim());
+
+  return (
+    <button type="button" className="home-v2-event-row" onClick={onClick}>
+      <div className="home-v2-event-thumb">
+        {hasPhoto ? (
+          <img src={event.image} alt="" />
+        ) : (
+          getInitials(event.title)
+        )}
+      </div>
+      <div className="home-v2-event-info">
+        <p className="home-v2-event-title">{event.title}</p>
+        <p className="home-v2-event-meta">
+          {formatEventDate(event)} · {guests.length} invité{guests.length !== 1 ? 's' : ''}
+        </p>
+      </div>
+      <span
+        className={`home-v2-event-badge ${pending > 0 ? 'home-v2-event-badge--pending' : 'home-v2-event-badge--ok'}`}
+      >
+        {pending > 0 ? `${pending} en attente` : 'À jour ✓'}
+      </span>
     </button>
   );
+}
 
+function CountdownWidget({ event, days }: { event: Event; days: number }) {
   return (
-    <div
-      style={{
-        background: 'rgba(0,0,0,0.04)',
-        borderRadius: 100,
-        padding: 3,
-        display: 'inline-flex',
-      }}
-    >
-      {btn('organizer', 'Organisateur')}
-      {btn('guest', 'Invité')}
+    <div className="home-v2-countdown">
+      <p className="home-v2-countdown-label">Prochain événement</p>
+      <p className="home-v2-countdown-name">{event.title}</p>
+      <p className="home-v2-countdown-value">{days}</p>
+      <p className="home-v2-countdown-unit">JOURS</p>
     </div>
   );
 }
 
-function StatBlock({
-  value,
-  label,
-  icon,
-  dark,
+function GuestResponsesCard({
+  total,
+  confirmed,
+  pending,
+  declined,
 }: {
-  value: number;
-  label: string;
-  icon: React.ReactNode;
-  dark?: boolean;
+  total: number;
+  confirmed: number;
+  pending: number;
+  declined: number;
 }) {
+  const pct = (n: number) => (total > 0 ? `${(n / total) * 100}%` : '0%');
+
+  const row = (label: string, count: number, color: string) => (
+    <div className="home-v2-progress-row" key={label}>
+      <span className="home-v2-progress-label">{label}</span>
+      <div className="home-v2-progress-track">
+        <div className="home-v2-progress-fill" style={{ width: pct(count), background: color }} />
+      </div>
+      <span className="home-v2-progress-count">{count}</span>
+    </div>
+  );
+
   return (
-    <div
-      style={{
-        background: dark ? 'var(--dark)' : '#fff',
-        border: dark ? 'none' : '1px solid var(--card-border)',
-        borderRadius: 14,
-        padding: '16px 20px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}
-    >
-      <div>
-        <div
-          style={{
-            fontSize: 28,
-            fontWeight: 800,
-            color: dark ? 'var(--cognac)' : 'var(--dark)',
-            letterSpacing: '-0.5px',
-            lineHeight: 1,
-          }}
-        >
-          {value}
-        </div>
-        <div
-          style={{
-            marginTop: 6,
-            fontSize: 12,
-            fontWeight: 500,
-            color: dark ? 'rgba(196,135,58,0.5)' : '#AAA',
-          }}
-        >
-          {label}
-        </div>
-      </div>
-      <div
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: 10,
-          background: dark ? 'rgba(196,135,58,0.15)' : '#F5EAD8',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {icon}
-      </div>
+    <div className="home-v2-responses">
+      <h3 className="home-v2-responses-title">Réponses invités</h3>
+      {row('Confirmés', confirmed, 'var(--cognac)')}
+      {row('En attente', pending, '#E8D8C0')}
+      {row('Déclinés', declined, '#F5EDE0')}
     </div>
   );
 }
 
-function BecomeProviderBanner({ onLearnMore }: { onLearnMore: () => void }) {
+function ProviderBanner({ onLearnMore }: { onLearnMore: () => void }) {
   return (
-    <div
-      style={{
-        background: 'linear-gradient(105deg, #F5EAD8 0%, #FDF5EC 100%)',
-        border: '1px solid var(--cognac-border)',
-        borderRadius: 14,
-        padding: '20px 22px',
-        display: 'flex',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 16,
-      }}
-    >
-      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flex: 1, minWidth: 200 }}>
-        <span style={{ fontSize: 28 }} aria-hidden>
-          ⭐
-        </span>
-        <div>
-          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--dark)' }}>
-            Devenez prestataire
-          </h3>
-          <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-            Proposez vos services aux organisateurs d&apos;événements sur myEvent.
-          </p>
-        </div>
+    <div className="home-v2-provider-banner">
+      <span className="home-v2-provider-icon" aria-hidden>
+        ⭐
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: 13 }}>Devenez prestataire</div>
+        <div style={{ fontSize: 11, color: 'var(--cognac)' }}>Proposez vos services</div>
       </div>
       <button
         type="button"
         onClick={onLearnMore}
         style={{
+          marginLeft: 'auto',
           background: '#fff',
-          border: '1.5px solid var(--cognac-border)',
+          border: '1px solid rgba(196,135,58,0.25)',
           color: 'var(--cognac)',
-          borderRadius: 10,
-          padding: '10px 18px',
+          fontSize: 12,
           fontWeight: 700,
-          fontSize: 14,
+          padding: '6px 12px',
+          borderRadius: 8,
           cursor: 'pointer',
           whiteSpace: 'nowrap',
         }}
@@ -828,33 +1012,102 @@ function BecomeProviderBanner({ onLearnMore }: { onLearnMore: () => void }) {
   );
 }
 
-function JoinInput({
-  placeholder,
-  value,
-  onChange,
-  type = 'text',
+function JoinModal({
+  joinData,
+  joinError,
+  joiningEvent,
+  setShowJoinModal,
+  setJoinData,
+  handleJoin,
 }: {
-  placeholder: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
+  joinData: { code: string; password: string };
+  joinError: string;
+  joiningEvent: boolean;
+  setShowJoinModal: (v: boolean) => void;
+  setJoinData: React.Dispatch<React.SetStateAction<{ code: string; password: string }>>;
+  handleJoin: () => void;
 }) {
   return (
-    <input
-      type={type}
-      placeholder={placeholder}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="join-modal-input"
+    <div
       style={{
-        width: '100%',
-        padding: '12px 14px',
-        borderRadius: 10,
-        border: '1.5px solid #E8E8E8',
-        fontSize: 15,
-        outline: 'none',
-        boxSizing: 'border-box',
+        position: 'fixed',
+        inset: 0,
+        zIndex: 200,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+        background: 'rgba(0,0,0,0.5)',
+        backdropFilter: 'blur(4px)',
       }}
-    />
+      onClick={() => !joiningEvent && setShowJoinModal(false)}
+    >
+      <div
+        style={{
+          background: '#fff',
+          width: '100%',
+          maxWidth: 400,
+          borderRadius: 20,
+          padding: 24,
+          margin: 'auto',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--dark)' }}>
+          Rejoindre un événement
+        </h3>
+        <p style={{ margin: '8px 0 20px', fontSize: 13, color: '#AAA' }}>
+          Entre la clé et le mot de passe fournis par l&apos;organisateur.
+        </p>
+        <input
+          className="join-modal-input"
+          placeholder="Clé"
+          value={joinData.code}
+          onChange={(e) => setJoinData((p) => ({ ...p, code: e.target.value }))}
+          style={joinInputStyle}
+        />
+        <input
+          className="join-modal-input"
+          type="password"
+          placeholder="Mot de passe"
+          value={joinData.password}
+          onChange={(e) => setJoinData((p) => ({ ...p, password: e.target.value }))}
+          style={joinInputStyle}
+        />
+        {joinError && (
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: '#E53E3E' }}>{joinError}</p>
+        )}
+        <button
+          type="button"
+          onClick={handleJoin}
+          disabled={joiningEvent}
+          style={{
+            width: '100%',
+            background: 'var(--cognac)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 12,
+            padding: 13,
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: joiningEvent ? 'wait' : 'pointer',
+            opacity: joiningEvent ? 0.7 : 1,
+          }}
+        >
+          {joiningEvent ? 'Envoi…' : 'Envoyer'}
+        </button>
+      </div>
+    </div>
   );
 }
+
+const joinInputStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '12px 16px',
+  borderRadius: 12,
+  border: '1.5px solid var(--card-border)',
+  fontSize: 14,
+  outline: 'none',
+  marginBottom: 12,
+  boxSizing: 'border-box',
+};
