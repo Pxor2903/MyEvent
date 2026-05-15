@@ -1,28 +1,27 @@
--- Politique pour les photos prestataires (publiques)
-INSERT INTO storage.policies (name, bucket_id, operation, definition)
-VALUES (
-  'Provider photos are public',
-  'event-files',
-  'SELECT',
-  'true'
-) ON CONFLICT DO NOTHING;
+-- Photos prestataires (publiques en lecture)
+CREATE POLICY "Provider photos publiques" ON storage.objects
+  FOR SELECT USING (bucket_id = 'event-files' AND (storage.foldername(name))[1] = 'provider-photos');
 
--- Les prestataires authentifiés peuvent uploader leurs photos
-INSERT INTO storage.policies (name, bucket_id, operation, definition, check_expression)
-VALUES (
-  'Providers can upload their photos',
-  'event-files',
-  'INSERT',
-  'auth.role() = ''authenticated''',
-  '(storage.foldername(name))[1] = ''provider-photos'''
-) ON CONFLICT DO NOTHING;
+-- Upload photos prestataires (authentifié)
+CREATE POLICY "Providers uploadent leurs photos" ON storage.objects
+  FOR INSERT WITH CHECK (
+    bucket_id = 'event-files'
+    AND auth.role() = 'authenticated'
+    AND (storage.foldername(name))[1] = 'provider-photos'
+  );
 
--- Les prestataires authentifiés peuvent uploader leurs documents
-INSERT INTO storage.policies (name, bucket_id, operation, definition, check_expression)
-VALUES (
-  'Providers can upload their documents',
-  'event-files',
-  'INSERT',
-  'auth.role() = ''authenticated''',
-  '(storage.foldername(name))[1] = ''provider-docs'''
-) ON CONFLICT DO NOTHING;
+-- Upload documents justificatifs (authentifié)
+CREATE POLICY "Providers uploadent leurs documents" ON storage.objects
+  FOR INSERT WITH CHECK (
+    bucket_id = 'event-files'
+    AND auth.role() = 'authenticated'
+    AND (storage.foldername(name))[1] = 'provider-docs'
+  );
+
+-- Lecture documents justificatifs (owner uniquement)
+CREATE POLICY "Providers lisent leurs documents" ON storage.objects
+  FOR SELECT USING (
+    bucket_id = 'event-files'
+    AND auth.role() = 'authenticated'
+    AND (storage.foldername(name))[1] = 'provider-docs'
+  );

@@ -81,4 +81,7 @@ export interface PlatformStats {
   pendingProviders: number;
   approvedProviders: number;
   totalEvents: number;
+  usersActiveThisMonth: number;
+  eventsActive: number;
+  usersWithEvents: number;
 }
