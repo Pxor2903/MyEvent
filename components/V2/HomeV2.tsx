@@ -128,7 +128,20 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
     (user.firstName?.[0] ?? '').concat(user.lastName?.[0] ?? '').toUpperCase() || '?';
 
   const scrollToEvents = () => {
-    eventsListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const el = document.getElementById('events-list') ?? eventsListRef.current;
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const goToProfile = () => navigate('/profile');
+
+  const goToProviders = () => {
+    // TODO: navigate('/providers') quand la route existera
+    navigate('/profile');
+  };
+
+  const goToMessages = () => {
+    // TODO: navigate('/messages') quand la route existera
+    console.log('coming soon');
   };
 
   const handleCreate = async (data: Record<string, unknown>) => {
@@ -218,19 +231,14 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
     }
   };
 
-  const goProviders = () => {
-    if (isApprovedProvider) navigate('/profile/prestataire');
-    else navigate('/profile/devenir-prestataire');
-  };
-
   const handleMobileTab = (tab: NavTab) => {
     setMobileTab(tab);
     if (tab === 'profile') {
-      navigate('/profile');
+      goToProfile();
       return;
     }
     if (tab === 'providers') {
-      goProviders();
+      goToProviders();
       return;
     }
     if (tab === 'events') {
@@ -243,15 +251,15 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
   const handleDesktopNav = (tab: NavTab) => {
     setDesktopNav(tab);
     if (tab === 'profile') {
-      navigate('/profile');
+      goToProfile();
       return;
     }
     if (tab === 'providers') {
-      goProviders();
+      goToProviders();
       return;
     }
     if (tab === 'messages') {
-      // Route /messages à créer plus tard
+      goToMessages();
       return;
     }
     if (tab === 'events') {
@@ -272,6 +280,7 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
           user={user}
           userInitials={userInitials}
           onNav={handleDesktopNav}
+          onProfileClick={goToProfile}
           unreadMessages={UNREAD_MESSAGES}
         />
       )}
@@ -352,15 +361,8 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
           className="home-v2-stat home-v2-stat--dark"
           onClick={scrollToEvents}
         >
-          <div
-            className="home-v2-stat-value"
-            style={{ color: 'var(--cognac)' }}
-          >
-            {activeEventsCount}
-          </div>
-          <div className="home-v2-stat-label" style={{ color: 'rgba(196,135,58,0.5)' }}>
-            Événements actifs
-          </div>
+          <div className="home-v2-stat-value home-v2-stat-value--cognac">{activeEventsCount}</div>
+          <div className="home-v2-stat-label home-v2-stat-label--on-dark">Événements actifs</div>
         </button>
 
         <button
@@ -373,52 +375,32 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
         >
           {upcoming && daysUntilUpcoming != null ? (
             <>
-              <div className="home-v2-stat-value" style={{ color: 'var(--dark)' }}>
+              <div className="home-v2-stat-value home-v2-stat-value--dark">
                 {daysUntilUpcoming}j
               </div>
-              <div className="home-v2-stat-label" style={{ color: 'var(--text-muted)' }}>
-                {(upcoming.title.length > 15
+              <div className="home-v2-stat-label home-v2-stat-label--cognac">
+                {upcoming.title.length > 15
                   ? `${upcoming.title.slice(0, 15)}…`
-                  : upcoming.title)}
+                  : upcoming.title}
               </div>
             </>
           ) : (
-            <div
-              className="home-v2-stat-label"
-              style={{
-                color: 'var(--text-muted)',
-                fontSize: 12,
-                fontWeight: 600,
-                textAlign: 'center',
-                marginTop: 8,
-              }}
-            >
-              Aucun événement à venir
-            </div>
+            <>
+              <div className="home-v2-stat-value home-v2-stat-value--dark">—</div>
+              <div className="home-v2-stat-label home-v2-stat-label--cognac">
+                Aucun événement à venir
+              </div>
+            </>
           )}
         </button>
 
         <button
           type="button"
           className="home-v2-stat home-v2-stat--light"
-          onClick={() => {
-            /* navigate('/messages') — route à créer */
-          }}
+          onClick={goToMessages}
         >
-          <div
-            className="home-v2-stat-value"
-            style={{ color: UNREAD_MESSAGES > 0 ? 'var(--cognac)' : 'var(--dark)' }}
-          >
-            {UNREAD_MESSAGES}
-          </div>
-          <div
-            className="home-v2-stat-label"
-            style={{
-              color: UNREAD_MESSAGES > 0 ? 'rgba(196,135,58,0.5)' : 'var(--text-muted)',
-            }}
-          >
-            Messages non lus
-          </div>
+          <div className="home-v2-stat-value home-v2-stat-value--dark">{UNREAD_MESSAGES}</div>
+          <div className="home-v2-stat-label home-v2-stat-label--muted">Messages non lus</div>
         </button>
       </section>
 
@@ -480,7 +462,7 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
                 loading={loading}
                 events={displayedEvents}
                 isOrganizer={activeRoleView === 'organizer'}
-                onOpen={openEvent}
+                onOpen={(ev) => navigate(`/event/${ev.id}`)}
                 onCreate={() => setView('create-event')}
               />
             )}
@@ -537,7 +519,7 @@ export const HomeV2: React.FC<{ user: User; onLogout: () => void }> = ({ user, o
       )}
 
       {!isApprovedProvider && activeRoleView === 'organizer' && (
-        <ProviderBanner onLearnMore={() => navigate('/profile/devenir-prestataire')} />
+        <ProviderBanner onLearnMore={() => navigate('/register-provider')} />
       )}
 
       {uploadingPhoto && (
@@ -667,12 +649,14 @@ function DesktopSidebar({
   user,
   userInitials,
   onNav,
+  onProfileClick,
   unreadMessages,
 }: {
   active: NavTab;
   user: User;
   userInitials: string;
   onNav: (t: NavTab) => void;
+  onProfileClick: () => void;
   unreadMessages: number;
 }) {
   const item = (id: NavTab, label: string, icon: React.ReactNode, badge?: number) => (
@@ -743,13 +727,20 @@ function DesktopSidebar({
         )}
       </nav>
 
-      <div
+      <button
+        type="button"
+        onClick={onProfileClick}
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: 10,
           padding: '10px 8px',
           marginTop: 'auto',
+          border: 'none',
+          background: 'transparent',
+          cursor: 'pointer',
+          width: '100%',
+          textAlign: 'left',
         }}
       >
         <span
@@ -765,6 +756,7 @@ function DesktopSidebar({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            flexShrink: 0,
           }}
         >
           {userInitials}
@@ -772,7 +764,7 @@ function DesktopSidebar({
         <span style={{ fontSize: 13, fontWeight: 600, color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {user.firstName} {user.lastName}
         </span>
-      </div>
+      </button>
     </aside>
   );
 }
@@ -907,7 +899,12 @@ function EventsDesktopList({
   );
 }
 
-function EventRow({ event, onClick }: { event: Event; onClick: () => void }) {
+type EventRowProps = {
+  event: Event;
+  onClick: () => void;
+};
+
+const EventRow: React.FC<EventRowProps> = ({ event, onClick }) => {
   const guests = event.guests ?? [];
   const pending = guests.filter((g) => g.status === 'pending').length;
   const hasPhoto = Boolean(event.image?.trim());
@@ -934,7 +931,7 @@ function EventRow({ event, onClick }: { event: Event; onClick: () => void }) {
       </span>
     </button>
   );
-}
+};
 
 function CountdownWidget({ event, days }: { event: Event; days: number }) {
   return (

@@ -239,6 +239,26 @@
   margin-top: 4px;
 }
 
+.home-v2-stat-value--cognac {
+  color: var(--cognac);
+}
+
+.home-v2-stat-value--dark {
+  color: var(--dark);
+}
+
+.home-v2-stat-label--on-dark {
+  color: rgba(196, 135, 58, 0.5);
+}
+
+.home-v2-stat-label--cognac {
+  color: var(--cognac);
+}
+
+.home-v2-stat-label--muted {
+  color: #bbb;
+}
+
 /* Desktop body grid */
 .home-v2-body {
   display: block;
